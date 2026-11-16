@@ -1844,14 +1844,17 @@
 
   let pendingDiffRestore = null;
 
+  // Parsed in an inert document (DOMParser), so images in an old note aren't
+  // loaded just by comparing it.
   function htmlToText(html) {
-    const div = document.createElement("div");
+    const doc = new DOMParser().parseFromString("<!doctype html><body></body>", "text/html");
+    const div = doc.body;
     div.innerHTML = html;
     div.querySelectorAll("br").forEach(function (br) {
-      br.replaceWith(document.createTextNode("\n"));
+      br.replaceWith(doc.createTextNode("\n"));
     });
     div.querySelectorAll("div, p, li, blockquote, h1, h2, h3, h4, h5, h6").forEach(function (el) {
-      el.prepend(document.createTextNode("\n"));
+      el.prepend(doc.createTextNode("\n"));
     });
     return (div.textContent || "").replace(/^\n/, "").replace(/\n{3,}/g, "\n\n");
   }

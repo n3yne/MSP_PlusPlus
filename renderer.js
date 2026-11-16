@@ -1492,13 +1492,17 @@ document.addEventListener("DOMContentLoaded", function () {
     on(webview, "render-process-gone", function (e) {
       const reason = (e && e.details && e.details.reason) || "unknown";
       if (reason === "clean-exit") return;
+      const lastTitle = titleSpan.textContent;
+      const tabTitleForNotice = function () { return lastTitle && lastTitle !== "Page stopped" ? lastTitle.slice(0, 60) : ""; };
       console.error("[Tabs] Page process gone:", reason);
       titleSpan.textContent = "Page stopped";
       addUniqueNotification({
         id: notifNextId++,
-        type: "tab-crashed",
+        // One notice per tab, so a second crashed tab gets its own Reload button.
+        type: "tab-crashed-" + id,
         title: "A tab stopped working",
-        desc: "The page in a tab closed unexpectedly (" + reason + "). Reload the tab to carry on.",
+        desc: "The page in a tab" + (tabTitleForNotice() ? " (" + tabTitleForNotice() + ")" : "") +
+          " closed unexpectedly (" + reason + "). Reload the tab to carry on.",
         action: {
           label: "Reload tab",
           kind: "callback",

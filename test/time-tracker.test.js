@@ -214,3 +214,59 @@ describe("time-tracker daily summary", () => {
     expect(out[0].id).toBe("l5");
   });
 });
+
+describe("time-tracker main: saving", () => {
+  const fsx = require("fs");
+  const os = require("os");
+  const pathx = require("path");
+  const ttMain = require("../plugins/time-tracker/main");
+
+  function start() {
+    const dir = fsx.mkdtempSync(pathx.join(os.tmpdir(), "msppp-tt-"));
+    const handlers = {};
+    const messages = {};
+    const logs = [];
+    ttMain.init({
+      getDataPath: () => dir,
+      handle: (name, fn) => { handlers[name] = fn; },
+      onMessage: (name, fn) => { messages[name] = fn; },
+      log: (...a) => logs.push(a.join(" ")),
+    });
+    return { dir, handlers, messages, logs, file: pathx.join(dir, "timers.json") };
+  }
+  const timer = (id) => ({ id, key: "T-" + id, siteId: "freshservice", accumulatedMs: 1000 });
+
+  test("a save in flight doesn't overwrite the close-time save", async () => {
+    const t = start();
+    const fsp = require("fs/promises");
+    const orig = fsp.writeFile;
+    let fired = false;
+    const spy = jest.spyOn(fsp, "writeFile").mockImplementation(async function (file, ...rest) {
+      const out = await orig.call(fsp, file, ...rest);
+      if (!fired) { fired = true; t.messages["save-sync"]({ timers: [timer("new")] }); }
+      return out;
+    });
+    try {
+      await t.handlers.save({ timers: [timer("old")] });
+    } finally {
+      spy.mockRestore();
+    }
+    const saved = JSON.parse(fsx.readFileSync(t.file, "utf-8"));
+    expect(saved.timers.map((x) => x.id)).toEqual(["new"]);
+    fsx.rmSync(t.dir, { recursive: true, force: true });
+  });
+
+  test("a failed write is reported, not answered with ok", async () => {
+    const t = start();
+    const fsp = require("fs/promises");
+    const spy = jest.spyOn(fsp, "writeFile").mockRejectedValue(new Error("disk full"));
+    let res;
+    try {
+      res = await t.handlers.save({ timers: [timer("a")] });
+    } finally {
+      spy.mockRestore();
+    }
+    expect(res.ok).toBe(false);
+    fsx.rmSync(t.dir, { recursive: true, force: true });
+  });
+});

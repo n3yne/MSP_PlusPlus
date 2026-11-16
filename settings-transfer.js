@@ -100,12 +100,13 @@ function parseSettingsExport(text, credentialFields) {
 
 // The settings to save after an import: the file's settings replace this PC's,
 // except for the credentials (and what they're tied to) and install-specific
-// keys, which stay as they are here. Settings the file doesn't have fall back
-// to their defaults.
+// keys, which stay as they are here. Settings the file doesn't have (those of a
+// plugin the exporting PC didn't have, say) keep their value here: resetting
+// them could, for example, shorten Note Backup's retention and delete snapshots.
 function mergeImportedSettings(existingRaw, importedSettings, credentialFields) {
   const result = {};
   for (const [key, value] of Object.entries(isPlainObject(existingRaw) ? existingRaw : {})) {
-    if (!UNSAFE_KEYS.has(key) && (isSecretKey(key, credentialFields) || MACHINE_KEYS.has(key))) result[key] = value;
+    if (!UNSAFE_KEYS.has(key)) result[key] = value;
   }
   for (const [key, value] of Object.entries(importedSettings || {})) {
     if (isExportableKey(key, credentialFields)) result[key] = value;

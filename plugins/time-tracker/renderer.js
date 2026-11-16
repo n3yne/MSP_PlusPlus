@@ -258,17 +258,33 @@
 
   // ===================== Saving =====================
 
+  // True when the saved timers couldn't be loaded: nothing is saved then, so
+  // an empty list never replaces them on disk.
+  let loadFailed = false;
+
   let saveTimer = null;
   function scheduleSave() {
     clearTimeout(saveTimer);
+    if (loadFailed) return;
     saveTimer = setTimeout(function () {
-      api.invoke(PLUGIN_ID, "save", { timers: timers, log: log, savedAt: Date.now() }).catch(function (err) {
+      api.invoke(PLUGIN_ID, "save", { timers: timers, log: log, savedAt: Date.now() }).then(function (res) {
+        if (res && res.ok === false) saveFailed(res.error);
+      }, function (err) {
         console.error("[Time Tracker] save:", err);
+        saveFailed();
       });
     }, 400);
   }
 
+  // Shown when the timers couldn't be written, so a failed save isn't silent.
+  function saveFailed(error) {
+    if (!api.ui || typeof api.ui.notify !== "function") return;
+    api.ui.notify({ type: PLUGIN_ID + "-save-failed", title: "Time Tracker: changes not saved",
+      desc: error || "The timers couldn't be saved to disk." });
+  }
+
   window.addEventListener("beforeunload", function () {
+    if (loadFailed) return;
     if (!loaded) return;
     const now = Date.now();
     timers.forEach(function (t) { pauseTimer(t, now); });
@@ -919,6 +935,11 @@
     resumeAfterCrash(timers, store && store.savedAt, Date.now());
   }).catch(function (err) {
     console.error("[Time Tracker] load:", err);
+    loadFailed = true;
+    if (api.ui && typeof api.ui.notify === "function") {
+      api.ui.notify({ type: PLUGIN_ID + "-load-failed", title: "Time Tracker: couldn't load",
+        desc: "Your saved timers couldn't be read, so changes won't be saved until MSP++ restarts." });
+    }
   }).then(function () {
     loaded = true;
     render();

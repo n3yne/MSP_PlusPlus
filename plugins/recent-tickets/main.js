@@ -92,14 +92,27 @@ module.exports = {
       }
     }
 
-    let writing = Promise.resolve();
+    // Each save gets a number. One that a later save (the close-time save too)
+    // has overtaken is dropped instead of being renamed over the newer file, and
+    // the rename is synchronous so a close-time save can't land between the
+    // check and the rename. Resolves false when the write failed.
+    let writing = Promise.resolve(true);
+    let saveGen = 0;
     function writeAsync(store) {
-      writing = writing.then(async function () {
+      const gen = ++saveGen;
+      const result = writing.then(async function () {
+        if (gen !== saveGen) return true;
         const tmp = file + ".tmp";
         await fsp.writeFile(tmp, JSON.stringify(store, null, 2), "utf-8");
-        await fsp.rename(tmp, file);
-      }).catch(function (err) { api.log("Couldn't save recent tickets:", err.message); });
-      return writing;
+        if (gen !== saveGen) {
+          try { await fsp.unlink(tmp); } catch { /* already gone */ }
+          return true;
+        }
+        fs.renameSync(tmp, file);
+        return true;
+      }).catch(function (err) { api.log("Couldn't save recent tickets:", err.message); return false; });
+      writing = result;
+      return result;
     }
 
     api.handle("load", async function () {
@@ -108,12 +121,13 @@ module.exports = {
 
     api.handle("save", async function (data) {
       const store = sanitizeStore(data);
-      await writeAsync(store);
+      if (!(await writeAsync(store))) return { ok: false, error: "Couldn't save the recent tickets to disk." };
       return { ok: true, count: store.entries.length };
     });
 
     // Sent while the window closes, when an awaited reply may never arrive.
     api.onMessage("save-sync", function (data) {
+      saveGen++; // any save still in flight is older than this one
       try {
         const store = sanitizeStore(data);
         const tmp = file + ".close.tmp";

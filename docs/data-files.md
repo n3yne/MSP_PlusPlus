@@ -28,6 +28,8 @@ The folder is still called `note-backups` from before Note Backup became a plugi
 | `main-window-state.json` | R W | Main window size, position and maximized state. |
 | `site-permissions.json` | R W | Saved Allow / Block answers to site permission prompts. Cleared by the reset button in Settings → General. |
 | `plugins-config.json` | R W | Which plugins are turned on. |
+| `settings.json.bak`, `plugins-config.json.bak` | R W | A copy of the file as of the last successful save. Used if the file itself is damaged. |
+| `settings.corrupt-<time>.json`, `plugins-config.corrupt-<time>.json` | W | A copy of a damaged settings or plugin file, kept when it couldn't be read (MSP++ then uses the `.bak` copy and says so). |
 
 ## Note Backup: `DATA\note-backups\`
 
@@ -101,7 +103,7 @@ Electron (Chromium) keeps the browsing data for the tabs here. This is where you
 
 - **Downloads** and **Save Image As** go wherever you pick in the Save dialog. The download list in the app is kept in memory only and is cleared on restart.
 - **Import Plugin** reads the folder you pick.
-- **Export Settings** (Settings → General) writes a `.json` file where you pick, with the contents of `settings.json` and `plugins-config.json` minus API keys and anything tied to them. **Import Settings** reads the file you pick and replaces `settings.json` (keeping the API keys saved on this PC) and the plugin on/off choices in `plugins-config.json`.
+- **Export Settings** (Settings → General) writes a `.json` file where you pick, with the contents of `settings.json` and `plugins-config.json` minus API keys and anything tied to them. **Import Settings** reads the file you pick and replaces the settings it contains in `settings.json` (keeping the API keys saved on this PC, and any setting the file doesn't have, such as those of a plugin the exporting PC didn't have) and the plugin on/off choices in `plugins-config.json`.
 
 ## Logs
 

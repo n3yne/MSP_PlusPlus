@@ -6,9 +6,11 @@ name: Plugin directory
 # "plugin-directory" release, which is a pre-release so the app updater (which
 # follows the latest release) never treats it as an app version.
 #
-# Runs when plugins change on main, or by hand from the Actions tab. Packages
-# are rebuilt from scratch each time; an unchanged plugin gives the same bytes,
-# so re-uploading it changes nothing. Older packages stay on the release, so a
+# Runs when plugins change on main, or by hand from the Actions tab. Only main
+# publishes, and only after approval in the "plugin-directory" environment.
+# Packages are rebuilt from scratch each time; an unchanged plugin gives the
+# same bytes, so re-uploading it changes nothing. A plugin that changed must
+# get a new version, or the build fails. Older packages stay on the release, so a
 # bad version can be rolled back by pointing index.json at the old file.
 on:
   push:
@@ -60,8 +62,18 @@ jobs:
       - name: Test
         run: npm test -- --ci
 
+      # The index.json on the release now, so the build can refuse a plugin that
+      # changed without a new version number. Missing before the first publish.
+      - name: Fetch the published index
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release download plugin-directory --pattern index.json --output published-index.json \
+            || echo "No published index yet"
+
       - name: Build plugin packages and index.json
-        run: node scripts/build-plugin-directory.js dist-plugins
+        run: node scripts/build-plugin-directory.js dist-plugins --published published-index.json
 
       - name: Keep the packages for the publish job
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -74,6 +86,13 @@ jobs:
   publish:
     name: Publish to the plugin-directory release
     needs: build
+    # Only main publishes. A hand-started run from another branch still builds
+    # and tests, but can't put that branch's plugins in front of users.
+    if: github.ref == 'refs/heads/main'
+    # Waits for approval when the "plugin-directory" environment has required
+    # reviewers (Settings > Environments). Every installed MSP++ runs what this
+    # job uploads, so a person signs off on each publish.
+    environment: plugin-directory
     runs-on: ubuntu-latest
     timeout-minutes: 10
     # Only this job can write: it creates the release (and its tag) the first

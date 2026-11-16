@@ -89,6 +89,7 @@ Every plugin must have a `manifest.json` at its root:
 | `minAppVersion` | No | Minimum app version required. Plugins below this threshold are skipped with a warning. |
 | `site` | No | Makes this a site plugin: `{ name, shortName?, hosts, defaultUrl?, chromeUserAgent? }`. See [Site Plugins](sites.md). |
 | `credentials` | No | Setting names that hold secrets, e.g. `["myApiKey"]` (`/^[a-z][A-Za-z0-9]{0,40}$/`). Your settings transformer should encrypt `myApiKey` with `api.encryptCredential` into `myApiKeyEncrypted` and delete the plain value. The app then keeps the encrypted value out of renderer processes (they see a `myApiKeySet` boolean instead), preserves it across saves that don't include a new key, refuses to save a new key it can't encrypt, and deletes it when settings are saved with `myApiKeyRemove: true`. |
+| `sensitiveSettings` | No | *App 0.8.3+.* Settings that a settings import must point out before changing, as `{ "settingName": "Label" }` (up to 10), for example one that sends page loads to another host. When an imported file would set one to a new value, the import prompt lists it with its new value and offers **Import Without These**. |
 
 > **ID rules:** Use only lowercase letters, digits, hyphens, and underscores. Path-traversal characters (`../`, `/`, `\`) cause the plugin to be rejected at load time.
 
@@ -230,9 +231,9 @@ api.setHostRedirects([{ from: "service.acme.com", to: "acme.freshservice.com" }]
 ```
 
 - Both hosts are bare domains. Only an exact `from` host matches, not its subdomains. The target is always `https`, with no port.
-- `to` must be on your plugin's own `site.hosts`, and `from` must not be on any loaded site's hosts, so a plugin can't redirect another site's pages or loop on its own. Pairs that break these rules are skipped with a warning in the log. A plugin without a `site` block can't redirect.
+- `to` must be on your plugin's own `site.hosts`, and `from` must not be on any loaded site's hosts, so a plugin can't redirect another site's pages or loop on its own. From 0.8.3, `from` can't be a sign-in host either (Microsoft, Google, Apple, Okta, Duo, OneLogin, Auth0, Ping, JumpCloud, GitHub and their subdomains). Pairs that break these rules are skipped with a warning in the log. A plugin without a `site` block can't redirect.
 - Only top-level `GET` page loads are redirected. Form posts (such as a sign-in response posted back to `from`), the page's own requests, and `fetch()` calls from `main.js` go through unchanged.
-- The Freshservice plugin uses it for its **Alias Host** setting.
+- The Freshservice plugin uses it for its **Alias Host** setting, and lists those settings in `sensitiveSettings`.
 
 #### `api.setSiteHosts(list)`
 

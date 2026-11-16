@@ -12,6 +12,10 @@
   "credentials": [
     "fsApiKey"
   ],
+  "sensitiveSettings": {
+    "fsAliasHost": "Freshservice alias host (pages on it open from the Freshservice host)",
+    "fsAliasTarget": "Freshservice host the alias opens"
+  },
   "site": {
     "name": "Freshservice",
     "shortName": "FS",

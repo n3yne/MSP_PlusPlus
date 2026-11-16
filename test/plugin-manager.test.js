@@ -37,9 +37,10 @@ describe("plugin-manager", () => {
   });
 
   test("returns percent-encoded file URLs that round-trip to the script path", async () => {
-    const { userData, pluginDir } = makeUserData();
+    const { userData } = makeUserData();
     await pluginManager.initPlugins(userData, {}, ipcMain);
-    const expected = path.join(pluginDir, "renderer.js");
+    // Imported before 0.8, so it was moved out of its data folder first.
+    const expected = path.join(userData, "installed-plugins", "menu-test", "renderer.js");
     const url = pluginManager.getRendererScripts().find((u) => fileURLToPath(u) === expected);
     expect(url).toMatch(/^file:\/\//);
     expect(url).not.toMatch(/#/);
@@ -162,6 +163,15 @@ describe("plugin-manager", () => {
       ]);
     });
 
+    test("the alias can't be a sign-in host, and the Freshservice alias settings are marked sensitive", async () => {
+      const { userData } = makeUserData();
+      await pluginManager.initPlugins(userData,
+        { fsAliasHost: "login.microsoftonline.com", fsAliasTarget: "stranger.freshservice.com" }, ipcMain);
+      expect(pluginManager.getHostRedirects()).toEqual([]);
+      const keys = pluginManager.getSensitiveSettings().filter((s) => s.pluginId === "freshservice").map((s) => s.key);
+      expect(keys).toEqual(["fsAliasHost", "fsAliasTarget"]);
+    });
+
     test("no alias set means no redirects", async () => {
       const { userData } = makeUserData();
       await pluginManager.initPlugins(userData, {}, ipcMain);
@@ -184,6 +194,8 @@ describe("plugin-manager", () => {
         "{ from: 'acme.freshservice.com', to: 'na.helpdesk-example.net' }," + // another site's host
         "{ from: 'same.helpdesk-example.net', to: 'same.helpdesk-example.net' }," + // loop
         "{ from: 'https://x.com/', to: 'na.helpdesk-example.net' }," +      // not a bare host
+        "{ from: 'login.microsoftonline.com', to: 'na.helpdesk-example.net' }," + // sign-in host
+        "{ from: 'accounts.google.com', to: 'na.helpdesk-example.net' }," +  // sign-in host
         "'junk'" +
         "]); };");
       await pluginManager.initPlugins(userData, {}, ipcMain);
@@ -380,8 +392,57 @@ describe("plugin-manager", () => {
       await pluginManager.initPlugins(userData, {}, ipcMain);
       const info = pluginManager.getPluginInfo();
       expect(info.find((p) => p.id === "extra-plugin").source).toBe("imported");
-      expect(info.find((p) => p.id === "menu-test").source).toBe("user");
+      expect(info.find((p) => p.id === "menu-test").source).toBe("imported");
       expect(info.filter((p) => p.id === "time-tracker")).toHaveLength(1);
+    });
+
+    test("a plugin imported before 0.8 moves out of its data folder and loads from installed-plugins", async () => {
+      const { userData, pluginDir } = makeUserData();
+      fs.writeFileSync(path.join(pluginDir, "notes.json"), "{\"kept\":true}");
+      await pluginManager.initPlugins(userData, {}, ipcMain);
+      const record = pluginManager.getPluginInfo().find((p) => p.id === "menu-test");
+      expect(record).toMatchObject({ source: "imported", loaded: true });
+      expect(pluginManager.getRendererScripts().map((u) => fileURLToPath(u)))
+        .toContain(path.join(userData, "installed-plugins", "menu-test", "renderer.js"));
+      // The data folder keeps its data but is no longer a plugin.
+      expect(fs.existsSync(path.join(pluginDir, "manifest.json"))).toBe(false);
+      expect(fs.readFileSync(path.join(pluginDir, "notes.json"), "utf8")).toBe("{\"kept\":true}");
+      expect(JSON.parse(fs.readFileSync(path.join(userData, "installed-plugins", "registry.json"), "utf8"))["menu-test"].source)
+        .toBe("imported");
+    });
+
+    test("code in a data folder no longer loads, even with a newer version", async () => {
+      const { userData } = makeUserData();
+      await pluginManager.initPlugins(userData, {}, ipcMain);
+      // A manifest written into a data folder after the move (e.g. by a plugin bug).
+      const dataDir = path.join(userData, "plugins", "sneaky");
+      fs.mkdirSync(dataDir, { recursive: true });
+      fs.writeFileSync(path.join(dataDir, "manifest.json"), JSON.stringify({ id: "sneaky", version: "1.0.0", main: "main.js" }));
+      fs.writeFileSync(path.join(dataDir, "main.js"), "module.exports = function () {};");
+      const folders = await pluginManager.findPluginFolders(userData);
+      expect(folders.some((f) => f.pluginDir.startsWith(path.join(userData, "plugins") + path.sep))).toBe(false);
+    });
+
+    test("a folder in installed-plugins the registry doesn't list counts as imported", async () => {
+      const { userData } = makeUserData();
+      const dir = path.join(userData, "installed-plugins", "hand-copied");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({ id: "hand-copied", version: "1.0.0" }));
+      await pluginManager.initPlugins(userData, {}, ipcMain);
+      expect(pluginManager.getPluginInfo().find((p) => p.id === "hand-copied").source).toBe("imported");
+    });
+
+    test("manifest sensitiveSettings are collected", async () => {
+      const { userData } = makeUserData();
+      const dir = path.join(userData, "installed-plugins", "alias-plugin");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({
+        id: "alias-plugin", version: "1.0.0",
+        sensitiveSettings: { aliasHost: "Alias host", "bad key": "x", other: 5 },
+      }));
+      await pluginManager.initPlugins(userData, {}, ipcMain);
+      expect(pluginManager.getSensitiveSettings()).toContainEqual({ key: "aliasHost", label: "Alias host", pluginId: "alias-plugin" });
+      expect(pluginManager.getSensitiveSettings().some((s) => s.key === "bad key" || s.key === "other")).toBe(false);
     });
 
     test("changes staged in Settings are applied before plugins load", async () => {

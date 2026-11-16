@@ -7,6 +7,7 @@ const {
   parseSettingsExport,
   mergeImportedSettings,
   pluginChanges,
+  sensitiveChanges,
   defaultExportFileName,
 } = require("../settings-transfer");
 
@@ -164,4 +165,26 @@ describe("pluginChanges", () => {
 
 test("defaultExportFileName uses the local date", () => {
   expect(defaultExportFileName(new Date(2026, 0, 5))).toBe("MSP++ settings 2026-01-05.json");
+});
+
+describe("sensitiveChanges", () => {
+  const watched = [
+    { key: "fsAliasHost", label: "Alias host" },
+    { key: "pluginAutoUpdate", label: "Install plugin updates automatically" },
+    { key: "__proto__", label: "nope" },
+  ];
+
+  test("lists watched settings the import would set to something new", () => {
+    expect(sensitiveChanges({ fsAliasHost: "" }, { fsAliasHost: "login.example.com", pluginAutoUpdate: true }, watched)).toEqual([
+      { key: "fsAliasHost", label: "Alias host", display: "login.example.com" },
+      { key: "pluginAutoUpdate", label: "Install plugin updates automatically", display: "on" },
+    ]);
+  });
+
+  test("leaves out unchanged values, values being cleared and settings not in the file", () => {
+    expect(sensitiveChanges({ fsAliasHost: "a.example.com", pluginAutoUpdate: true },
+      { fsAliasHost: "a.example.com", pluginAutoUpdate: false }, watched)).toEqual([]);
+    expect(sensitiveChanges({}, { theme: "dark" }, watched)).toEqual([]);
+    expect(sensitiveChanges(null, null, watched)).toEqual([]);
+  });
 });

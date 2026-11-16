@@ -40,14 +40,19 @@ function crc32(buf) {
 
 // ===================== Paths =====================
 
+// Names Windows keeps for devices, with or without an extension ("nul.js").
+const WINDOWS_DEVICE_NAME = /^(?:con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])(?:\.|$)/i;
+
 // A zip entry name is safe when it is a relative path made of ordinary parts:
-// no leading slash, no drive letter, no backslash, no "." or ".." parts.
+// no leading slash, no drive letter, no backslash, no "." or ".." parts, and no
+// Windows device names (CON, NUL, AUX...), which can't be files there.
 function isSafeEntryName(name) {
   if (typeof name !== "string" || !name || name.length > 255) return false;
   if (name.includes("\\") || name.includes("\0") || name.startsWith("/")) return false;
   if (/^[a-zA-Z]:/.test(name)) return false;
   const parts = name.replace(/\/$/, "").split("/");
-  return parts.every(p => p && p !== "." && p !== ".." && !/[<>:"|?*]/.test(p) && !/[. ]$/.test(p));
+  return parts.every(p => p && p !== "." && p !== ".." && !/[<>:"|?*]/.test(p) && !/[. ]$/.test(p) &&
+    !WINDOWS_DEVICE_NAME.test(p));
 }
 
 // ===================== Reading =====================

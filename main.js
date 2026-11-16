@@ -926,6 +926,39 @@ function createSettingsWindow(target) {
   settingsWindow.on("closed", () => { settingsWindow = null; });
 }
 
+// Core settings the import prompt names (settingsTransfer.sensitiveChanges);
+// plugins add their own with manifest "sensitiveSettings".
+const CORE_SENSITIVE_SETTINGS = [
+  { key: "pluginAutoUpdate", label: "Install plugin updates automatically" },
+];
+
+// Deletes the stored API keys (and their "set" flags and bindings) of a plugin
+// being removed with its data. Credentials declared by another installed plugin
+// stay.
+async function forgetPluginCredentials(id) {
+  const info = pluginManager.getPluginInfo();
+  const own = (info.find((p) => p.id === id) || {}).credentials || [];
+  const shared = new Set(info.filter((p) => p.id !== id).flatMap((p) => p.credentials || []));
+  const names = own.filter((n) => !shared.has(n));
+  if (!names.length) return;
+  await withSettingsLock(async () => {
+    const raw = await readSettingsFile();
+    let changed = false;
+    for (const key of Object.keys(raw)) {
+      if (names.some((n) => key.startsWith(n))) { delete raw[key]; changed = true; }
+    }
+    if (!changed) return;
+    await saveSettings(raw);
+    const settings = applySettingsDefaults(raw);
+    pluginManager.updateSettings(settings);
+    const publicSettings = toPublicSettings(settings);
+    pluginManager.fireEvent("settings:changed", publicSettings);
+    electron.BrowserWindow.getAllWindows().forEach((win) => {
+      if (!win.isDestroyed()) win.webContents.send("settings-changed", publicSettings);
+    });
+  });
+}
+
 function fromMainWindow(event) {
   return !!(mainWindow && !mainWindow.isDestroyed() && event && event.sender === mainWindow.webContents);
 }
@@ -1197,6 +1230,11 @@ function registerIpcHandlers() {
     const parsed = settingsTransfer.parseSettingsExport(text, pluginManager.getCredentialFields());
     if (!parsed.ok) return { success: false, error: parsed.error };
     const imported = parsed.data;
+    // Settings that change where pages go or what gets installed are named in the
+    // prompt, and can be left out, so a settings file someone sent can't quietly
+    // set them.
+    const sensitive = settingsTransfer.sensitiveChanges(
+      await readSettingsFile(), imported.settings, CORE_SENSITIVE_SETTINGS.concat(pluginManager.getSensitiveSettings()));
 
     const from = [
       imported.appVersion ? "MSP++ " + imported.appVersion : "",
@@ -1204,19 +1242,26 @@ function registerIpcHandlers() {
         ? "on " + new Date(imported.exportedAt).toLocaleString() : "",
     ].filter(Boolean).join(" ");
     const answer = await electron.dialog.showMessageBox(parent, {
-      type: "question",
-      buttons: ["Import", "Cancel"],
-      defaultId: 0,
-      cancelId: 1,
+      type: sensitive.length ? "warning" : "question",
+      buttons: sensitive.length ? ["Import All", "Import Without These", "Cancel"] : ["Import", "Cancel"],
+      defaultId: sensitive.length ? 1 : 0,
+      cancelId: sensitive.length ? 2 : 1,
       noLink: true,
       title: "Import Settings",
       message: "Replace your settings with the ones in this file?",
       detail: (from ? "Exported from " + from + ".\n\n" : "") +
         "This replaces your bookmarks, canned responses, home page and plugin settings. " +
         "API keys aren't in the file, so any keys saved on this PC are kept. " +
-        "Notes, timers and other plugin data aren't changed.",
+        "Notes, timers and other plugin data aren't changed." +
+        (sensitive.length
+          ? "\n\nThe file also changes these. Only import them if you know where the file came from:\n" +
+            sensitive.map((c) => "• " + c.label + ": " + c.display).join("\n")
+          : ""),
     });
-    if (answer.response !== 0) return { cancelled: true };
+    if (answer.response === (sensitive.length ? 2 : 1)) return { cancelled: true };
+    if (sensitive.length && answer.response === 1) {
+      for (const c of sensitive) delete imported.settings[c.key];
+    }
 
     return withSettingsLock(async () => {
       const credentialFields = pluginManager.getCredentialFields();
@@ -1276,8 +1321,10 @@ function registerIpcHandlers() {
   });
 
   // Plugin system: enable or disable a plugin (persisted; takes effect after restart)
-  electron.ipcMain.handle("plugin-set-enabled", async (_event, { id, enabled }) => {
-    if (typeof id !== "string" || typeof enabled !== "boolean") {
+  electron.ipcMain.handle("plugin-set-enabled", async (event, payload) => {
+    if (!fromSettingsWindow(event)) return { success: false, error: "Not available" };
+    const { id, enabled } = payload || {};
+    if (typeof id !== "string" || !/^[a-z0-9][a-z0-9_-]{0,62}$/.test(id) || typeof enabled !== "boolean") {
       return { success: false, error: "Invalid arguments" };
     }
     await pluginManager.setPluginEnabled(id, enabled);
@@ -1302,6 +1349,29 @@ function registerIpcHandlers() {
     if (result.canceled || !result.filePaths.length) {
       return { cancelled: true };
     }
+    const parent = fromSetup ? mainWindow : settingsWindow;
+    // Says what the package is and what it replaces before anything is staged:
+    // a plugin file someone sent can carry any id, including one already installed.
+    const confirm = async (info) => {
+      const label = `${info.name}${info.version ? " v" + info.version : ""}`;
+      const replaces = info.replaces
+        ? `It replaces the installed ${info.replaces.name}${info.replaces.version ? " v" + info.replaces.version : ""}` +
+          (info.replaces.source === "directory" ? " from the plugin directory" : "") + ".\n\n"
+        : "";
+      const answer = await electron.dialog.showMessageBox(parent, {
+        type: "warning",
+        buttons: [info.replaces ? "Replace Plugin" : "Install Plugin", "Cancel"],
+        defaultId: 1,
+        cancelId: 1,
+        noLink: true,
+        title: "Import Plugin",
+        message: `Install ${label}?`,
+        detail: `Plugin id: ${info.id}\n\n` + replaces +
+          "Plugins can read the pages and tickets you open, use your saved API keys and run code on this PC, " +
+          "the same as MSP++ itself. Only install a plugin file you got from someone you trust.",
+      });
+      return answer.response === 0;
+    };
     try {
       const chosen = result.filePaths[0];
       if (!folder) {
@@ -1309,8 +1379,9 @@ function registerIpcHandlers() {
         if (stat.size > 5 * 1024 * 1024) return { success: false, error: "That file is too large to be a plugin" };
       }
       const imported = folder
-        ? pluginDirectory.importPackage({ folder: chosen })
-        : pluginDirectory.importPackage({ buffer: await fsp.readFile(chosen) });
+        ? await pluginDirectory.importPackage({ folder: chosen, confirm })
+        : await pluginDirectory.importPackage({ buffer: await fsp.readFile(chosen), confirm });
+      if (imported.cancelled) return { cancelled: true };
       return Object.assign({ success: true }, imported);
     } catch (err) {
       return { success: false, error: err.message || String(err) };
@@ -1342,6 +1413,10 @@ function registerIpcHandlers() {
     if (typeof id !== "string") return { success: false, error: "Invalid arguments" };
     try {
       const result = pluginDirectory.remove(id, { deleteData: deleteData === true });
+      // "Also delete its saved data" covers its saved API keys too, so a plugin
+      // installed later can't read them. Keys another installed plugin also
+      // declares are kept.
+      if (result.success && deleteData === true) await forgetPluginCredentials(id);
       broadcastPluginDirectory(pluginDirectory.getState());
       return result;
     } catch (err) {

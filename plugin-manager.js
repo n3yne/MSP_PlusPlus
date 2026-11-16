@@ -41,6 +41,11 @@ const _discoveredPlugins = [];
 // Collected from disabled plugins too, so their stored keys stay protected.
 const _credentialFields = [];
 const CREDENTIAL_NAME_PATTERN = /^[a-z][A-Za-z0-9]{0,40}$/;
+// Settings a plugin wants pointed out before a settings import changes them
+// (manifest "sensitiveSettings": { "settingName": "Label shown to the user" }),
+// such as one that sends page loads to another host. { key, label, pluginId }.
+const _sensitiveSettings = [];
+const MAX_SENSITIVE_SETTINGS = 10;
 
 // Sites declared by loaded plugins in their manifests ("site": { ... }) — see docs/sites.md.
 // Core uses them for the things it has to do before any page loads: the home page
@@ -86,6 +91,16 @@ let _rebuildMenu = null;
 // site block is only recorded after its init() has run.
 const _hostRedirectRequests = new Map();
 const MAX_HOST_REDIRECTS = 10;
+// Sign-in and identity hosts no plugin may redirect away from, whatever its
+// settings say: a redirect from one of these could hand a sign-in page to
+// someone else's site. Matches the host and its subdomains.
+const PROTECTED_REDIRECT_SOURCES = [
+  "microsoftonline.com", "microsoft.com", "live.com", "windows.net", "microsoftonline.us",
+  "office.com", "office365.com", "msauth.net", "msftauth.net",
+  "google.com", "googleapis.com", "apple.com", "icloud.com",
+  "okta.com", "oktapreview.com", "duosecurity.com", "onelogin.com", "auth0.com",
+  "pingidentity.com", "pingone.com", "jumpcloud.com", "github.com",
+];
 // Called with no arguments whenever a plugin changes its redirects (main.js re-installs them).
 let _hostRedirectsListener = null;
 
@@ -211,13 +226,18 @@ function setSiteHostsListener(fn) {
 
 // Pairs a plugin may actually use: both hosts bare domains, `to` on one of that
 // plugin's own site hosts, and `from` on nobody's site hosts (so a plugin can't
-// take over another site, or redirect its own pages in a loop).
+// take over another site, or redirect its own pages in a loop), and not a
+// sign-in host (PROTECTED_REDIRECT_SOURCES).
 function validHostRedirects(pluginId) {
   const own = _sites.find(si => si.pluginId === pluginId);
   if (!own) return [];
   const extraHosts = [].concat(...siteExtraHosts().values());
   const out = [];
   for (const r of _hostRedirectRequests.get(pluginId) || []) {
+    if (hostMatchesSite(r.from, { hosts: PROTECTED_REDIRECT_SOURCES })) {
+      console.warn(`[PluginManager] Plugin "${pluginId}" redirect from "${r.from}" is a sign-in host — skipped`);
+      continue;
+    }
     if (_sites.some(si => hostMatchesSite(r.from, si)) || extraHosts.includes(r.from)) {
       console.warn(`[PluginManager] Plugin "${pluginId}" redirect from "${r.from}" is a site host — skipped`);
       continue;
@@ -474,7 +494,7 @@ async function loadPlugin(pluginDir, source, ipcMain) {
     version: manifest.version || "",
     description: manifest.description || "",
     category: PluginCategories.normalizeCategory(manifest.category),
-    source,         // "bundled" | "directory" | "imported" | "user" (imported before 0.8)
+    source,         // "bundled" | "directory" | "imported" (a file, folder or unknown source)
     dir: pluginDir,
     enabled,
     loaded: false,
@@ -500,6 +520,15 @@ async function loadPlugin(pluginDir, source, ipcMain) {
       flag: name + "Set",
       remove: name + "Remove",
     });
+  }
+
+  const sensitive = manifest.sensitiveSettings;
+  if (sensitive && typeof sensitive === "object" && !Array.isArray(sensitive)) {
+    for (const [key, label] of Object.entries(sensitive).slice(0, MAX_SENSITIVE_SETTINGS)) {
+      if (!/^[a-z][A-Za-z0-9]{0,60}$/.test(key) || typeof label !== "string" || !label.trim()) continue;
+      if (_sensitiveSettings.some(x => x.key === key)) continue;
+      _sensitiveSettings.push({ key, label: label.trim().slice(0, 80), pluginId: id });
+    }
   }
 
   if (!enabled) {
@@ -601,22 +630,24 @@ async function loadPlugin(pluginDir, source, ipcMain) {
 
 // ===================== Public API =====================
 
-// Every plugin folder to load, one per plugin id. Plugins come from three places:
+// Every plugin folder to load, one per plugin id. Plugins come from two places:
 //   <app>/plugins/<id>                 bundled with the app
 //   <data>/installed-plugins/<id>      installed from the plugin directory or a file
-//   <data>/plugins/<id>                imported before 0.8 (shares the plugin's data folder)
-// When the same id is in more than one place, the newest version wins, and a
-// tie goes to the bundled copy. So a fixed bundled plugin can be shipped through
-// the directory before the next app release.
+// Plugins imported before 0.8 lived in their data folder (<data>/plugins/<id>);
+// applyPending moves them to installed-plugins, and code never loads from a data
+// folder. When the same id is in both places, the newer version wins, and a tie
+// goes to the bundled copy. So a fixed bundled plugin can be shipped through the
+// directory before the next app release.
 async function findPluginFolders(userData) {
   const registry = PluginDirectory.readRegistry(userData);
   const searchDirs = [
     { dir: path.join(__dirname, "plugins"), source: () => "bundled" },
     {
       dir: path.join(userData, PluginDirectory.INSTALLED_DIR),
-      source: (id) => (registry[id] && registry[id].source === "imported" ? "imported" : "directory"),
+      // Only an install the registry says came from the directory counts as one;
+      // anything else (imported, or a folder copied in by hand) is "imported".
+      source: (id) => (registry[id] && registry[id].source === "directory" ? "directory" : "imported"),
     },
-    { dir: path.join(userData, "plugins"), source: () => "user" },
   ];
 
   const candidates = [];
@@ -634,9 +665,7 @@ async function findPluginFolders(userData) {
       let manifest = null;
       try {
         manifest = JSON.parse(await fsp.readFile(path.join(pluginDir, "manifest.json"), "utf-8"));
-      } catch { /* no manifest: a plugin's data folder, or broken — loadPlugin logs it */ }
-      // Plugin data folders (<data>/plugins/<id> without a manifest) aren't plugins.
-      if (!manifest && dir === path.join(userData, "plugins")) continue;
+      } catch { /* no manifest: broken — loadPlugin logs it */ }
       candidates.push({
         pluginDir,
         id: manifest && typeof manifest.id === "string" ? manifest.id : null,
@@ -675,6 +704,7 @@ async function initPlugins(userData, initialSettings, ipcMain, rebuildMenuFn) {
   _pluginsConfigFile = path.join(userData, "note-backups", "plugins-config.json");
   _discoveredPlugins.length = 0; // Clear on re-init
   _credentialFields.length = 0;
+  _sensitiveSettings.length = 0;
   _sites.length = 0;
   for (const key of Object.keys(_pluginDefaultSettings)) delete _pluginDefaultSettings[key];
   _pluginValidators.length = 0;
@@ -801,6 +831,11 @@ function getCredentialFields() {
   return _credentialFields.map(c => Object.assign({}, c));
 }
 
+// [{ key, label, pluginId }] from manifests' "sensitiveSettings" (disabled plugins included).
+function getSensitiveSettings() {
+  return _sensitiveSettings.map(x => Object.assign({}, x));
+}
+
 function getPluginDefaultSettings() {
   return Object.assign({}, _pluginDefaultSettings);
 }
@@ -848,6 +883,7 @@ module.exports = {
   validatePluginSettings,
   transformSettingsForSave,
   getCredentialFields,
+  getSensitiveSettings,
   getSites,
   findSiteForUrl,
   getHostRedirects,

@@ -318,5 +318,54 @@ describe("metrics bar scraping", () => {
       await jest.advanceTimersByTimeAsync(10000);
       expect(cardValues(t.items)).toEqual(["12", "4"]);
     });
+
+    test("an app left open over the weekend resets at the first refresh of the new week", async () => {
+      jest.setSystemTime(new Date(2026, 10, 13, 16, 0)); // Friday
+      const t = setup({
+        settings: WEEK_SETTINGS,
+        reads: [{ open: "12", done: "4" }],
+      });
+      await jest.advanceTimersByTimeAsync(10000);
+      expect(cardValues(t.items)).toEqual(["12", "4"]);
+      expect(t.cache().done.value).toBe("4");
+
+      jest.setSystemTime(new Date(2026, 10, 16, 8, 0)); // Monday, same session
+      t.refresh.emit("click");
+      await jest.advanceTimersByTimeAsync(10000);
+      // "done" started the week at 0 and last week's 4 is held back; "open" doesn't reset.
+      expect(cardValues(t.items)).toEqual(["12", "0"]);
+      expect(t.cache().done.prevValue).toBe("4");
+    });
+
+    test("a weekly target is ignored for a field that doesn't reset", async () => {
+      jest.setSystemTime(new Date(2026, 10, 12, 16, 0)); // Thursday afternoon
+      const settings = JSON.parse(JSON.stringify(WEEK_SETTINGS));
+      settings.metricsProgressEnabled = true;
+      settings.metricsBarDashboards[0].fields[0].weeklyTarget = "40";
+      settings.metricsBarDashboards[0].fields[1].weeklyTarget = "40";
+      const t = setup({ settings, reads: [{ open: "1", done: "1" }] });
+      await jest.advanceTimersByTimeAsync(10000);
+      expect(t.items.children[0].title).not.toMatch(/On track/);
+      expect(t.items.children[0].classList.contains("metrics-progress-behind")).toBe(false);
+      expect(t.items.children[1].title).toMatch(/On track/);
+      expect(t.items.children[1].classList.contains("metrics-progress-behind")).toBe(true);
+    });
+
+    test("a dashboard on the Freshservice alias host isn't reported as signed out", async () => {
+      const settings = JSON.parse(JSON.stringify(WEEK_SETTINGS));
+      settings.metricsBarDashboards[0].url = "https://service.example.com/a/dashboard/7";
+      settings.fsAliasHost = "service.example.com";
+      settings.fsAliasTarget = "acme.freshservice.com";
+      const t = setup({
+        settings,
+        reads: [{ open: null, done: null }],
+        finalUrl: "https://acme.freshservice.com/a/dashboard/7",
+        cached: { open: { value: "12", ts: Date.now() }, done: { value: "4", ts: Date.now() } },
+      });
+      await jest.advanceTimersByTimeAsync(60000);
+      const staleTitle = t.items.children[0].children[2].title;
+      expect(staleTitle).toMatch(/Could not refresh/);
+      expect(staleTitle).not.toMatch(/signed out/);
+    });
   });
 });

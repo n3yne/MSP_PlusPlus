@@ -71,34 +71,53 @@
     });
   } catch { /* start fresh */ }
 
-  // Zero out cached values from a previous work week so stale numbers
-  // don't persist into the new week before the first successful scrape.
-  (function () {
-    const _workDays = appSettings.metricsWorkDays || [1, 2, 3, 4, 5];
-    const _weekEndDay = typeof appSettings.metricsWorkWeekEndDay === "number" ? appSettings.metricsWorkWeekEndDay : 5;
-    let _weekStartDay = -1;
+  // The day the work week starts on (0 = Sunday … 6 = Saturday): the first work
+  // day after the configured week-end day, or -1 when no work days are set.
+  function weekStartDayOf(settings) {
+    const workDays = settings.metricsWorkDays || [1, 2, 3, 4, 5];
+    const weekEndDay = typeof settings.metricsWorkWeekEndDay === "number" ? settings.metricsWorkWeekEndDay : 5;
     for (let i = 1; i <= 7; i++) {
-      const c = (_weekEndDay + i) % 7;
-      if (_workDays.includes(c)) { _weekStartDay = c; break; }
+      const c = (weekEndDay + i) % 7;
+      if (workDays.includes(c)) return c;
     }
-    if (_weekStartDay === -1) return;
-    const _now = new Date();
-    const _weekStart = new Date(_now);
-    _weekStart.setDate(_weekStart.getDate() - (_now.getDay() - _weekStartDay + 7) % 7);
-    _weekStart.setHours(0, 0, 0, 0);
-    const _weekStartMs = _weekStart.getTime();
-    let _changed = false;
+    return -1;
+  }
+
+  // Midnight at the start of the current work week, or null when no work days
+  // are set.
+  function weekStartDate(settings, now) {
+    const startDay = weekStartDayOf(settings);
+    if (startDay === -1) return null;
+    const d = new Date(now || new Date());
+    d.setDate(d.getDate() - (d.getDay() - startDay + 7) % 7);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }
+
+  // Zero out cached values from a previous work week so stale numbers don't
+  // persist into the new week before the first successful read. Runs at startup
+  // and before every refresh, so an app left open over the weekend resets too.
+  // Returns true when anything was reset.
+  function resetForNewWeek() {
+    const weekStart = weekStartDate(appSettings);
+    if (!weekStart) return false;
+    const weekStartMs = weekStart.getTime();
+    let changed = false;
     Object.keys(metricsCache).forEach(function (id) {
-      if (metricsCache[id].ts < _weekStartMs && fieldResetsWeekly(id)) {
+      if (metricsCache[id].ts < weekStartMs && fieldResetsWeekly(id)) {
         metricsValues[id] = "0";
         metricsCache[id] = { value: "0", ts: Date.now(), prevValue: metricsCache[id].value };
-        _changed = true;
+        metricsStale.delete(id);
+        delete metricsStaleReason[id];
+        changed = true;
       }
     });
-    if (_changed) {
+    if (changed) {
       try { localStorage.setItem("fspp-metrics-cache", JSON.stringify(metricsCache)); } catch { /* storage unavailable */ }
     }
-  }());
+    return changed;
+  }
+  resetForNewWeek();
 
   // Timing for reading a dashboard after it loads. Dashboards such as
   // Freshservice's are single-page apps: the page "finishes loading" first and
@@ -205,11 +224,7 @@
     const dayMinutes = Math.max(0, dayEndMins - dayStartMins - lunchMins);
     if (dayMinutes <= 0 || workDays.length === 0) return { progress: 0, ptoRatio: 1 };
 
-    let weekStartDay = -1;
-    for (let i = 1; i <= 7; i++) {
-      const candidate = (weekEndDay + i) % 7;
-      if (workDays.includes(candidate)) { weekStartDay = candidate; break; }
-    }
+    const weekStartDay = weekStartDayOf(settings);
     if (weekStartDay === -1) return { progress: 0, ptoRatio: 1 };
 
     const orderedDays = [];
@@ -307,7 +322,9 @@
         }
         const tooltipLines = [];
 
-        if (appSettings.metricsProgressEnabled && f.weeklyTarget) {
+        // A weekly target only means something for a value that counts up from 0
+        // each week, so fields with "Resets every week" unticked skip it.
+        if (appSettings.metricsProgressEnabled && f.weeklyTarget && f.resetsWeekly !== false) {
           const target = parseFloat(String(f.weeklyTarget).replace(/[^0-9.]/g, ""));
           if (!isNaN(target) && target > 0) {
             const currentNum = parseFloat(String(val || "0").replace(/[^0-9.]/g, ""));
@@ -359,15 +376,12 @@
   // The work week starts on the first work day after the configured week-end day.
   function metricsDateVars(settings, now) {
     now = now || new Date();
-    const workDays = settings.metricsWorkDays || [1, 2, 3, 4, 5];
-    const weekEndDay = typeof settings.metricsWorkWeekEndDay === "number" ? settings.metricsWorkWeekEndDay : 5;
-    let weekStartDay = 1;
-    for (let i = 1; i <= 7; i++) {
-      const c = (weekEndDay + i) % 7;
-      if (workDays.includes(c)) { weekStartDay = c; break; }
+    // With no work days set there is no work week; fall back to Monday.
+    let weekStart = weekStartDate(settings, now);
+    if (!weekStart) {
+      weekStart = new Date(now);
+      weekStart.setDate(weekStart.getDate() - (now.getDay() + 6) % 7);
     }
-    const weekStart = new Date(now);
-    weekStart.setDate(weekStart.getDate() - (now.getDay() - weekStartDay + 7) % 7);
     return {
       today: localDateString(now),
       weekStart: localDateString(weekStart),
@@ -425,6 +439,7 @@
     if (!dashboards.length) return;
 
     metricsScraperBusy = true;
+    if (resetForNewWeek()) renderMetricsBar();
     metricsBarStatus.textContent = "Refreshing…";
     let anySuccess = false;
 
@@ -531,8 +546,14 @@
     } catch {
       return null;
     }
-    if (/(^|\/)(login|signin|sign_in|sso)(\/|$)/i.test(current.pathname) || current.hostname !== expected.hostname) {
-      return "signed out of " + expected.hostname + "? Open the dashboard in a tab and sign in";
+    // A dashboard address on the Freshservice alias host (Settings → Freshservice →
+    // Alias Host) is redirected to the Freshservice host, which is still the dashboard.
+    const alias = String(appSettings.fsAliasHost || "").toLowerCase();
+    const aliasTarget = String(appSettings.fsAliasTarget || "").toLowerCase();
+    const expectedHost = alias && aliasTarget && expected.hostname.toLowerCase() === alias
+      ? aliasTarget : expected.hostname.toLowerCase();
+    if (/(^|\/)(login|signin|sign_in|sso)(\/|$)/i.test(current.pathname) || current.hostname.toLowerCase() !== expectedHost) {
+      return "signed out of " + expectedHost + "? Open the dashboard in a tab and sign in";
     }
     return null;
   }

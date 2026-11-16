@@ -328,7 +328,12 @@
       wrap.appendChild(row);
       wrap.appendChild(selRow);
       wrap.appendChild(buildApiQueryRow(dbId, f));
-      wrap.appendChild(buildResetsWeeklyRow(dbId, f));
+      // The weekly target row (below) is hidden while "Resets every week" is
+      // unticked: pace against a weekly target means nothing for such a value.
+      let targetRowEl = null;
+      wrap.appendChild(buildResetsWeeklyRow(dbId, f, function (resets) {
+        if (targetRowEl) targetRowEl.style.display = resets ? "" : "none";
+      }));
 
       if (appSettings.metricsProgressEnabled) {
         const targetRow = document.createElement("div");
@@ -353,6 +358,8 @@
         targetRow.appendChild(targetLabel);
         targetRow.appendChild(targetInput);
         wrap.appendChild(targetRow);
+        targetRowEl = targetRow;
+        if (f.resetsWeekly === false) targetRow.style.display = "none";
       }
 
       containerEl.appendChild(wrap);
@@ -384,7 +391,7 @@
 
   // "Resets every week" (default on). Untick it for values that keep counting
   // across weeks, so the bar doesn't show 0 or hold back the value at week start.
-  function buildResetsWeeklyRow(dbId, f) {
+  function buildResetsWeeklyRow(dbId, f, onChange) {
     const row = document.createElement("div");
     row.className = "metrics-field-selector-row";
     const label = document.createElement("label");
@@ -396,7 +403,7 @@
       "Ticked: this value counts from the start of the work week, so it shows 0 until the " +
       "first refresh of the new week, and last week's number is held back for an hour.\n" +
       "Unticked: the value doesn't reset (for example open tickets or a running total), " +
-      "so the bar keeps showing it at the start of the week.";
+      "so the bar keeps showing it at the start of the week, and its weekly target is not used.";
     box.addEventListener("change", function () {
       const db_ = (appSettings.metricsBarDashboards || []).find(function (d) { return d.id === dbId; });
       if (db_) db_.fields = (db_.fields || []).map(function (x) {
@@ -406,6 +413,7 @@
         return next;
       });
       saveSettings();
+      if (typeof onChange === "function") onChange(box.checked);
     });
     label.appendChild(box);
     label.appendChild(document.createTextNode(" Resets every week"));

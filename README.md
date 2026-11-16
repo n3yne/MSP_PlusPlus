@@ -350,6 +350,8 @@ Output is placed in the `dist/` folder.
 
 **Freshservice API queries (optional):** with the API key set in **Settings → Plugins → Freshservice**, fill in a field's **API query** and click **Test** to see the count. Freshservice has no API for dashboard widgets, so the query has to describe the same tickets as the widget. Filterable fields are `agent_id`, `group_id`, `requester_id`, `status` (2 Open, 3 Pending, 4 Resolved, 5 Closed), `priority`, `impact`, `urgency`, `tag`, `due_by`, `fr_due_by`, `created_at`, `updated_at` and custom fields. Text and dates go in single quotes, e.g. `agent_id:123 AND status:4 AND updated_at:>'{weekStart}'`. There is no "resolved on" date, so counts of tickets resolved this week can only be approximated with `updated_at`, and dates are compared in UTC.
 
+**Resets every week:** at the start of the work week the bar shows weekly counts as 0 until the first refresh, and ignores a refreshed value that still matches last week's for an hour (the dashboard may not have rolled over yet). Untick **Resets every week** on a field whose value keeps counting across weeks, such as open tickets or a running total, so it keeps its value and updates normally at week start. The weekly target and on-track colours aren't used for such a field. The reset also happens when MSP++ is left open over the weekend.
+
 ---
 
 ## AI Assistant Setup

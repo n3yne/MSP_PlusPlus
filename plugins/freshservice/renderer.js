@@ -602,8 +602,8 @@
 
   // Ticket search (the Ticket Search plugin's side panel tab, and anything else
   // that wants it, such as a command palette): by number, subject or requester,
-  // through the REST API. Each result gets a link built the same way as ticket
-  // quick-open, so it opens on the instance in use.
+  // through the REST API. Each result links to the account the API searched, on
+  // an open tab's host when one is that account (alias or Freshservice host).
   async function searchTickets(term, options) {
     const opts = options || {};
     const res = await api.invoke(PLUGIN_ID, "search-tickets", { term: term, days: opts.days });
@@ -614,7 +614,19 @@
       list.sort(function (a, b) { return (b.active ? 1 : 0) - (a.active ? 1 : 0); });
       tabUrls = list.map(function (t) { return t.url; });
     } catch { /* no tabs yet */ }
-    const ctx = { active: true, tabUrls: tabUrls, homeUrl: settings.defaultUrl || "" };
+    // Results come from the API account, so links go to an open tab's host only
+    // when that tab is the same account (the alias pair counts); else the API domain.
+    const account = Array.isArray(res.accountHosts) && res.accountHosts.length ? res.accountHosts : [res.domain];
+    let base = null;
+    for (const u of tabUrls) {
+      const b = instanceBase(u);
+      let host = "";
+      try { host = new URL(u).hostname.toLowerCase(); } catch { /* not a URL */ }
+      if (b && account.includes(host)) { base = b; break; }
+    }
+    const linkFor = function (id) {
+      return base ? base.origin + "/" + base.portal + "/tickets/" + id : "https://" + res.domain + "/a/tickets/" + id;
+    };
     const tickets = (res.tickets || []).map(function (t) {
       return {
         id: String(t.id),
@@ -626,7 +638,7 @@
         priority: t.priorityLabel || "",
         updatedAt: t.updatedAt || "",
         matches: t.matches || [],
-        url: ticketUrl(String(t.id), ctx) || ("https://" + res.domain + "/a/tickets/" + t.id),
+        url: linkFor(Number(t.id)),
       };
     });
     let note = "";

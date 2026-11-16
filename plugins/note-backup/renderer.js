@@ -1622,6 +1622,21 @@
     refreshTicketListTimer = setTimeout(refreshTicketList, 500);
   }
 
+  function splitTicketKey(key) {
+    const m = /^(.*?)(\d+)$/.exec(String(key || ""));
+    return m ? { prefix: m[1].toUpperCase(), num: Number(m[2]) } : { prefix: String(key || "").toUpperCase(), num: NaN };
+  }
+
+  function compareTicketKeys(a, b) {
+    const ka = splitTicketKey(a);
+    const kb = splitTicketKey(b);
+    if (ka.prefix !== kb.prefix) return ka.prefix.localeCompare(kb.prefix);
+    const na = isNaN(ka.num);
+    const nb = isNaN(kb.num);
+    if (na || nb) return na === nb ? String(a).localeCompare(String(b)) : (na ? 1 : -1);
+    return ka.num - kb.num || String(a).localeCompare(String(b));
+  }
+
   async function refreshTicketList(selectTicketId = null) {
     try {
       const tickets = await store.getAllTickets();
@@ -1635,15 +1650,10 @@
           const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
           result = timeA - timeB;
         } else {
-          // ticketNumber — extract leading digits for numeric comparison,
-          // fall back to locale string compare for non-numeric IDs
-          const numA = parseInt(a.ticketId, 10);
-          const numB = parseInt(b.ticketId, 10);
-          if (!isNaN(numA) && !isNaN(numB)) {
-            result = numA - numB;
-          } else {
-            result = a.ticketId.localeCompare(b.ticketId);
-          }
+          // ticketNumber — keys are a bare number (Freshservice tickets) or a
+          // prefix and a number (CW-123, CHN-45). Group by prefix, bare numbers
+          // first, then compare the numbers as numbers, so CW-999 < CW-1000.
+          result = compareTicketKeys(a.ticketId, b.ticketId);
         }
         return sortDir === "desc" ? -result : result;
       });

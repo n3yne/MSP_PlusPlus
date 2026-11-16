@@ -31,11 +31,13 @@
       '    <div class="settings-field-row">' +
       '      <input type="text" id="plugin-tn-email" class="settings-text-input" placeholder="you@company.com" maxlength="254" spellcheck="false" autocomplete="off" />' +
       '      <button type="button" id="plugin-tn-find" class="btn btn-small btn-primary">Find me</button>' +
+      '      <button type="button" id="plugin-tn-me" class="btn btn-small btn-secondary">Use my API key</button>' +
       "    </div>" +
       '    <p id="plugin-tn-agent" class="settings-description settings-description-field"></p>' +
       "  </div>" +
       '  <p class="settings-description settings-description-field">' +
-      "    Tickets count as yours when you are the assigned agent. If looking up your email isn't allowed for your API key, " +
+      "    Tickets count as yours when you are the assigned agent. <strong>Use my API key</strong> picks the agent the " +
+      "    Freshservice API key belongs to, with no email needed. If looking up your email isn't allowed for your API key, " +
       "    type your agent ID instead (the number at the end of your agent profile's address in Freshservice)." +
       "  </p>" +
       "</div>" +
@@ -78,6 +80,7 @@
 
     const elEmail = panel.querySelector("#plugin-tn-email");
     const elFind = panel.querySelector("#plugin-tn-find");
+    const elMe = panel.querySelector("#plugin-tn-me");
     const elAgent = panel.querySelector("#plugin-tn-agent");
     const elOther = panel.querySelector("#plugin-tn-other-agents");
     const elDesktop = panel.querySelector("#plugin-tn-desktop");
@@ -146,7 +149,30 @@
       }
     }
 
+    // The agent the API key belongs to (the same one Quick Actions calls "me").
+    async function useApiKeyAgent() {
+      elMe.disabled = true;
+      elAgent.textContent = "Asking Freshservice…";
+      try {
+        const res = await invoke("freshservice", "current-agent", {});
+        if (!res || res.error || !res.agent) {
+          elAgent.textContent = (res && res.error) || "Freshservice didn't say which agent the API key belongs to.";
+          return;
+        }
+        await settingsAPI.saveSettings({
+          ticketNotifyAgentId: res.agent.id,
+          ticketNotifyAgentName: res.agent.name || "",
+          ticketNotifyAgentEmail: res.agent.email || "",
+        });
+      } catch {
+        elAgent.textContent = "Couldn't reach the Freshservice plugin. Is it turned on and up to date?";
+      } finally {
+        elMe.disabled = false;
+      }
+    }
+
     elFind.addEventListener("click", findAgent);
+    elMe.addEventListener("click", useApiKeyAgent);
     elEmail.addEventListener("keydown", function (e) {
       if (e.key === "Enter") { e.preventDefault(); findAgent(); }
     });

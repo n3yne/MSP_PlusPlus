@@ -104,3 +104,41 @@ describe("buildDirectory", () => {
     expect(() => buildDirectory({ root: bad, outDir: path.join(bad, "out") })).toThrow(/problems/);
   });
 });
+
+describe("checkAgainstPublished", () => {
+  const { checkAgainstPublished, parseArgs } = require("../scripts/build-plugin-directory");
+  const entry = (id, version, sha) => ({ id, version, sha256: sha.repeat(64) });
+
+  test("passes when nothing published yet, or versions are new or unchanged", () => {
+    const built = { plugins: [entry("a", "1.0.1", "b"), entry("c", "1.0.0", "c"), entry("d", "1.0.0", "d")] };
+    expect(checkAgainstPublished(null, built)).toEqual([]);
+    const published = { plugins: [entry("a", "1.0.0", "a"), entry("c", "1.0.0", "c")] };
+    expect(checkAgainstPublished(published, built)).toEqual([]);
+  });
+
+  test("fails when a published version's package changed", () => {
+    const published = { plugins: [entry("a", "1.0.0", "a")] };
+    const problems = checkAgainstPublished(published, { plugins: [entry("a", "1.0.0", "b")] });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/a 1\.0\.0 changed/);
+  });
+
+  test("parseArgs reads the out folder and --published", () => {
+    expect(parseArgs(["out", "--published", "idx.json"])).toEqual({ outDir: "out", published: "idx.json" });
+    expect(parseArgs(["--published", "idx.json"]).published).toBe("idx.json");
+  });
+});
+
+describe("plugins.yml", () => {
+  const yml = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "plugins.yml"), "utf8").replace(/\r\n/g, "\n");
+  const publish = yml.slice(yml.indexOf("\n  publish:"));
+
+  test("publishes only from main, behind the plugin-directory environment", () => {
+    expect(publish).toMatch(/\n {4}if: github\.ref == 'refs\/heads\/main'\n/);
+    expect(publish).toMatch(/\n {4}environment: plugin-directory\n/);
+  });
+
+  test("checks the build against the published index", () => {
+    expect(yml).toMatch(/build-plugin-directory\.js dist-plugins --published published-index\.json/);
+  });
+});

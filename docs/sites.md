@@ -48,6 +48,8 @@ A site plugin is an ordinary plugin (see [plugins.md](plugins.md)) with two extr
 
 Core also opens **sign-in popups as real windows** (so `window.opener` / `postMessage` handshakes work) when the popup's URL is on one of `hosts` and its path has an auth segment (`/auth`, `/login`, `/sso`, `/oauth`, `/saml`, `/openid`, `/signin`). Popups to Microsoft and Google sign-in pages always open as windows. Every other popup opens in a new tab.
 
+A host that is only known at run time (a self-hosted server from a setting) can be added with `api.setSiteHosts()` in `main.js` (app 0.8.3+, see [`plugins.md`](plugins.md)); it then gets the same user agent and popup handling.
+
 Only an **enabled plugin that loaded** contributes its site block. Invalid hosts are skipped with a warning in the log.
 
 ---

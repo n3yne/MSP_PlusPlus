@@ -19,6 +19,7 @@
       "If your ConnectWise Manage runs on your own server or domain instead of myconnectwise.net, " +
       "enter its address here. Pages on that host are then treated as ConnectWise Manage. " +
       "Only the host name is kept. Reload any ConnectWise tabs that are already open. " +
+      "With MSP++ 0.8.3 or newer the host also gets the Chrome user agent and sign-in popup windows. " +
       "Leave it empty if you use a myconnectwise.net address." +
       "</p>";
     panel.appendChild(section);

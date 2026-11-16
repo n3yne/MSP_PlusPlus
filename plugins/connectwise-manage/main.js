@@ -2,7 +2,8 @@
 
 // ConnectWise Manage plugin — main process
 //
-// Only declares the plugin's settings; the site adapter is in renderer.js.
+// Declares the plugin's settings and tells the app about the Custom URL host; the
+// site adapter is in renderer.js.
 
 // A host name of one or more labels ("cw.acme.com", "cw.acme.local", "cwserver")
 // or an IPv4 address. Mirrors CUSTOM_HOST_PATTERN in renderer.js.
@@ -18,7 +19,30 @@ function validCustomHost(host) {
   return CUSTOM_HOST_PATTERN.test(host) && !OTHER_SITE_HOST_PATTERN.test(host);
 }
 
+// The hosts for api.setSiteHosts: the Custom URL host when one is set and valid.
+function customSiteHosts(settings) {
+  const host = settings && settings.cwCustomHost;
+  return typeof host === "string" && host && validCustomHost(host) ? [host] : [];
+}
+
 module.exports = {
+
+  init: function (api) {
+    // The app (0.8.3+) then gives the Custom URL host what myconnectwise.net gets:
+    // the Chrome user agent and sign-in popups that open as real windows. Older
+    // apps don't have the hook; there the host is only recognised by the adapter.
+    if (typeof api.setSiteHosts !== "function") return;
+    let last = null;
+    const apply = function (settings) {
+      const hosts = customSiteHosts(settings);
+      const key = JSON.stringify(hosts);
+      if (key === last) return;
+      last = key;
+      api.setSiteHosts(hosts);
+    };
+    apply(api.getSettings());
+    api.on("settings:changed", apply);
+  },
 
   defaultSettings: {
     // Host of a self-hosted or custom-domain ConnectWise Manage server, e.g.
@@ -33,4 +57,5 @@ module.exports = {
 
   // Exported for tests.
   validCustomHost,
+  customSiteHosts,
 };

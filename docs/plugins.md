@@ -234,6 +234,20 @@ api.setHostRedirects([{ from: "service.acme.com", to: "acme.freshservice.com" }]
 - Only top-level `GET` page loads are redirected. Form posts (such as a sign-in response posted back to `from`), the page's own requests, and `fetch()` calls from `main.js` go through unchanged.
 - The Freshservice plugin uses it for its **Alias Host** setting.
 
+#### `api.setSiteHosts(list)`
+
+*App 0.8.3 and later.* Adds hosts to your plugin's own site (its manifest `site` block) at run time, such as the address of a self-hosted server that the user typed into a setting. Each call replaces your plugin's list; `[]` removes them. Call it again when your settings change.
+
+```js
+if (typeof api.setSiteHosts === "function") api.setSiteHosts(["cw.acme.com"]);
+```
+
+- Pages on these hosts get what core does for the manifest `site.hosts`: the Chrome user agent (when the site sets `chromeUserAgent`) and sign-in popups that open as real windows. Your renderer adapter's `matchesUrl` still has to recognise the host itself.
+- Each entry is a bare host: a domain, a single-label name (`cwserver`) or an IPv4 address, with no scheme, port or path. Only that exact host matches, not its subdomains. Up to 10.
+- A host on another plugin's site hosts is skipped with a warning in the log, and the first plugin to add a host keeps it. A plugin without a `site` block can't add hosts. A host added here can't be the `from` of a redirect.
+- Check that the function exists first if your plugin should still load on apps before 0.8.3.
+- The ConnectWise Manage plugin uses it for its **Custom URL** setting.
+
 ---
 
 ## Renderer component (`renderer.js`)
@@ -648,6 +662,7 @@ api.getSettings(): Readonly<AppSettings>
 api.addMenuItem(opts: { label: string, accelerator?: string, click: () => void }): void
 api.log(...args: any[]): void
 api.setHostRedirects(list: Array<{ from: string, to: string }>): void   // app 0.8.2+
+api.setSiteHosts(list: string[]): void   // app 0.8.3+
 ```
 
 ### Renderer (`window.pluginAPI`)

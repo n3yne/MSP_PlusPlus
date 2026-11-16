@@ -49,6 +49,37 @@ describe("connectwise-manage Custom URL", () => {
     expect(cw.matchesUrl("https://cw.acme.com/")).toBe(false);
   });
 
+  test("the custom host is handed to the app when it supports extra site hosts", () => {
+    expect(cwMain.customSiteHosts({ cwCustomHost: "cw.acme.com" })).toEqual(["cw.acme.com"]);
+    expect(cwMain.customSiteHosts({ cwCustomHost: "" })).toEqual([]);
+    expect(cwMain.customSiteHosts({ cwCustomHost: "acme.freshservice.com" })).toEqual([]);
+    expect(cwMain.customSiteHosts({ cwCustomHost: "https://cw.acme.com/" })).toEqual([]);
+    expect(cwMain.customSiteHosts({})).toEqual([]);
+    expect(cwMain.customSiteHosts(undefined)).toEqual([]);
+
+    const calls = [];
+    const listeners = [];
+    cwMain.init({
+      getSettings: () => ({ cwCustomHost: "cw.acme.com" }),
+      on: (name, fn) => listeners.push({ name, fn }),
+      setSiteHosts: (hosts) => calls.push(hosts),
+    });
+    expect(calls).toEqual([["cw.acme.com"]]);
+    expect(listeners.map((l) => l.name)).toEqual(["settings:changed"]);
+    listeners[0].fn({ cwCustomHost: "cw.acme.com" });
+    listeners[0].fn({ cwCustomHost: "" });
+    expect(calls).toEqual([["cw.acme.com"], []]);
+  });
+
+  test("loads on an app without the extra site hosts hook", () => {
+    const listeners = [];
+    expect(() => cwMain.init({
+      getSettings: () => ({ cwCustomHost: "cw.acme.com" }),
+      on: (name, fn) => listeners.push({ name, fn }),
+    })).not.toThrow();
+    expect(listeners).toEqual([]);
+  });
+
   test("an unusable value clears the custom host", () => {
     cw.setCustomHost("cw.acme.com");
     cw.setCustomHost("ftp://nope");

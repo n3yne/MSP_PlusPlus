@@ -67,7 +67,7 @@
       "If your company reaches Freshservice through its own address, enter it as the alias host. " +
       "Any page opened on the alias host loads from the Freshservice host instead, with the rest of the " +
       "address (path, query and #) unchanged. Form posts to the alias, such as a sign-in response, and " +
-      "API calls to the domain above are left as they are." +
+      "API calls to the domain above are left as they are. Needs MSP++ 0.8.2 or newer." +
       "</p>";
     panel.appendChild(aliasSection);
 

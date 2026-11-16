@@ -2,7 +2,7 @@
 
 const fsApi = require("../plugins/freshservice/main");
 
-const { validateSettings, defaultSettings, normalizeDomain, formatTicketText, formatArticle, buildFilterQuery, buildTimeEntry, formatTimeSpent } = fsApi;
+const { validateSettings, defaultSettings, normalizeDomain, aliasRedirects, formatTicketText, formatArticle, buildFilterQuery, buildTimeEntry, formatTimeSpent } = fsApi;
 
 // Placeholder only — never a real key.
 const FAKE_KEY = "test-key-not-real";
@@ -20,6 +20,34 @@ describe("freshservice validateSettings", () => {
     expect(validateSettings({ fsApiDomain: "not a host" })).toBe(false);
     expect(validateSettings({ fsApiKey: "x".repeat(201) })).toBe(false);
     expect(validateSettings({ fsApiKeyEncrypted: 42 })).toBe(false);
+  });
+});
+
+describe("freshservice alias host", () => {
+  test("validates the alias and Freshservice host fields", () => {
+    expect(validateSettings({ fsAliasHost: "", fsAliasTarget: "" })).toBe(true);
+    expect(validateSettings({ fsAliasHost: "service.example.com", fsAliasTarget: "acme.freshservice.com" })).toBe(true);
+    expect(validateSettings({ fsAliasHost: "https://service.example.com/" })).toBe(false);
+    expect(validateSettings({ fsAliasHost: "acme.freshservice.com" })).toBe(false);
+    expect(validateSettings({ fsAliasHost: 5 })).toBe(false);
+    expect(validateSettings({ fsAliasTarget: "service.example.com" })).toBe(false);
+    expect(validateSettings({ fsAliasTarget: "Acme.freshservice.com" })).toBe(false);
+  });
+
+  test("aliasRedirects needs both hosts", () => {
+    expect(aliasRedirects({ fsAliasHost: "service.example.com", fsAliasTarget: "acme.freshservice.com" }))
+      .toEqual([{ from: "service.example.com", to: "acme.freshservice.com" }]);
+    expect(aliasRedirects({ fsAliasHost: "service.example.com", fsAliasTarget: "" })).toEqual([]);
+    expect(aliasRedirects({ fsAliasHost: "", fsAliasTarget: "acme.freshservice.com" })).toEqual([]);
+    expect(aliasRedirects({ fsAliasHost: "a.freshservice.com", fsAliasTarget: "acme.freshservice.com" })).toEqual([]);
+    expect(aliasRedirects({})).toEqual([]);
+  });
+
+  test("leaves the API domain alone", () => {
+    // The API keeps calling whatever domain is set for it, alias or not.
+    expect(validateSettings({
+      fsApiDomain: "service.example.com", fsAliasHost: "service.example.com", fsAliasTarget: "acme.freshservice.com",
+    })).toBe(true);
   });
 });
 

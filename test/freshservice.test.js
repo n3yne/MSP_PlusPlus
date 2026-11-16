@@ -454,3 +454,36 @@ describe("freshservice buildTimeEntry", () => {
     expect(buildTimeEntry({ id: "3", minutes: 1441 }).error).toMatch(/24 hours/);
   });
 });
+
+describe("freshservice account hosts, site hosts and field names", () => {
+  const alias = { fsAliasHost: "service.example.com", fsAliasTarget: "acme.freshservice.com" };
+
+  test("accountHosts adds the other end of the alias pair to the API domain", () => {
+    expect(fsApi.accountHosts("acme.freshservice.com", {})).toEqual(["acme.freshservice.com"]);
+    expect(fsApi.accountHosts("service.example.com", alias)).toEqual(["service.example.com", "acme.freshservice.com"]);
+    expect(fsApi.accountHosts("acme.freshservice.com", alias)).toEqual(["acme.freshservice.com", "service.example.com"]);
+    expect(fsApi.accountHosts("other.freshservice.com", alias)).toEqual(["other.freshservice.com"]);
+    expect(fsApi.accountHosts("", alias)).toEqual([]);
+    expect(sameInstance("other.freshservice.com", "service.example.com", alias)).toBe(false);
+  });
+
+  test("customSiteHosts gives a custom API domain, not Freshservice hosts or the alias", () => {
+    expect(fsApi.customSiteHosts({ fsApiDomain: "helpdesk.example.com" })).toEqual(["helpdesk.example.com"]);
+    expect(fsApi.customSiteHosts({ fsApiDomain: "acme.freshservice.com" })).toEqual([]);
+    expect(fsApi.customSiteHosts({ fsApiDomain: "" })).toEqual([]);
+    expect(fsApi.customSiteHosts(Object.assign({ fsApiDomain: "service.example.com" }, alias))).toEqual([]);
+  });
+
+  test("choicesToLabels keeps custom statuses and falls back to the standard names", () => {
+    const labels = fsApi.choicesToLabels({ status: [{ value: 2, label: "Open" }, { value: 7, label: "Waiting on Vendor" }] });
+    expect(labels.status[7]).toBe("Waiting on Vendor");
+    expect(labels.priority[4]).toBe("Urgent");
+    expect(fsApi.choicesToLabels({}).status[5]).toBe("Closed");
+  });
+
+  test("formatTicketText names a custom status when given the instance's labels", () => {
+    const labels = fsApi.choicesToLabels({ status: [{ value: 7, label: "Waiting on Vendor" }] });
+    expect(formatTicketText({ id: 1, subject: "Printer", status: 7 }, [], labels)).toMatch(/Status: Waiting on Vendor/);
+    expect(formatTicketText({ id: 1, subject: "Printer", status: 7 }, [])).not.toMatch(/Status:/);
+  });
+});

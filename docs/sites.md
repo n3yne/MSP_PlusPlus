@@ -6,7 +6,7 @@ Bundled site plugins:
 
 | Plugin | Folder | Hosts |
 |---|---|---|
-| Freshservice | `plugins/freshservice` | `freshservice.com`, `freshworks.com`, `myfreshworks.com`, plus the domain set for its API, its alias host, and the Home URL's host (unless another site claims it) |
+| Freshservice | `plugins/freshservice` | `freshservice.com`, `freshworks.com`, `myfreshworks.com`, plus the domain set for its API (which also gets the Chrome user agent and sign-in popups on apps with `api.setSiteHosts`), its alias host, and the Home URL's host (unless another site claims it) |
 | ConnectWise Manage | `plugins/connectwise-manage` | `myconnectwise.net` (cloud instances such as `na.myconnectwise.net`), plus the host of its **Custom URL** setting (a self-hosted or custom-domain server) |
 
 Several site plugins can be installed at once. The adapter is chosen **per tab, by URL**, so a Freshservice tab and another site's tab can sit side by side, each with its own ticket detection and note sync.

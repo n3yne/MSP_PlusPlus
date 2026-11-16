@@ -440,9 +440,11 @@
     apiInput.title =
       "Freshservice ticket filter query. When set, the bar shows how many tickets match it, " +
       "and reads the dashboard only if the API call fails.\n" +
-      "Fields: agent_id, group_id, status (2 Open, 3 Pending, 4 Resolved, 5 Closed), priority, " +
+      "Fields: agent_id, group_id, status (2 Open, 3 Pending, 4 Resolved, 5 Closed; custom statuses have higher numbers), priority, " +
       "tag, created_at, updated_at, due_by and custom fields. Use single quotes for text and dates.\n" +
-      "Placeholders: {today}, {weekStart}, {monthStart}, e.g. updated_at:>'{weekStart}'.\n" +
+      "Placeholders: {today}, {weekStart}, {monthStart}, e.g. updated_at:>'{weekStart}'. They are your local dates, " +
+      "but Freshservice reads a date as a whole day in UTC, so tickets from the first or last few hours of a day " +
+      "can count on the neighbouring day.\n" +
       "Needs the API key in Settings → Freshservice.";
     const apiTest = document.createElement("button");
     apiTest.type = "button";

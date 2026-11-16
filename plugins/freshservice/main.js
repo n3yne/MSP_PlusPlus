@@ -100,6 +100,22 @@ module.exports = {
       api.on("settings:changed", applyAliasRedirect);
     }
 
+    // A custom API domain (a company's own name for the instance) gets what the
+    // manifest hosts get from the app (0.8.3+): the Chrome user agent and sign-in
+    // popups as real windows. Older apps don't have the hook.
+    if (typeof api.setSiteHosts === "function") {
+      let lastSiteHosts = null;
+      const applySiteHosts = function (settings) {
+        const hosts = customSiteHosts(settings);
+        const key = JSON.stringify(hosts);
+        if (key === lastSiteHosts) return;
+        lastSiteHosts = key;
+        api.setSiteHosts(hosts);
+      };
+      applySiteHosts(api.getSettings());
+      api.on("settings:changed", applySiteHosts);
+    }
+
     // Encrypt a newly entered key before it reaches disk; never write it in plain text.
     //
     // The key is also tied to the domain it was entered for (fsApiKeyHost), so
@@ -202,6 +218,27 @@ module.exports = {
       return id;
     }
 
+    // Status and priority names, custom ones included, from /ticket_form_fields,
+    // cached per domain. Never throws: on an error the standard names are used,
+    // and asked for again after a couple of minutes.
+    const labelsCache = new Map(); // domain → { at, value, failed? }
+    async function fieldLabels(conn) {
+      const cached = labelsCache.get(conn.domain);
+      const maxAge = cached && cached.failed ? SCAN_CACHE_MS : ACTION_OPTIONS_CACHE_MS;
+      if (cached && Date.now() - cached.at < maxAge) return cached.value;
+      try {
+        const json = await apiGet(Object.assign({}, conn, { what: "Ticket fields" }), "/ticket_form_fields");
+        const value = choicesToLabels(fieldChoices(json));
+        labelsCache.set(conn.domain, { at: Date.now(), value });
+        return value;
+      } catch (err) {
+        api.log("ticket field names failed, using the standard ones:", err.message);
+        const value = choicesToLabels({});
+        labelsCache.set(conn.domain, { at: Date.now(), value, failed: true });
+        return value;
+      }
+    }
+
     async function fetchConversations(conn, ticketId) {
       const all = [];
       for (let page = 1; page <= MAX_CONVERSATION_PAGES; page++) {
@@ -225,12 +262,13 @@ module.exports = {
         return { skipped: true, error: `The open page (${host}) isn't the configured Freshservice domain.` };
       }
       try {
-        const [ticketJson, conversations] = await Promise.all([
+        const [ticketJson, conversations, labels] = await Promise.all([
           apiGet(conn, `/tickets/${ticketId}?include=requester`),
           fetchConversations(conn, ticketId),
+          fieldLabels(conn),
         ]);
         const ticket = ticketJson.ticket || {};
-        return { ticketId, text: formatTicketText(ticket, conversations) };
+        return { ticketId, text: formatTicketText(ticket, conversations, labels) };
       } catch (err) {
         api.log("get-ticket failed:", err.message);
         return { error: err.message || String(err) };
@@ -528,12 +566,15 @@ module.exports = {
       // Fill in requester names, looking up at most a handful of unknown people.
       const unknown = [...new Set(merged.map((t) => t.requesterId).filter((id) => id && !peopleCache.has(conn.domain + ":" + id)))]
         .slice(0, MAX_REQUESTER_LOOKUPS);
-      await Promise.all(unknown.map((id) => lookUpPerson(conn, id).catch(() => null)));
+      const [labels] = await Promise.all([
+        fieldLabels(conn),
+        ...unknown.map((id) => lookUpPerson(conn, id).catch(() => null)),
+      ]);
       const tickets = merged.map((t) => {
         const person = t.requesterId ? peopleCache.get(conn.domain + ":" + t.requesterId) : null;
         return Object.assign({}, t, {
-          statusLabel: STATUS_LABELS[t.status] || "",
-          priorityLabel: PRIORITY_LABELS[t.priority] || "",
+          statusLabel: labels.status[t.status] || "",
+          priorityLabel: labels.priority[t.priority] || "",
           requester: person ? person.name : "",
           requesterEmail: person ? person.email : "",
         });
@@ -546,6 +587,7 @@ module.exports = {
       return {
         tickets,
         domain: conn.domain,
+        accountHosts: accountHosts(conn.domain, api.getSettings()),
         days,
         scanned: scanned ? scanned.tickets.length : 0,
         scanFull: scanned ? scanned.full : false,
@@ -596,6 +638,7 @@ module.exports = {
       if (groups.status === "rejected") warnings.push("Couldn't list groups: " + groups.reason.message);
       warnings.forEach((w) => api.log("get-ticket-options:", w));
       const choices = fields.status === "fulfilled" ? fieldChoices(fields.value) : {};
+      if (fields.status === "fulfilled") labelsCache.set(conn.domain, { at: Date.now(), value: choicesToLabels(choices) });
       const value = {
         statuses: choices.status && choices.status.length ? choices.status : labelsToChoices(STATUS_LABELS),
         priorities: choices.priority && choices.priority.length ? choices.priority : labelsToChoices(PRIORITY_LABELS),
@@ -667,14 +710,40 @@ module.exports = {
         ]);
         const ticket = (ticketJson && ticketJson.ticket) || {};
         const last = latestConversation(conversations);
-        const [agent, author] = await Promise.all([
+        const [agent, author, labels] = await Promise.all([
           isId(ticket.responder_id) ? lookUpPerson(conn, ticket.responder_id).catch(() => null) : null,
           last && !last.incoming && isId(last.user_id) ? lookUpPerson(conn, last.user_id).catch(() => null) : null,
+          fieldLabels(conn),
         ]);
-        return { preview: formatTicketPreview(ticket, last, { agent, author }) };
+        return { preview: formatTicketPreview(ticket, last, { agent, author }, labels) };
       } catch (err) {
         if (err && err.status === 404) return { error: "Ticket #" + ticketId + " wasn't found (it may have been deleted)." };
         api.log("preview-ticket failed:", err.message);
+        return { error: err.message || String(err) };
+      }
+    });
+
+    // The hosts that are the configured API account, for plugins that compare a
+    // tab's host with it (the API domain and, with an alias set up, its pair).
+    api.handle("account-hosts", async function () {
+      const conn = connection();
+      if (conn.error) return conn;
+      return { domain: conn.domain, hosts: accountHosts(conn.domain, api.getSettings()) };
+    });
+
+    // The agent the API key belongs to (/agents/me), so a plugin can tell which
+    // tickets are "mine" without asking for an email address.
+    api.handle("current-agent", async function () {
+      const conn = connection();
+      if (conn.error) return conn;
+      try {
+        const json = await apiGet(Object.assign({}, conn, { what: "Agent" }), "/agents/me");
+        const agent = formatAgent(json && json.agent);
+        if (!agent) return { error: "Freshservice didn't say which agent the API key belongs to." };
+        agentIdByDomain.set(conn.domain, agent.id);
+        return { agent };
+      } catch (err) {
+        api.log("current-agent failed:", err.message);
         return { error: err.message || String(err) };
       }
     });
@@ -695,6 +764,9 @@ module.exports = {
   normalizeDomain,
   aliasRedirects,
   sameInstance,
+  accountHosts,
+  customSiteHosts,
+  choicesToLabels,
   keyHost,
   buildFilterQuery,
   buildTimeEntry,
@@ -821,12 +893,44 @@ function aliasRedirects(settings) {
 // the API domain may still be the alias, or the other way round).
 function sameInstance(host, domain, settings) {
   const h = String(host || "").toLowerCase();
+  return !!h && accountHosts(domain, settings).includes(h);
+}
+
+// The page hosts that are the same Freshservice account as the API domain: the
+// domain itself and, when it is one end of the alias pair, the other end. The
+// one place this is worked out; other plugins ask through "account-hosts".
+function accountHosts(domain, settings) {
   const d = String(domain || "").toLowerCase();
-  if (!h || !d) return false;
-  if (h === d) return true;
+  if (!d) return [];
   const pair = aliasRedirects(settings)[0];
-  if (!pair) return false;
-  return (h === pair.from && d === pair.to) || (h === pair.to && d === pair.from);
+  if (pair && d === pair.from) return [d, pair.to];
+  if (pair && d === pair.to) return [d, pair.from];
+  return [d];
+}
+
+// Hosts for api.setSiteHosts: the API domain when it isn't a Freshservice host
+// already (a company's own name for the instance). The alias host is left out:
+// its page loads are redirected, and a site host can't be redirected.
+function customSiteHosts(settings) {
+  const d = normalizeDomain(settings && settings.fsApiDomain);
+  if (!d || isFreshworksHost(d)) return [];
+  const pair = aliasRedirects(settings)[0];
+  return pair && pair.from === d ? [] : [d];
+}
+
+// fieldChoices() → { status: { 2: "Open", … }, priority: { … } }, with the
+// standard names for any list that came back empty.
+function choicesToLabels(choices) {
+  const toMap = (list, fallback) => {
+    if (!Array.isArray(list) || !list.length) return Object.assign({}, fallback);
+    const out = {};
+    for (const c of list) out[c.value] = c.label;
+    return out;
+  };
+  return {
+    status: toMap(choices && choices.status, STATUS_LABELS),
+    priority: toMap(choices && choices.priority, PRIORITY_LABELS),
+  };
 }
 
 // The domain a saved API key belongs to, or "" when there is no key or no domain
@@ -1009,7 +1113,8 @@ function latestConversation(conversations) {
 
 // A ticket from the API (with ?include=requester), its newest conversation and
 // the people looked up for it → the fields a hover preview shows.
-function formatTicketPreview(ticket, last, people) {
+function formatTicketPreview(ticket, last, people, labels) {
+  const names = labels || choicesToLabels({});
   const t = ticket && typeof ticket === "object" ? ticket : {};
   const p = people || {};
   const clean = (v, max) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().substring(0, max || 200) : "");
@@ -1033,8 +1138,8 @@ function formatTicketPreview(ticket, last, people) {
   return {
     id: isId(t.id) ? t.id : null,
     subject: clean(t.subject, 300),
-    status: STATUS_LABELS[t.status] || "",
-    priority: PRIORITY_LABELS[t.priority] || "",
+    status: names.status[t.status] || "",
+    priority: names.priority[t.priority] || "",
     requester: requester ? requester.name : "",
     requesterEmail: requester ? requester.email : "",
     agent: p.agent && p.agent.name ? p.agent.name : "",
@@ -1054,12 +1159,13 @@ function conversationLabel(c) {
 
 // Builds the plain-text view of a ticket that the AI features read: a header,
 // the description, then each conversation in order, separated like the page scrape.
-function formatTicketText(ticket, conversations) {
+function formatTicketText(ticket, conversations, labels) {
+  const names = labels || choicesToLabels({});
   const header = [];
   header.push(`Ticket #${ticket.id || ""}${ticket.subject ? ": " + ticket.subject : ""}`);
   const meta = [];
-  if (STATUS_LABELS[ticket.status]) meta.push("Status: " + STATUS_LABELS[ticket.status]);
-  if (PRIORITY_LABELS[ticket.priority]) meta.push("Priority: " + PRIORITY_LABELS[ticket.priority]);
+  if (names.status[ticket.status]) meta.push("Status: " + names.status[ticket.status]);
+  if (names.priority[ticket.priority]) meta.push("Priority: " + names.priority[ticket.priority]);
   const r = ticket.requester;
   if (r && (r.name || r.first_name || r.email)) {
     const name = r.name || [r.first_name, r.last_name].filter(Boolean).join(" ");

@@ -1,14 +1,14 @@
 {
   "id": "freshservice",
   "name": "Freshservice",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "distribution": "directory",
   "description": "Freshservice site support: ticket detection, note editor sync, page reading for AI features, ticket details and Solutions articles through the Freshservice REST API (v2), and time entries for the Time Tracker.",
   "category": "Sites",
   "main": "main.js",
   "renderer": "renderer.js",
   "settings": "settings.js",
-  "minAppVersion": "0.5.7",
+  "minAppVersion": "0.8.0",
   "credentials": [
     "fsApiKey"
   ],

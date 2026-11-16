@@ -201,13 +201,30 @@
     timer = setTimeout(run, delay);
   }
 
-  // The ticket ID shown in the active tab, when it is on the configured domain.
+  // The page hosts that are the API's Freshservice account: the API domain and,
+  // with an alias set up, the other end of it. The Freshservice plugin works this
+  // out ("account-hosts"); asked again before each check and on settings changes.
+  let accountHosts = [];
+  function refreshAccountHosts() {
+    return pluginAPI.invoke("freshservice", "account-hosts", {}).then(function (res) {
+      accountHosts = res && Array.isArray(res.hosts) ? res.hosts : [];
+    }).catch(function () { accountHosts = []; });
+  }
+
+  function onAccount(hostname) {
+    const host = String(hostname || "").toLowerCase();
+    if (!host) return false;
+    if (accountHosts.length) return accountHosts.includes(host);
+    return host === String(settings().fsApiDomain || "").toLowerCase();
+  }
+
+  // The ticket ID shown in the active tab, when it is on the configured account.
   function activeTicketId() {
     const tab = pluginAPI.browser.getActiveTab();
     if (!tab || !tab.webview) return null;
     let url;
     try { url = new URL(tab.webview.getURL()); } catch { return null; }
-    if (url.hostname !== settings().fsApiDomain) return null;
+    if (!onAccount(url.hostname)) return null;
     const m = url.pathname.match(/\/(?:a|helpdesk)\/tickets\/(\d+)/);
     return m ? Number(m[1]) : null;
   }
@@ -300,6 +317,7 @@
       }
       if (result.notifications.length) {
         lastNotifiedAt = Date.now();
+        await refreshAccountHosts();
         show(result.notifications);
       }
       if (result.error && /\(429\)/.test(result.error)) {
@@ -321,6 +339,7 @@
   let lastWatched = JSON.stringify(WATCHED.map(function (k) { return settings()[k]; }));
   pluginAPI.events.on("settings:changed", function (s) {
     const now = JSON.stringify(WATCHED.map(function (k) { return s ? s[k] : undefined; }));
+    refreshAccountHosts();
     if (now === lastWatched) return;
     lastWatched = now;
     schedule(3000);

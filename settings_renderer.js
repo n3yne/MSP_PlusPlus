@@ -615,7 +615,7 @@ document.addEventListener("DOMContentLoaded", function () {
       dataBox = document.createElement("input");
       dataBox.type = "checkbox";
       label.appendChild(dataBox);
-      label.appendChild(document.createTextNode(" Also delete its saved data"));
+      label.appendChild(document.createTextNode(" Also delete its saved data and API keys"));
       row.appendChild(label);
     }
 

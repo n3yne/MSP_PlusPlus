@@ -250,16 +250,101 @@ describe("createPluginDirectory", () => {
 
   test("importPackage stages a .mspplugin file or a folder as imported", async () => {
     const { dir, userData } = setup({ entries: [], packages: {} });
-    expect(dir.importPackage({ buffer: timePkg })).toMatchObject({ id: "time-tracker", version: "0.8.1" });
+    const yes = async () => true;
+    expect(await dir.importPackage({ buffer: timePkg, confirm: yes })).toMatchObject({ id: "time-tracker", version: "0.8.1" });
     PluginDirectory.applyPending(userData, quiet);
-    expect(PluginDirectory.readRegistry(userData)["time-tracker"].source).toBe("imported");
+    const reg = PluginDirectory.readRegistry(userData)["time-tracker"];
+    expect(reg.source).toBe("imported");
+    expect(reg.sha256).toBe(crypto.createHash("sha256").update(timePkg).digest("hex"));
 
     const folder = fs.mkdtempSync(path.join(os.tmpdir(), "mspp-folder-"));
     fs.writeFileSync(path.join(folder, "manifest.json"), JSON.stringify({ id: "folder-plugin", version: "1.0.0" }));
-    expect(dir.importPackage({ folder }).id).toBe("folder-plugin");
+    expect((await dir.importPackage({ folder, confirm: yes })).id).toBe("folder-plugin");
 
     const tooNew = makePackage({ id: "future", version: "1.0.0", minAppVersion: "99.0.0" });
-    expect(() => dir.importPackage({ buffer: tooNew })).toThrow(/needs MSP\+\+ 99\.0\.0/);
+    await expect(dir.importPackage({ buffer: tooNew, confirm: yes })).rejects.toThrow(/needs MSP\+\+ 99\.0\.0/);
+  });
+
+  test("importPackage asks first, says what it replaces, and stages nothing when declined", async () => {
+    const installed = [{ id: "time-tracker", name: "Time Tracker", version: "0.7.0", source: "directory" }];
+    const { dir, userData } = setup({ entries: [], packages: {}, installed });
+    const asked = [];
+    const result = await dir.importPackage({ buffer: timePkg, confirm: async (info) => { asked.push(info); return false; } });
+    expect(result).toEqual({ cancelled: true });
+    expect(asked[0]).toMatchObject({ id: "time-tracker", version: "0.8.1", replaces: { name: "Time Tracker", version: "0.7.0", source: "directory" } });
+    expect(PluginDirectory.readPending(userData).install).toEqual({});
+    // No confirm callback means no install.
+    expect(await dir.importPackage({ buffer: timePkg })).toEqual({ cancelled: true });
+    expect(PluginDirectory.readPending(userData).install).toEqual({});
+  });
+
+  test("directory installs record the package hash in the registry", async () => {
+    const { dir, userData } = setup({
+      entries: [entryFor(aiMan, aiPkg)],
+      packages: { "ai-features-0.8.0.mspplugin": aiPkg },
+    });
+    await dir.refresh();
+    expect((await dir.install(["ai-features"])).success).toBe(true);
+    PluginDirectory.applyPending(userData, quiet);
+    expect(PluginDirectory.readRegistry(userData)["ai-features"].sha256)
+      .toBe(crypto.createHash("sha256").update(aiPkg).digest("hex"));
+  });
+
+  test("a download longer than the directory says is stopped while reading", async () => {
+    const big = Buffer.alloc(4096, 1);
+    let pulled = 0;
+    const fetchImpl = async (url) => {
+      if (url.endsWith("index.json")) {
+        const body = Buffer.from(JSON.stringify({ plugins: [{ id: "big", version: "1.0.0", url: "big.mspplugin", sha256: "a".repeat(64), size: 100 }] }));
+        return { ok: true, status: 200, headers: { get: () => null }, arrayBuffer: async () => body };
+      }
+      let sent = false;
+      return {
+        ok: true, status: 200, headers: { get: () => null },
+        body: { getReader: () => ({
+          read: async () => { if (pulled++ > 10) throw new Error("kept reading"); if (sent) return { done: true }; sent = true; return { done: false, value: big }; },
+          cancel: async () => {},
+        }) },
+      };
+    };
+    const userData = fs.mkdtempSync(path.join(os.tmpdir(), "mspp-limit-"));
+    const dir = PluginDirectory.createPluginDirectory({
+      userData, appVersion: "0.8.3", fetchImpl, logger: quiet,
+      indexUrl: "https://example.test/releases/download/plugin-directory/index.json",
+    });
+    await dir.refresh();
+    const result = await dir.install(["big"]);
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/didn't match the directory's checksum/);
+    expect(pulled).toBe(1);
+  });
+
+  test("an index without a length that runs past the limit is refused", async () => {
+    const huge = Buffer.alloc(1024 * 1024 + 10, 0x20);
+    const fetchImpl = async () => ({ ok: true, status: 200, headers: { get: () => null }, arrayBuffer: async () => huge });
+    const userData = fs.mkdtempSync(path.join(os.tmpdir(), "mspp-limit-"));
+    const dir = PluginDirectory.createPluginDirectory({
+      userData, appVersion: "0.8.3", fetchImpl, logger: quiet,
+      indexUrl: "https://example.test/releases/download/plugin-directory/index.json",
+    });
+    expect((await dir.refresh()).error).toMatch(/too large/);
+  });
+
+  test("migrateLegacyImports keeps a newer installed copy and the old promise to delete data on removal", () => {
+    const userData = fs.mkdtempSync(path.join(os.tmpdir(), "mspp-legacy-"));
+    const legacy = path.join(userData, "plugins", "old-one");
+    fs.mkdirSync(legacy, { recursive: true });
+    fs.writeFileSync(path.join(legacy, "manifest.json"), JSON.stringify({ id: "old-one", version: "1.0.0" }));
+    const installedDir = path.join(userData, "installed-plugins", "old-one");
+    fs.mkdirSync(installedDir, { recursive: true });
+    fs.writeFileSync(path.join(installedDir, "manifest.json"), JSON.stringify({ id: "old-one", version: "2.0.0" }));
+    fs.writeFileSync(path.join(userData, "installed-plugins", "pending.json"), JSON.stringify({ install: {}, remove: { "old-one": {} } }));
+    expect(PluginDirectory.migrateLegacyImports(userData, quiet)).toEqual(["old-one"]);
+    expect(JSON.parse(fs.readFileSync(path.join(installedDir, "manifest.json"), "utf8")).version).toBe("2.0.0");
+    expect(fs.existsSync(path.join(legacy, "manifest.json"))).toBe(false);
+    expect(PluginDirectory.readPending(userData).remove["old-one"]).toEqual({ deleteData: true });
+    // Nothing left to move the second time.
+    expect(PluginDirectory.migrateLegacyImports(userData, quiet)).toEqual([]);
   });
 
   test("sends If-None-Match on later checks and keeps the index on 304", async () => {

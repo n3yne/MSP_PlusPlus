@@ -113,6 +113,26 @@ function mergeImportedSettings(existingRaw, importedSettings, credentialFields) 
   return result;
 }
 
+// Settings from `watched` ([{ key, label }]) that the import would set to a
+// different value than this PC has: [{ key, label, display }], display being the
+// new value as text for the import prompt. A setting being cleared ("", false,
+// null) isn't listed, since turning something off is never the risk.
+function sensitiveChanges(existingRaw, importedSettings, watched) {
+  const out = [];
+  const existing = isPlainObject(existingRaw) ? existingRaw : {};
+  const imported = isPlainObject(importedSettings) ? importedSettings : {};
+  for (const w of watched || []) {
+    if (!w || typeof w.key !== "string" || UNSAFE_KEYS.has(w.key)) continue;
+    if (!Object.prototype.hasOwnProperty.call(imported, w.key)) continue;
+    const value = imported[w.key];
+    if (value === "" || value === false || value === null || value === undefined) continue;
+    if (JSON.stringify(value) === JSON.stringify(existing[w.key])) continue;
+    const display = value === true ? "on" : typeof value === "string" ? value : JSON.stringify(value);
+    out.push({ key: w.key, label: String(w.label || w.key), display: display.slice(0, 200) });
+  }
+  return out;
+}
+
 // Plugins whose on/off state the import changes: [{ id, enabled }].
 function pluginChanges(currentPlugins, importedPlugins) {
   const changes = [];
@@ -140,5 +160,6 @@ module.exports = {
   parseSettingsExport,
   mergeImportedSettings,
   pluginChanges,
+  sensitiveChanges,
   defaultExportFileName,
 };

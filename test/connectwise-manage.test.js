@@ -19,6 +19,64 @@ describe("connectwise-manage matchesUrl", () => {
   });
 });
 
+describe("connectwise-manage Custom URL", () => {
+  const cwMain = require("../plugins/connectwise-manage/main");
+  afterEach(() => cw.setCustomHost(""));
+
+  test("normalizes what is typed to a bare host", () => {
+    expect(cw.normalizeCustomHost("https://CW.Acme.com/v4_6_release/ConnectWise.aspx?x=1")).toBe("cw.acme.com");
+    expect(cw.normalizeCustomHost(" cw.acme.com ")).toBe("cw.acme.com");
+    expect(cw.normalizeCustomHost("http://cwserver:8443/")).toBe("cwserver");
+    expect(cw.normalizeCustomHost("10.0.0.5")).toBe("10.0.0.5");
+    expect(cw.normalizeCustomHost("")).toBe("");
+    expect(cw.normalizeCustomHost(undefined)).toBe("");
+    expect(cw.normalizeCustomHost("ftp://cw.acme.com")).toBeNull();
+    expect(cw.normalizeCustomHost("https://user:pw@cw.acme.com")).toBeNull();
+    expect(cw.normalizeCustomHost("cw acme com")).toBeNull();
+  });
+
+  test("pages on the custom host are ConnectWise, others are not", () => {
+    expect(cw.matchesUrl("https://cw.acme.com/v4_6_release/ConnectWise.aspx")).toBe(false);
+    cw.setCustomHost("cw.acme.com");
+    expect(cw.matchesUrl("https://cw.acme.com/v4_6_release/ConnectWise.aspx")).toBe(true);
+    expect(cw.matchesUrl("http://CW.ACME.COM:8443/")).toBe(true);
+    expect(cw.matchesUrl("https://na.myconnectwise.net/")).toBe(true);
+    expect(cw.matchesUrl("https://acme.com/")).toBe(false);
+    expect(cw.matchesUrl("https://x.cw.acme.com/")).toBe(false);
+    expect(cw.matchesUrl("https://cw.acme.com.evil.com/")).toBe(false);
+    expect(cw.matchesUrl("file:///cw.acme.com")).toBe(false);
+    cw.setCustomHost("");
+    expect(cw.matchesUrl("https://cw.acme.com/")).toBe(false);
+  });
+
+  test("an unusable value clears the custom host", () => {
+    cw.setCustomHost("cw.acme.com");
+    cw.setCustomHost("ftp://nope");
+    expect(cw.matchesUrl("https://cw.acme.com/")).toBe(false);
+  });
+
+  test("ticket links and quick-open work on the custom host", () => {
+    cw.setCustomHost("cw.acme.com");
+    const page = "https://cw.acme.com/v4_6_release/services/system_io/Service/fv_sr100_request.rails?service_recid=123&companyName=acme&tab=2";
+    expect(cw.recordLink(page))
+      .toBe("https://cw.acme.com/v4_6_release/services/system_io/Service/fv_sr100_request.rails?service_recid=123&companyName=acme");
+    expect(cw.ticketUrl("CW-456", { active: false, tabUrls: ["https://example.com/", page] }))
+      .toBe("https://cw.acme.com/v4_6_release/services/system_io/Service/fv_sr100_request.rails?service_recid=456&companyName=acme");
+  });
+
+  test("settings accept a bare host or nothing", () => {
+    expect(cwMain.defaultSettings).toEqual({ cwCustomHost: "" });
+    expect(cwMain.validateSettings({})).toBe(true);
+    expect(cwMain.validateSettings({ cwCustomHost: "" })).toBe(true);
+    expect(cwMain.validateSettings({ cwCustomHost: "cw.acme.com" })).toBe(true);
+    expect(cwMain.validateSettings({ cwCustomHost: "cwserver" })).toBe(true);
+    expect(cwMain.validateSettings({ cwCustomHost: "https://cw.acme.com" })).toBe(false);
+    expect(cwMain.validateSettings({ cwCustomHost: "CW.acme.com" })).toBe(false);
+    expect(cwMain.validateSettings({ cwCustomHost: "acme.freshservice.com" })).toBe(false);
+    expect(cwMain.validateSettings({ cwCustomHost: 5 })).toBe(false);
+  });
+});
+
 describe("connectwise-manage ticket keys", () => {
   test("prefixes ticket numbers so they don't collide with Freshservice", () => {
     expect(cw.ticketKey("123456")).toBe("CW-123456");

@@ -1,6 +1,7 @@
 // ConnectWise Manage plugin — main window renderer
 //
-// Registers a site adapter for ConnectWise Manage (*.myconnectwise.net) so the
+// Registers a site adapter for ConnectWise Manage (*.myconnectwise.net, plus the
+// Custom URL set in Settings for a self-hosted or custom-domain server) so the
 // Note Backup and AI Features plugins work on CW tabs the same way they do on
 // Freshservice tabs. The adapter supplies:
 //   - recordScript   — finds the open ticket number (URL first, then the page)
@@ -23,6 +24,9 @@
 
   const TICKET_PREFIX = "CW-";
   const CW_HOSTNAME_PATTERN = /(?:^|\.)myconnectwise\.net$/i;
+  // A host name of one or more labels ("cw.acme.com", "cw.acme.local", "cwserver")
+  // or an IPv4 address.
+  const CUSTOM_HOST_PATTERN = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
   const MAX_GRAB_ELEMENTS = 5000;
 
   const PUSH_DELAY_DRAFT = 500;          // ms — Draft.js push debounce
@@ -33,11 +37,35 @@
 
   // ==================== Pure helpers ====================
 
+  // The host of the Custom URL setting (cwCustomHost), kept in step with settings
+  // by the browser part below. Pages on exactly this host count as ConnectWise.
+  let customHost = "";
+
+  // A Custom URL as typed ("https://cw.acme.com/v4_6_release/…", "cw.acme.com",
+  // "cw.acme.com:8443") → its bare lower-case host name, "" when empty, or null
+  // when it isn't a usable http(s) host. Mirrored in main.js and settings.js.
+  function normalizeCustomHost(raw) {
+    let value = String(raw == null ? "" : raw).trim();
+    if (!value) return "";
+    if (value.length > 2048) return null;
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) value = "https://" + value;
+    let url;
+    try { url = new URL(value); } catch { return null; }
+    if ((url.protocol !== "https:" && url.protocol !== "http:") || url.username || url.password) return null;
+    const host = url.hostname.toLowerCase().replace(/\.$/, "");
+    return CUSTOM_HOST_PATTERN.test(host) ? host : null;
+  }
+
+  function setCustomHost(raw) {
+    customHost = normalizeCustomHost(raw) || "";
+  }
+
   function matchesUrl(url) {
     try {
       const parsed = new URL(url);
       if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
-      return CW_HOSTNAME_PATTERN.test(parsed.hostname);
+      if (CW_HOSTNAME_PATTERN.test(parsed.hostname)) return true;
+      return !!customHost && parsed.hostname.toLowerCase().replace(/\.$/, "") === customHost;
     } catch { return false; }
   }
 
@@ -650,7 +678,7 @@
 
   if (typeof module !== "undefined" && module.exports) {
     module.exports = {
-      adapter, matchesUrl, formatTitle, ticketKey, ticketNumberFromKey, ticketFromUrl, recordLink, ticketUrl,
+      adapter, matchesUrl, normalizeCustomHost, setCustomHost, formatTitle, ticketKey, ticketNumberFromKey, ticketFromUrl, recordLink, ticketUrl,
       fieldTypeLabel, pushDelay, onWatcherMessage, buildPushScript, buildReplyInsertScript, buildTimeEntryFillScript, fillTimeEntry,
       NOTES_READ_SCRIPT, REPLY_CONTEXT_SCRIPT, WATCHER_SCRIPT, RECORD_SCRIPT, SCRAPE_SCRIPT, WATCHER_PREFIX,
     };
@@ -661,6 +689,12 @@
   if (!api || !api.sites || typeof api.sites.register !== "function") {
     console.warn("[ConnectWise Manage] This app version has no site adapter API; plugin inactive.");
     return;
+  }
+  // Custom URL (Settings → Plugins → ConnectWise Manage). Set before registering so
+  // the first tab check already sees it.
+  try { setCustomHost((api.getSettings() || {}).cwCustomHost); } catch { /* no settings yet */ }
+  if (api.events && typeof api.events.on === "function") {
+    api.events.on("settings:changed", function (s) { setCustomHost(s && s.cwCustomHost); });
   }
   api.sites.register(adapter);
 })();

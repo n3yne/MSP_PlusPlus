@@ -1,11 +1,13 @@
 {
   "id": "connectwise-manage",
   "name": "ConnectWise Manage",
-  "version": "0.7.7",
+  "version": "0.8.1",
   "distribution": "directory",
-  "description": "Site support for ConnectWise Manage: ticket detection, live note sync with time-entry and stopwatch notes, ticket notes for AI Summarize, and filling the hours of a time entry for the Time Tracker.",
+  "description": "Site support for ConnectWise Manage: ticket detection, live note sync with time-entry and stopwatch notes, ticket notes for AI Summarize, and filling the hours of a time entry for the Time Tracker. Works on myconnectwise.net and on your own server or domain (Custom URL).",
   "category": "Sites",
+  "main": "main.js",
   "renderer": "renderer.js",
+  "settings": "settings.js",
   "minAppVersion": "0.5.7",
   "site": {
     "name": "ConnectWise Manage",

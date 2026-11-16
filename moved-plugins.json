@@ -82,7 +82,9 @@
     {
       "id": "connectwise-manage",
       "name": "ConnectWise Manage",
-      "settings": {},
+      "settings": {
+        "cwCustomHost": ""
+      },
       "hosts": [
         "myconnectwise.net"
       ]

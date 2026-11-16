@@ -56,6 +56,7 @@ An Electron-based wrapper for MSP and ticketing web apps (Freshservice and Conne
 
 ### ConnectWise Manage
 - **Works alongside Freshservice** – Open ConnectWise Manage (`*.myconnectwise.net`) in any tab; each tab uses the right site automatically
+- **Your own server or domain** – If ConnectWise Manage runs somewhere other than `myconnectwise.net`, enter its address under **Settings → Plugins → ConnectWise Manage → Custom URL** and pages on that host are treated as ConnectWise Manage too. The Chrome user-agent and sign-in popup handling still apply to `myconnectwise.net` only
 - **Live two-way sync** – The panel syncs with the time-entry notes editor and the stopwatch notes. Stopwatch notes are reached by opening the stopwatch popup out of sight, saving it as a draft and closing it again
 - **Pull from CW / Push to CW** – Manual sync buttons, as for Freshservice
 - **Auto ticket detection** – The ticket number is read from the URL or the page and saved as `CW-123456`, so it never collides with Freshservice numbers

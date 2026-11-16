@@ -130,7 +130,7 @@ describe("checkAgainstPublished", () => {
 });
 
 describe("plugins.yml", () => {
-  const yml = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "plugins.yml"), "utf8");
+  const yml = fs.readFileSync(path.join(__dirname, "..", ".github", "workflows", "plugins.yml"), "utf8").replace(/\r\n/g, "\n");
   const publish = yml.slice(yml.indexOf("\n  publish:"));
 
   test("publishes only from main, behind the plugin-directory environment", () => {

@@ -89,6 +89,30 @@ describe("time-tracker timer actions", () => {
     expect(tt.pruneTimers(list, 10)).toBe(list);
   });
 
+  test("pruneTimers never drops a timer with time on it", () => {
+    const list = [
+      { id: "a", accumulatedMs: 5, runningSince: null },
+      { id: "b", accumulatedMs: 0, runningSince: 100 },
+      { id: "c", accumulatedMs: 9, runningSince: null },
+    ];
+    expect(tt.pruneTimers(list, 2).map((t) => t.id)).toEqual(["a", "b", "c"]);
+  });
+
+  test("pickTimerWebview only takes a tab on the timer's own host", () => {
+    const timer = { siteId: "freshservice", url: "https://sandbox.freshservice.com/a/tickets/123" };
+    const live = { webview: "live", siteId: "freshservice", url: "https://acme.freshservice.com/a/tickets/9" };
+    const sandbox = { webview: "sandbox", siteId: "freshservice", url: "https://sandbox.freshservice.com/a/tickets/123" };
+    expect(tt.pickTimerWebview(timer, [live])).toBeNull();
+    expect(tt.pickTimerWebview(timer, [live, sandbox])).toBe("sandbox");
+    expect(tt.pickTimerWebview({ siteId: "freshservice", url: "" }, [live])).toBe("live");
+  });
+
+  test("sleepGapMs spots a heartbeat that came back much too late", () => {
+    expect(tt.sleepGapMs(0, 30000, 30000, 300000)).toBe(0);
+    expect(tt.sleepGapMs(0, 90000, 30000, 300000)).toBe(0);
+    expect(tt.sleepGapMs(0, 30000 + 3600000, 30000, 300000)).toBe(3600000);
+  });
+
   test("buildCopyText has the time, ticket, title and note", () => {
     const t = { siteName: "FS", label: "ticket #123", key: "123", title: "Printer offline" };
     expect(tt.buildCopyText(t, 65, " Restarted the spooler ")).toBe("1:05 (1.08 h) — FS · ticket #123: Printer offline\nRestarted the spooler");
@@ -129,6 +153,13 @@ describe("time-tracker main", () => {
     const timers = Array.from({ length: 250 }, (_, i) => ({ id: "t" + i, key: String(i), siteId: "s" }));
     expect(ttMain.sanitizeStore({ timers }).timers).toHaveLength(ttMain.MAX_TIMERS);
     expect(ttMain.sanitizeStore(null)).toEqual({ version: 1, savedAt: 0, timers: [], log: [] });
+  });
+
+  test("sanitizeStore keeps timers with unlogged time past the cap", () => {
+    const timers = Array.from({ length: 250 }, (_, i) => ({ id: "t" + i, key: String(i), siteId: "s", accumulatedMs: i < 230 ? 60000 : 0 }));
+    const kept = ttMain.sanitizeStore({ timers }).timers;
+    expect(kept).toHaveLength(230);
+    expect(kept.every((t) => t.accumulatedMs > 0)).toBe(true);
   });
 });
 

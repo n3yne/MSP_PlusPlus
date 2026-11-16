@@ -99,7 +99,10 @@ function sanitizeLog(list, now) {
   return out.length > MAX_LOG ? out.slice(out.length - MAX_LOG) : out;
 }
 
-// Cleans the whole store: at most MAX_TIMERS timers, unique ids and keys.
+// Cleans the whole store: unique ids and keys, at most MAX_TIMERS timers, but
+// timers with unlogged time are kept past that (up to HARD_MAX_TIMERS) so a long
+// list never loses time; idle ones are dropped first.
+const HARD_MAX_TIMERS = MAX_TIMERS * 5;
 function sanitizeStore(data) {
   const list = data && Array.isArray(data.timers) ? data.timers : [];
   const seenIds = new Set();
@@ -113,7 +116,10 @@ function sanitizeStore(data) {
     seenIds.add(t.id);
     seenKeys.add(scopedKey);
     timers.push(t);
-    if (timers.length >= MAX_TIMERS) break;
+    if (timers.length >= HARD_MAX_TIMERS) break;
+  }
+  for (let i = timers.length - 1; i >= 0 && timers.length > MAX_TIMERS; i--) {
+    if (!timers[i].runningSince && !timers[i].accumulatedMs) timers.splice(i, 1);
   }
   const savedAt = Number(data && data.savedAt);
   return {

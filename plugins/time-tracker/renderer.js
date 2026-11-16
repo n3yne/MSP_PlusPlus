@@ -122,7 +122,8 @@
   }
 
   // Keeps the list under MAX_TIMERS by dropping the oldest timers that aren't
-  // running and have nothing unlogged on them first, then the oldest of the rest.
+  // running and have nothing unlogged on them. A timer with time on it is never
+  // dropped, so the list can go over the limit rather than lose unlogged time.
   function pruneTimers(timers, max) {
     const limit = max || MAX_TIMERS;
     if (timers.length <= limit) return timers;
@@ -130,7 +131,30 @@
     for (let i = out.length - 1; i >= 0 && out.length > limit; i--) {
       if (!out[i].runningSince && !out[i].accumulatedMs) out.splice(i, 1);
     }
-    return out.slice(0, limit);
+    return out;
+  }
+
+  function hostOf(url) {
+    try { return new URL(url).hostname.toLowerCase(); } catch { return ""; }
+  }
+
+  // The time a running timer should leave out because the computer was asleep:
+  // a heartbeat that should come every intervalMs arrived gapMs late.
+  function sleepGapMs(lastBeat, now, intervalMs, thresholdMs) {
+    const gap = now - lastBeat - intervalMs;
+    return gap >= thresholdMs ? gap : 0;
+  }
+
+  // The tab to log a timer's time from. tabs: [{ webview, siteId, url }], the
+  // active tab first. Only a tab on the timer's site and on the same host as the
+  // timer's link counts: another instance of the same site (a second
+  // Freshservice account) has its own ticket with the same number.
+  function pickTimerWebview(timer, tabs) {
+    const host = hostOf(timer && timer.url);
+    const match = (tabs || []).find(function (t) {
+      return t && t.siteId === timer.siteId && (!host || hostOf(t.url) === host);
+    });
+    return match ? match.webview : null;
   }
 
   // Timers still marked running when they're loaded weren't paused at close
@@ -225,6 +249,7 @@
     module.exports = {
       elapsedMs, roundMinutes, formatClock, formatHM, decimalHours, parseDuration,
       buildCopyText, timerName, sameRecord, pauseTimer, startTimer, adjustTimer, pruneTimers, resumeAfterCrash,
+      hostOf, sleepGapMs, pickTimerWebview,
       dayKey, shiftDay, makeLogEntry, summarizeDay, buildSummaryText,
     };
     return;
@@ -330,14 +355,16 @@
     const active = api.browser.getActiveTab();
     const rec = active ? await recordInWebview(active.webview) : null;
     if (seq !== detectSeq) return;
-    const changed = !sameRecord(current, rec);
+    const changed = !sameRecord(current, rec) || (current && rec && current.title !== rec.title);
     current = rec;
+    let touched = false;
     if (rec) {
       // Keep a timer's title and link fresh (the subject loads after the URL).
       const t = findTimer(rec);
       if (t && rec.title && (t.title !== rec.title || t.url !== rec.url)) {
         t.title = rec.title;
         t.url = rec.url || t.url;
+        touched = true;
         scheduleSave();
       }
     }
@@ -345,7 +372,9 @@
       const t = findTimer(rec);
       if (!t || !t.runningSince) start(rec);
     }
-    render();
+    // Only when something changed: rebuilding the panel every few seconds
+    // jumps its scroll and can swallow a click.
+    if (changed || touched) render();
   }
 
   let detectTimer = null;
@@ -440,6 +469,7 @@
   }
 
   async function remove(t) {
+    if (logBusy && openLogId === t.id) return;
     const ms = elapsedMs(t, Date.now());
     if (ms >= 60000) {
       const ok = await api.ui.confirm("Delete the timer for " + timerName(t) + "? It has " + formatClock(ms) + " that hasn't been logged.");
@@ -473,6 +503,7 @@
   }
 
   function closeLog() {
+    if (logBusy) return;
     openLogId = null;
     logDraft = null;
     render();
@@ -495,27 +526,39 @@
   }
 
   // The tab to hand the site adapter: the active tab when it shows this
-  // timer's site, else any tab on that site.
-  function webviewForSite(siteId) {
+  // timer's site and host, else any tab that does (see pickTimerWebview).
+  function webviewForTimer(t) {
     const active = api.browser.getActiveTab();
-    const onSite = function (wv) {
-      const site = api.sites.forWebview(wv);
-      return site && site.id === siteId;
-    };
-    if (active && onSite(active.webview)) return active.webview;
-    const any = api.browser.getTabs().find(function (t) { return onSite(t.webview); });
-    return any ? any.webview : null;
+    const all = api.browser.getTabs();
+    const ordered = (active ? [active] : []).concat(all.filter(function (x) { return !active || x.id !== active.id; }));
+    const tabs = ordered.map(function (x) {
+      const site = x.webview ? api.sites.forWebview(x.webview) : null;
+      let url = "";
+      try { url = x.webview.getURL() || ""; } catch { /* not attached */ }
+      return { webview: x.webview, siteId: site ? site.id : "", url: url };
+    });
+    return pickTimerWebview(t, tabs);
   }
 
   async function logToSite(t) {
     const site = api.sites.get(t.siteId);
     const minutes = draftMinutes();
     if (!site || !site.timeEntry || minutes == null || logBusy) return;
-    logBusy = true;
-    setLogStatus("Saving…", "");
-    const webview = webviewForSite(t.siteId);
+    // Taken now: the form can't change while the entry is saved (it's
+    // disabled), and the result is recorded with what was sent.
+    const note = logDraft.note;
+    const billable = logDraft.billable;
+    const webview = webviewForTimer(t);
+    // The timer's own link decides the host (and so the account) the time goes
+    // to; a tab elsewhere must not redirect it.
     let url = t.url;
-    try { if (webview) url = webview.getURL() || url; } catch { /* use the saved link */ }
+    if (!url && webview) {
+      try { url = webview.getURL() || ""; } catch { /* no link at all */ }
+    }
+    logBusy = true;
+    logDraft.status = "Saving…";
+    logDraft.statusKind = "";
+    render();
     let res;
     try {
       res = await site.timeEntry.log({
@@ -523,8 +566,8 @@
         url: url,
         record: { ticket: t.key, kind: t.kind || "ticket", id: t.recordId, label: t.label },
         minutes: minutes,
-        note: logDraft.note,
-        billable: site.timeEntry.billable ? logDraft.billable : undefined,
+        note: note,
+        billable: site.timeEntry.billable ? billable : undefined,
         startedAt: t.createdAt,
       });
     } catch (err) {
@@ -532,13 +575,20 @@
     }
     logBusy = false;
     if (res && res.ok) {
-      markLogged(t, minutes, "site", logDraft.note);
-      openLogId = null;
-      logDraft = null;
+      markLogged(t, minutes, "site", note);
+      if (openLogId === t.id) {
+        openLogId = null;
+        logDraft = null;
+      }
       flash(res.message || ("Logged " + formatHM(minutes) + " on " + timerName(t) + "."), "ok");
       render();
     } else {
-      setLogStatus(((res && res.error) || "The time wasn't logged.") + " Copy it instead and paste it into the site.", "error");
+      if (logDraft) {
+        logDraft.status = ((res && res.error) || "The time wasn't logged.") +
+          " If you're not sure whether it went through, check the ticket before trying again, or copy it instead.";
+        logDraft.statusKind = "error";
+      }
+      render();
     }
   }
 
@@ -555,7 +605,7 @@
 
   function markLoggedFromForm(t) {
     const minutes = draftMinutes();
-    if (minutes == null) return;
+    if (minutes == null || logBusy) return;
     markLogged(t, minutes, "marked", logDraft.note);
     openLogId = null;
     logDraft = null;
@@ -691,9 +741,13 @@
       const b = button(te.label, "btn-primary tmr-needs-time", "Send this time to " + (site.name || "the site"), function () { logToSite(t); }, minutes == null || logBusy);
       actions.appendChild(b);
     }
-    actions.appendChild(button("📋 Copy", "btn-secondary tmr-needs-time", "Copy the time and note", function () { copyLog(t); }, minutes == null));
-    actions.appendChild(button("Mark logged", "btn-secondary tmr-needs-time", "You logged it yourself: reset this timer", function () { markLoggedFromForm(t); }, minutes == null));
-    actions.appendChild(button("Cancel", "btn-secondary", null, closeLog));
+    actions.appendChild(button("📋 Copy", "btn-secondary tmr-needs-time", "Copy the time and note", function () { copyLog(t); }, minutes == null || logBusy));
+    actions.appendChild(button("Mark logged", "btn-secondary tmr-needs-time", "You logged it yourself: reset this timer", function () { markLoggedFromForm(t); }, minutes == null || logBusy));
+    actions.appendChild(button("Cancel", "btn-secondary", null, closeLog, logBusy));
+    if (logBusy) {
+      timeInput.disabled = true;
+      note.disabled = true;
+    }
     form.appendChild(actions);
     if (!te) {
       form.appendChild(h("div", { className: "tmr-muted" }, [
@@ -894,6 +948,27 @@
     const total = panel.querySelector(".tmr-total");
     if (total) total.textContent = formatClock(timers.reduce(function (sum, t) { return sum + elapsedMs(t, now); }, 0));
   }, 1000);
+
+  // Time the computer spends asleep isn't work: timers don't fire while it
+  // sleeps, so a heartbeat that comes back very late means it was asleep, and
+  // running timers leave that stretch out.
+  const HEARTBEAT_MS = 30000;
+  const SLEEP_THRESHOLD_MS = 5 * 60000;
+  let lastBeat = Date.now();
+  setInterval(function () {
+    const now = Date.now();
+    const gap = sleepGapMs(lastBeat, now, HEARTBEAT_MS, SLEEP_THRESHOLD_MS);
+    lastBeat = now;
+    if (!gap || !loaded) return;
+    let any = false;
+    timers.forEach(function (t) {
+      if (t.runningSince) { t.runningSince = Math.min(now, t.runningSince + gap); any = true; }
+    });
+    if (!any) return;
+    scheduleSave();
+    flash("Left out " + formatHM(Math.round(gap / 60000)) + " while the computer was asleep.", "ok");
+    render();
+  }, HEARTBEAT_MS);
 
   // Saves running timers once a minute, so a crash loses at most a minute.
   setInterval(function () {

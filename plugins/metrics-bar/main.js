@@ -31,7 +31,8 @@ module.exports = {
   },
 
   // A field may carry an optional apiQuery: a Freshservice ticket filter query
-  // whose match count is used as the value before scraping the dashboard.
+  // whose match count is used as the value before scraping the dashboard, and
+  // resetsWeekly: false for values that don't start again at 0 each work week.
   validateSettings: function (s) {
     if (s.metricsBarEnabled !== undefined && typeof s.metricsBarEnabled !== "boolean") return false;
     if (s.metricsBarInterval !== undefined && (typeof s.metricsBarInterval !== "number" || ![5, 15, 30, 60].includes(s.metricsBarInterval))) return false;
@@ -50,6 +51,7 @@ module.exports = {
           if (typeof f.label !== "string" || f.label.length === 0 || f.label.length > 50) return false;
           if (typeof f.selector !== "string" || f.selector.length === 0 || f.selector.length > 2000) return false;
           if (f.apiQuery !== undefined && (typeof f.apiQuery !== "string" || f.apiQuery.length > 500)) return false;
+          if (f.resetsWeekly !== undefined && typeof f.resetsWeekly !== "boolean") return false;
         }
       }
     }

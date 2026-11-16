@@ -49,6 +49,18 @@
   const metricsStale = new Set();
   const WEEK_RESET_STALE_WINDOW_MS = 60 * 60 * 1000;
 
+  // Fields count from the start of the work week unless "Resets every week" is
+  // unticked (resetsWeekly: false), e.g. a running total or an open-ticket count.
+  // Those keep their value across the week boundary instead of starting at 0.
+  function fieldResetsWeekly(id) {
+    for (const db of appSettings.metricsBarDashboards || []) {
+      for (const f of db.fields || []) {
+        if (f.id === id) return f.resetsWeekly !== false;
+      }
+    }
+    return true;
+  }
+
   try {
     const _c = JSON.parse(localStorage.getItem("fspp-metrics-cache") || "{}");
     Object.keys(_c).forEach(function (id) {
@@ -77,7 +89,7 @@
     const _weekStartMs = _weekStart.getTime();
     let _changed = false;
     Object.keys(metricsCache).forEach(function (id) {
-      if (metricsCache[id].ts < _weekStartMs) {
+      if (metricsCache[id].ts < _weekStartMs && fieldResetsWeekly(id)) {
         metricsValues[id] = "0";
         metricsCache[id] = { value: "0", ts: Date.now(), prevValue: metricsCache[id].value };
         _changed = true;
@@ -459,6 +471,7 @@
                 // hour after the reset, and not for 0 itself: a count that genuinely matches
                 // last week's (e.g. still 0) would otherwise stay marked stale all week.
                 if (cached && cached.prevValue !== undefined && results[id] === cached.prevValue &&
+                    fieldResetsWeekly(id) &&
                     now - cached.ts < WEEK_RESET_STALE_WINDOW_MS &&
                     parseFloat(String(results[id]).replace(/[^0-9.]/g, "")) !== 0) {
                   markStale(id, "the dashboard still shows last week's value");

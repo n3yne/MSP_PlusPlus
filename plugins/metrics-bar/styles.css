@@ -452,6 +452,13 @@
   flex-shrink: 0;
 }
 
+.metrics-field-resets-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+
 .metrics-field-selector-input {
   flex: 1;
   font-family: monospace;

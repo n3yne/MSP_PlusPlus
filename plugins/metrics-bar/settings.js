@@ -328,6 +328,7 @@
       wrap.appendChild(row);
       wrap.appendChild(selRow);
       wrap.appendChild(buildApiQueryRow(dbId, f));
+      wrap.appendChild(buildResetsWeeklyRow(dbId, f));
 
       if (appSettings.metricsProgressEnabled) {
         const targetRow = document.createElement("div");
@@ -379,6 +380,37 @@
       weekStart: localDateString(weekStart),
       monthStart: localDateString(new Date(now.getFullYear(), now.getMonth(), 1)),
     };
+  }
+
+  // "Resets every week" (default on). Untick it for values that keep counting
+  // across weeks, so the bar doesn't show 0 or hold back the value at week start.
+  function buildResetsWeeklyRow(dbId, f) {
+    const row = document.createElement("div");
+    row.className = "metrics-field-selector-row";
+    const label = document.createElement("label");
+    label.className = "metrics-field-selector-label metrics-field-resets-label";
+    const box = document.createElement("input");
+    box.type = "checkbox";
+    box.checked = f.resetsWeekly !== false;
+    label.title =
+      "Ticked: this value counts from the start of the work week, so it shows 0 until the " +
+      "first refresh of the new week, and last week's number is held back for an hour.\n" +
+      "Unticked: the value doesn't reset (for example open tickets or a running total), " +
+      "so the bar keeps showing it at the start of the week.";
+    box.addEventListener("change", function () {
+      const db_ = (appSettings.metricsBarDashboards || []).find(function (d) { return d.id === dbId; });
+      if (db_) db_.fields = (db_.fields || []).map(function (x) {
+        if (x.id !== f.id) return x;
+        const next = Object.assign({}, x);
+        if (box.checked) delete next.resetsWeekly; else next.resetsWeekly = false;
+        return next;
+      });
+      saveSettings();
+    });
+    label.appendChild(box);
+    label.appendChild(document.createTextNode(" Resets every week"));
+    row.appendChild(label);
+    return row;
   }
 
   // Optional Freshservice ticket filter query for a field. When set, the

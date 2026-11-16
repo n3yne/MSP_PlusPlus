@@ -262,4 +262,61 @@ describe("metrics bar scraping", () => {
       expect(t.items.children[0].title).toMatch(/From the dashboard/);
     });
   });
+
+  describe("start of the work week", () => {
+    const WEEK_SETTINGS = {
+      metricsBarEnabled: true,
+      metricsBarInterval: 15,
+      metricsWorkDays: [1, 2, 3, 4, 5],
+      metricsWorkWeekEndDay: 5,
+      metricsBarDashboards: [{
+        id: "db1",
+        url: "https://acme.freshservice.com/a/dashboard/7",
+        fields: [
+          { id: "open", label: "Open", selector: ".open", resetsWeekly: false },
+          { id: "done", label: "Closed", selector: ".done" },
+        ],
+      }],
+    };
+    const friday = () => new Date(2026, 10, 13, 16, 0).getTime();
+
+    test("only fields that reset every week start the new week at 0", () => {
+      jest.setSystemTime(new Date(2026, 10, 16, 8, 0)); // Monday 16 Nov 2026
+      const t = setup({
+        settings: WEEK_SETTINGS,
+        reads: [{ open: null, done: null }],
+        cached: { open: { value: "12", ts: friday() }, done: { value: "4", ts: friday() } },
+      });
+      expect(t.cache().open.value).toBe("12");
+      expect(t.cache().open.prevValue).toBeUndefined();
+      expect(t.cache().done.value).toBe("0");
+      expect(t.cache().done.prevValue).toBe("4");
+    });
+
+    test("a field that doesn't reset shows a value equal to last week's", async () => {
+      jest.setSystemTime(new Date(2026, 10, 16, 8, 0));
+      const t = setup({
+        settings: WEEK_SETTINGS,
+        reads: [{ open: "12", done: "4" }],
+        cached: { open: { value: "12", ts: friday() }, done: { value: "4", ts: friday() } },
+      });
+      await jest.advanceTimersByTimeAsync(10000);
+      expect(cardValues(t.items)).toEqual(["12", "0"]);
+      expect(t.status.textContent).toMatch(/\(1 not refreshed\)/);
+      expect(t.items.children[1].children[2].title).toMatch(/still shows last week's value/);
+    });
+
+    test("unticking the box after the week-start reset lets last week's value through", async () => {
+      jest.setSystemTime(new Date(2026, 10, 16, 8, 0));
+      const settings = JSON.parse(JSON.stringify(WEEK_SETTINGS));
+      const t = setup({
+        settings,
+        reads: [{ open: "12", done: "4" }],
+        cached: { open: { value: "12", ts: friday() }, done: { value: "4", ts: friday() } },
+      });
+      settings.metricsBarDashboards[0].fields[1].resetsWeekly = false;
+      await jest.advanceTimersByTimeAsync(10000);
+      expect(cardValues(t.items)).toEqual(["12", "4"]);
+    });
+  });
 });

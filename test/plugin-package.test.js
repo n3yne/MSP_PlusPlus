@@ -89,8 +89,18 @@ describe("plugin-package", () => {
     "C:/Windows/evil.js",
     "a\\..\\evil.js",
     "con:",
+    "CON",
+    "nul.js",
+    "lib/aux/index.js",
+    "COM1.txt",
   ])("refuses the unsafe entry name %s", (name) => {
     expect(() => PluginPackage.readZip(rawZip(name, Buffer.from("x")))).toThrow(/unsafe file name/);
+  });
+
+  test("still accepts ordinary names that start like device names", () => {
+    for (const name of ["console.js", "connect.js", "nullable.js", "auxiliary/a.js", "com.js"]) {
+      expect(PluginPackage.isSafeEntryName(name)).toBe(true);
+    }
   });
 
   test("refuses symlinks, encrypted entries and non-zips", () => {

@@ -6,7 +6,7 @@
 // Where things live, under the app's data folder:
 //   installed-plugins/<id>/            code of a plugin installed from the directory
 //                                      or imported from a file or folder
-//   installed-plugins/registry.json    { "<id>": { source, version, installedAt } }
+//   installed-plugins/registry.json    { "<id>": { source, version, sha256, installedAt } }
 //   installed-plugins/.pending/<id>/   a downloaded install or update, waiting for restart
 //   installed-plugins/pending.json     { install: { "<id>": {...} }, remove: { "<id>": {...} } }
 //   plugins/<id>/                      each plugin's own data (getDataPath()), never
@@ -204,11 +204,65 @@ function cleanupStaleTemp(userData, logger = console) {
   }
 }
 
+// Plugins imported before 0.8 were unpacked into their own data folder
+// (plugins/<id>, which the plugin also writes its data to). From 0.8.4 code never
+// loads from a data folder, so a page or a plugin bug that writes a file there
+// can't turn into code that runs. Each such plugin is copied into
+// installed-plugins/<id> (unless a copy at least as new is there already) and its
+// manifest.json in the data folder is renamed, so it is no longer a plugin; its
+// data stays where it is. Never throws.
+const LEGACY_MANIFEST_SUFFIX = ".moved-to-installed-plugins";
+function migrateLegacyImports(userData, logger = console) {
+  const dataRoot = path.join(userData, "plugins");
+  let names;
+  try { names = fs.readdirSync(dataRoot, { withFileTypes: true }); } catch { return []; }
+  const root = installedRoot(userData);
+  const moved = [];
+  for (const entry of names) {
+    if (!entry.isDirectory() || entry.name.startsWith(".")) continue;
+    const dir = path.join(dataRoot, entry.name);
+    const manifestFile = path.join(dir, "manifest.json");
+    const manifest = readJson(manifestFile, null);
+    if (!manifest) continue;
+    try {
+      const id = manifest.id;
+      if (typeof id === "string" && ID_PATTERN.test(id)) {
+        const dest = path.join(root, id);
+        const installed = readJson(path.join(dest, "manifest.json"), null);
+        const version = typeof manifest.version === "string" ? manifest.version : "";
+        if (!installed || compareVersions(version, installed.version) > 0) {
+          const tmp = path.join(root, `${id}.tmp-${crypto.randomBytes(4).toString("hex")}`);
+          fs.mkdirSync(root, { recursive: true });
+          fs.cpSync(dir, tmp, { recursive: true, errorOnExist: false, force: true });
+          rmrf(dest);
+          moveDirSync(tmp, dest);
+          const registry = readRegistry(userData);
+          registry[id] = { source: "imported", version, installedAt: new Date().toISOString() };
+          writeRegistry(userData, registry);
+        }
+        // Before 0.8.4, removing such a plugin also removed its data folder (the
+        // Remove prompt said so); keep that promise for a removal already staged.
+        const pending = readPending(userData);
+        if (pending.remove[id]) {
+          pending.remove[id] = Object.assign({}, pending.remove[id], { deleteData: true });
+          writePending(userData, pending);
+        }
+        moved.push(id);
+      }
+      fs.renameSync(manifestFile, manifestFile + LEGACY_MANIFEST_SUFFIX);
+    } catch (err) {
+      logger.error(`[PluginDirectory] Couldn't move the plugin in "${dir}" out of its data folder:`, err);
+    }
+  }
+  return moved;
+}
+
 // Applies staged installs, updates and removals. Run once at startup, before
 // plugins load. Never throws: a change that fails stays pending, is logged, and
 // is retried at the next start.
 function applyPending(userData, logger = console) {
   cleanupStaleTemp(userData, logger);
+  migrateLegacyImports(userData, logger);
   const root = installedRoot(userData);
   const pending = readPending(userData);
   const ids = Object.keys(pending.install).concat(Object.keys(pending.remove));
@@ -251,6 +305,7 @@ function applyPending(userData, logger = console) {
       registry[id] = {
         source: info.source === "imported" ? "imported" : "directory",
         version: typeof info.version === "string" ? info.version : "",
+        sha256: typeof info.sha256 === "string" && SHA256_PATTERN.test(info.sha256) ? info.sha256 : "",
         installedAt: new Date().toISOString(),
       };
       delete pending.install[id];
@@ -273,7 +328,8 @@ function applyPending(userData, logger = console) {
 
 // Puts a package's files in .pending/<id> and records the change. Replaces any
 // earlier staged copy of the same plugin, and cancels a staged removal of it.
-function stagePackage(userData, files, manifest, source) {
+// sha256 is the package's, kept in the registry so an install can be traced back.
+function stagePackage(userData, files, manifest, source, sha256 = "") {
   const id = manifest.id;
   const root = installedRoot(userData);
   const pendingRoot = path.join(root, PENDING_DIR);
@@ -288,7 +344,7 @@ function stagePackage(userData, files, manifest, source) {
     throw err;
   }
   const pending = readPending(userData);
-  pending.install[id] = { version: typeof manifest.version === "string" ? manifest.version : "", source };
+  pending.install[id] = { version: typeof manifest.version === "string" ? manifest.version : "", source, sha256 };
   delete pending.remove[id];
   writePending(userData, pending);
 }
@@ -413,6 +469,34 @@ function sha256(buf) {
   return crypto.createHash("sha256").update(buf).digest("hex");
 }
 
+// Reads a fetch response's body, giving up (with tooLarge) as soon as it passes
+// max bytes, so a server that sends no length, or lies about it, can't make the
+// app hold an unbounded download in memory.
+async function readLimited(resp, max, tooLarge) {
+  const len = Number(resp.headers && typeof resp.headers.get === "function" && resp.headers.get("content-length"));
+  if (len && len > max) throw new Error(tooLarge);
+  const body = resp.body;
+  if (!body || typeof body.getReader !== "function") {
+    const buf = Buffer.from(await resp.arrayBuffer());
+    if (buf.length > max) throw new Error(tooLarge);
+    return buf;
+  }
+  const reader = body.getReader();
+  const chunks = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.length;
+    if (total > max) {
+      try { await reader.cancel(); } catch { /* already closed */ }
+      throw new Error(tooLarge);
+    }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks, total);
+}
+
 // opts:
 //   userData      the app's data folder
 //   appVersion    running app version, for minAppVersion
@@ -456,8 +540,7 @@ function createPluginDirectory(opts) {
     if (resp.status === 304) return;
     if (resp.status === 404) throw new Error("The plugin directory hasn't been published yet");
     if (!resp.ok) throw new Error(`The plugin directory answered with error ${resp.status}`);
-    const text = await resp.text();
-    if (text.length > MAX_INDEX_BYTES) throw new Error("The plugin directory's index is too large");
+    const text = (await readLimited(resp, MAX_INDEX_BYTES, "The plugin directory's index is too large")).toString("utf8");
     let json;
     try { json = JSON.parse(text); } catch { throw new Error("The plugin directory's index isn't valid JSON"); }
     index = parseIndex(json, indexUrl, logger);
@@ -570,12 +653,10 @@ function createPluginDirectory(opts) {
   async function download(entry) {
     const resp = await fetchImpl(entry.url, { headers: { "User-Agent": userAgent } });
     if (!resp.ok) throw new Error(`Download of ${entry.name} failed (error ${resp.status})`);
-    const len = Number(resp.headers && typeof resp.headers.get === "function" && resp.headers.get("content-length"));
-    if (len && len > PluginPackage.MAX_PACKAGE_BYTES) throw new Error(`${entry.name} is too large`);
-    const buf = Buffer.from(await resp.arrayBuffer());
-    if (buf.length !== entry.size || sha256(buf) !== entry.sha256) {
-      throw new Error(`${entry.name} didn't match the directory's checksum, so it wasn't installed`);
-    }
+    const mismatch = `${entry.name} didn't match the directory's checksum, so it wasn't installed`;
+    // entry.size is at most MAX_PACKAGE_BYTES (parseIndex); a longer download can't match.
+    const buf = await readLimited(resp, entry.size, mismatch);
+    if (buf.length !== entry.size || sha256(buf) !== entry.sha256) throw new Error(mismatch);
     return buf;
   }
 
@@ -590,7 +671,7 @@ function createPluginDirectory(opts) {
     if (manifest.version !== entry.version) {
       throw new Error(`${entry.name}'s package is version ${manifest.version}, not ${entry.version}`);
     }
-    stagePackage(userData, files, manifest, "directory");
+    stagePackage(userData, files, manifest, "directory", entry.sha256);
     return { id: entry.id, name: entry.name, version: entry.version };
   }
 
@@ -636,23 +717,32 @@ function createPluginDirectory(opts) {
     return install(ids);
   }
 
-  // Imports a .mspplugin file (buffer) or a plugin folder (path) chosen by the user.
-  function importPackage({ buffer, folder }) {
-    let manifest;
-    let files;
-    if (buffer) {
-      ({ manifest, files } = PluginPackage.readPackage(buffer));
-    } else if (folder) {
-      const buf = PluginPackage.packFolder(folder);
-      ({ manifest, files } = PluginPackage.readPackage(buf));
-    } else {
-      throw new Error("Nothing to import");
-    }
+  // Imports a .mspplugin file (buffer) or a plugin folder (path) chosen by the
+  // user. confirm(info) is asked first, with what the package is and what it would
+  // replace, and nothing is staged unless it resolves true:
+  //   info = { id, name, version, replaces: { name, version, source } | null }
+  // Returns { id, name, version }, or { cancelled: true }.
+  async function importPackage({ buffer, folder, confirm }) {
+    let buf;
+    if (buffer) buf = buffer;
+    else if (folder) buf = PluginPackage.packFolder(folder);
+    else throw new Error("Nothing to import");
+    const { manifest, files } = PluginPackage.readPackage(buf);
     if (manifest.minAppVersion && compareVersions(appVersion, manifest.minAppVersion) < 0) {
       throw new Error(`This plugin needs MSP++ ${manifest.minAppVersion} or newer`);
     }
-    stagePackage(userData, files, manifest, "imported");
-    return { id: manifest.id, name: typeof manifest.name === "string" ? manifest.name : manifest.id, version: manifest.version || "" };
+    const name = cleanText(manifest.name, 80) || manifest.id;
+    const version = typeof manifest.version === "string" ? manifest.version.slice(0, 40) : "";
+    const have = installedMap().get(manifest.id);
+    const info = {
+      id: manifest.id,
+      name,
+      version,
+      replaces: have ? { name: have.name || have.id, version: have.version || "", source: have.source || "" } : null,
+    };
+    if (typeof confirm !== "function" || (await confirm(info)) !== true) return { cancelled: true };
+    stagePackage(userData, files, manifest, "imported", sha256(buf));
+    return { id: info.id, name, version };
   }
 
   // Removes an installed (not bundled) plugin at the next start.
@@ -692,6 +782,7 @@ module.exports = {
   readRegistry,
   readPending,
   applyPending,
+  migrateLegacyImports,
   moveDirSync,
   cleanupStaleTemp,
   stagePackage,

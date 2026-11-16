@@ -28,6 +28,13 @@
     return d && !/[/:]/.test(d) ? d : "";
   }
 
+  // The company alias of the instance (Settings → Freshservice → Alias Host). The app
+  // redirects it to the Freshservice host, but a tab can show it while that starts.
+  function aliasHost() {
+    const d = String(settings.fsAliasHost || "").trim().toLowerCase();
+    return d && settings.fsAliasTarget && !/[/:]/.test(d) ? d : "";
+  }
+
   function homeHost() {
     try {
       const u = new URL(settings.defaultUrl || "");
@@ -57,6 +64,7 @@
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return false;
     const host = parsed.hostname.toLowerCase();
     if (FRESHWORKS_HOSTNAME_PATTERN.test(host) || (!!apiHost() && host === apiHost())) return true;
+    if (!!aliasHost() && host === aliasHost()) return true;
     // A custom helpdesk domain set as the Home URL counts as Freshservice too,
     // unless another site plugin claims it (it could be that site's home page).
     return !!homeHost() && host === homeHost() && !claimedByAnotherSite(url);

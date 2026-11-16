@@ -7,7 +7,9 @@
       "onByDefault": true,
       "settings": {
         "fsApiEnabled": true,
-        "fsApiDomain": ""
+        "fsApiDomain": "",
+        "fsAliasHost": "",
+        "fsAliasTarget": ""
       },
       "credentials": [
         "fsApiKey"

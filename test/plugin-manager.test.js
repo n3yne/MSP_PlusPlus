@@ -146,6 +146,82 @@ describe("plugin-manager", () => {
     expect(pluginManager.getPluginDefaultSettings().defaultUrl).toBe("https://freshservice.com/login");
   });
 
+  describe("host redirects", () => {
+    afterEach(() => {
+      pluginManager.setHostRedirectsListener(null);
+      delete global.__redirectApi;
+    });
+
+    test("the Freshservice alias host setting becomes a redirect", async () => {
+      const { userData } = makeUserData();
+      await pluginManager.initPlugins(userData,
+        { fsAliasHost: "service.example.com", fsAliasTarget: "acme.freshservice.com" }, ipcMain);
+      expect(pluginManager.getHostRedirects()).toEqual([
+        { from: "service.example.com", to: "acme.freshservice.com", pluginId: "freshservice" },
+      ]);
+    });
+
+    test("no alias set means no redirects", async () => {
+      const { userData } = makeUserData();
+      await pluginManager.initPlugins(userData, {}, ipcMain);
+      expect(pluginManager.getHostRedirects()).toEqual([]);
+    });
+
+    test("only allows redirects to the plugin's own site hosts, from hosts no site owns", async () => {
+      const { userData } = makeUserData();
+      const dir = path.join(userData, "plugins", "redirect-test");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({
+        id: "redirect-test",
+        main: "main.js",
+        site: { name: "Redirect Test", hosts: ["helpdesk-example.net"] },
+      }));
+      fs.writeFileSync(path.join(dir, "main.js"),
+        "module.exports = function (api) { global.__redirectApi = api; api.setHostRedirects([" +
+        "{ from: 'Alias.Example.org', to: 'na.helpdesk-example.net' }," +   // fine
+        "{ from: 'other.example.org', to: 'evil.example.com' }," +          // not its host
+        "{ from: 'acme.freshservice.com', to: 'na.helpdesk-example.net' }," + // another site's host
+        "{ from: 'same.helpdesk-example.net', to: 'same.helpdesk-example.net' }," + // loop
+        "{ from: 'https://x.com/', to: 'na.helpdesk-example.net' }," +      // not a bare host
+        "'junk'" +
+        "]); };");
+      await pluginManager.initPlugins(userData, {}, ipcMain);
+      expect(pluginManager.getHostRedirects()).toEqual([
+        { from: "alias.example.org", to: "na.helpdesk-example.net", pluginId: "redirect-test" },
+      ]);
+
+      // A later call replaces the list and tells the listener.
+      const calls = [];
+      pluginManager.setHostRedirectsListener(() => calls.push(pluginManager.getHostRedirects()));
+      global.__redirectApi.setHostRedirects([]);
+      expect(calls).toEqual([[]]);
+    });
+
+    test("a plugin without a site block can't redirect", async () => {
+      const { userData } = makeUserData();
+      const dir = path.join(userData, "plugins", "nosite-test");
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({ id: "nosite-test", main: "main.js" }));
+      fs.writeFileSync(path.join(dir, "main.js"),
+        "module.exports = function (api) { api.setHostRedirects([{ from: 'a.example.org', to: 'acme.freshservice.com' }]); };");
+      await pluginManager.initPlugins(userData, {}, ipcMain);
+      expect(pluginManager.getHostRedirects()).toEqual([]);
+    });
+
+    test("redirectUrlFor swaps only the host and keeps path, query and fragment", () => {
+      const r = [{ from: "service.example.com", to: "acme.freshservice.com" }];
+      expect(pluginManager.redirectUrlFor("https://service.example.com/a/tickets/12?view=1#notes", r))
+        .toBe("https://acme.freshservice.com/a/tickets/12?view=1#notes");
+      expect(pluginManager.redirectUrlFor("http://user:pw@SERVICE.example.com:8080/support/home", r))
+        .toBe("https://acme.freshservice.com/support/home");
+      expect(pluginManager.redirectUrlFor("https://service.example.com", r)).toBe("https://acme.freshservice.com/");
+      expect(pluginManager.redirectUrlFor("https://sub.service.example.com/", r)).toBeNull();
+      expect(pluginManager.redirectUrlFor("https://acme.freshservice.com/", r)).toBeNull();
+      expect(pluginManager.redirectUrlFor("ftp://service.example.com/", r)).toBeNull();
+      expect(pluginManager.redirectUrlFor("not a url", r)).toBeNull();
+    });
+  });
+
   test("a disabled site plugin shapes nothing", async () => {
     const { userData } = makeUserData();
     fs.mkdirSync(path.join(userData, "note-backups"), { recursive: true });

@@ -49,11 +49,18 @@ const PRIORITY_LABELS = { 1: "Low", 2: "Medium", 3: "High", 4: "Urgent" };
 // A bare hostname such as acme.freshservice.com (or a custom helpdesk domain).
 const HOSTNAME_PATTERN = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i;
 
+// Freshservice's own hosts. Keep in step with manifest.json "site.hosts".
+const FRESHWORKS_HOSTNAME_PATTERN = /(?:^|\.)(?:freshservice|freshworks|myfreshworks)\.com$/i;
+
 module.exports = {
 
   defaultSettings: {
     fsApiEnabled: true,
     fsApiDomain: "",
+    // Alias host: pages opened on fsAliasHost (a company's own name for their
+    // instance) are loaded from fsAliasTarget (its *.freshservice.com host) instead.
+    fsAliasHost: "",
+    fsAliasTarget: "",
   },
 
   validateSettings: function (s) {
@@ -65,10 +72,33 @@ module.exports = {
     if (s.fsApiKey !== undefined && (typeof s.fsApiKey !== "string" || s.fsApiKey.length > 200)) return false;
     if (s.fsApiKeyEncrypted !== undefined && (typeof s.fsApiKeyEncrypted !== "string" || s.fsApiKeyEncrypted.length > 2000)) return false;
     if (s.fsApiKeyHost !== undefined && (typeof s.fsApiKeyHost !== "string" || s.fsApiKeyHost.length > 300)) return false;
+    if (s.fsAliasHost !== undefined) {
+      if (typeof s.fsAliasHost !== "string") return false;
+      if (s.fsAliasHost && (normalizeDomain(s.fsAliasHost) !== s.fsAliasHost || isFreshworksHost(s.fsAliasHost))) return false;
+    }
+    if (s.fsAliasTarget !== undefined) {
+      if (typeof s.fsAliasTarget !== "string") return false;
+      if (s.fsAliasTarget && (normalizeDomain(s.fsAliasTarget) !== s.fsAliasTarget || !isFreshworksHost(s.fsAliasTarget))) return false;
+    }
     return true;
   },
 
   init: function (api) {
+
+    // Alias host redirect. The app (0.8.2+) redirects page loads; API calls go
+    // through fetch() below and keep using fsApiDomain, whatever it is.
+    if (typeof api.setHostRedirects === "function") {
+      let lastRedirects = null;
+      const applyAliasRedirect = function (settings) {
+        const pairs = aliasRedirects(settings);
+        const key = JSON.stringify(pairs);
+        if (key === lastRedirects) return;
+        lastRedirects = key;
+        api.setHostRedirects(pairs);
+      };
+      applyAliasRedirect(api.getSettings());
+      api.on("settings:changed", applyAliasRedirect);
+    }
 
     // Encrypt a newly entered key before it reaches disk; never write it in plain text.
     //
@@ -191,7 +221,7 @@ module.exports = {
       // The page and the API must be the same Freshservice account, or ticket
       // numbers would point at different tickets.
       const host = typeof data.host === "string" ? data.host.toLowerCase() : "";
-      if (host && host !== conn.domain) {
+      if (host && !sameInstance(host, conn.domain, api.getSettings())) {
         return { skipped: true, error: `The open page (${host}) isn't the configured Freshservice domain.` };
       }
       try {
@@ -214,7 +244,7 @@ module.exports = {
       const conn = connection();
       if (conn.error) return conn;
       const host = typeof data.host === "string" ? data.host.toLowerCase() : "";
-      if (host && host !== conn.domain) {
+      if (host && !sameInstance(host, conn.domain, api.getSettings())) {
         return { skipped: true, error: `The open page (${host}) isn't the configured Freshservice domain.` };
       }
       try {
@@ -293,7 +323,7 @@ module.exports = {
       const conn = connection();
       if (conn.error) return conn;
       const host = data && typeof data.host === "string" ? data.host.toLowerCase() : "";
-      if (host && host !== conn.domain) {
+      if (host && !sameInstance(host, conn.domain, api.getSettings())) {
         return { skipped: true, error: `The open page (${host}) isn't the configured Freshservice domain (${conn.domain}).` };
       }
       try {
@@ -544,7 +574,7 @@ module.exports = {
 
     function checkHost(data, conn) {
       const host = data && typeof data.host === "string" ? data.host.toLowerCase() : "";
-      if (host && host !== conn.domain) {
+      if (host && !sameInstance(host, conn.domain, api.getSettings())) {
         return { skipped: true, error: `The open page (${host}) isn't the configured Freshservice domain (${conn.domain}).` };
       }
       return null;
@@ -627,7 +657,7 @@ module.exports = {
       const conn = connection();
       if (conn.error) return conn;
       const host = data && typeof data.host === "string" ? data.host.toLowerCase() : "";
-      if (host && host !== conn.domain) {
+      if (host && !sameInstance(host, conn.domain, api.getSettings())) {
         return { skipped: true, error: `This ticket is on ${host}, not the configured Freshservice domain (${conn.domain}).` };
       }
       try {
@@ -663,6 +693,8 @@ module.exports = {
 
   // Exported for tests.
   normalizeDomain,
+  aliasRedirects,
+  sameInstance,
   keyHost,
   buildFilterQuery,
   buildTimeEntry,
@@ -768,6 +800,33 @@ function normalizeDomain(raw) {
   if (url.protocol !== "https:" || url.username || url.password || url.port) return null;
   const host = url.hostname.toLowerCase();
   return HOSTNAME_PATTERN.test(host) ? host : null;
+}
+
+function isFreshworksHost(host) {
+  return FRESHWORKS_HOSTNAME_PATTERN.test(String(host || ""));
+}
+
+// [{ from, to }] for api.setHostRedirects: the alias host to the Freshservice host,
+// when both are set and valid, else [].
+function aliasRedirects(settings) {
+  const from = normalizeDomain(settings && settings.fsAliasHost);
+  const to = normalizeDomain(settings && settings.fsAliasTarget);
+  if (!from || !to || from === to || isFreshworksHost(from) || !isFreshworksHost(to)) return [];
+  return [{ from, to }];
+}
+
+// True when a page host and the API domain are the same Freshservice account:
+// the same host, or the alias host and the Freshservice host it redirects to
+// (in either order — with the alias on, tabs sit on the Freshservice host while
+// the API domain may still be the alias, or the other way round).
+function sameInstance(host, domain, settings) {
+  const h = String(host || "").toLowerCase();
+  const d = String(domain || "").toLowerCase();
+  if (!h || !d) return false;
+  if (h === d) return true;
+  const pair = aliasRedirects(settings)[0];
+  if (!pair) return false;
+  return (h === pair.from && d === pair.to) || (h === pair.to && d === pair.from);
 }
 
 // The domain a saved API key belongs to, or "" when there is no key or no domain

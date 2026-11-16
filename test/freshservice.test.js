@@ -2,7 +2,7 @@
 
 const fsApi = require("../plugins/freshservice/main");
 
-const { validateSettings, defaultSettings, normalizeDomain, formatTicketText, formatArticle, buildFilterQuery, buildTimeEntry, formatTimeSpent } = fsApi;
+const { validateSettings, defaultSettings, normalizeDomain, aliasRedirects, sameInstance, formatTicketText, formatArticle, buildFilterQuery, buildTimeEntry, formatTimeSpent } = fsApi;
 
 // Placeholder only — never a real key.
 const FAKE_KEY = "test-key-not-real";
@@ -20,6 +20,34 @@ describe("freshservice validateSettings", () => {
     expect(validateSettings({ fsApiDomain: "not a host" })).toBe(false);
     expect(validateSettings({ fsApiKey: "x".repeat(201) })).toBe(false);
     expect(validateSettings({ fsApiKeyEncrypted: 42 })).toBe(false);
+  });
+});
+
+describe("freshservice alias host", () => {
+  test("validates the alias and Freshservice host fields", () => {
+    expect(validateSettings({ fsAliasHost: "", fsAliasTarget: "" })).toBe(true);
+    expect(validateSettings({ fsAliasHost: "service.example.com", fsAliasTarget: "acme.freshservice.com" })).toBe(true);
+    expect(validateSettings({ fsAliasHost: "https://service.example.com/" })).toBe(false);
+    expect(validateSettings({ fsAliasHost: "acme.freshservice.com" })).toBe(false);
+    expect(validateSettings({ fsAliasHost: 5 })).toBe(false);
+    expect(validateSettings({ fsAliasTarget: "service.example.com" })).toBe(false);
+    expect(validateSettings({ fsAliasTarget: "Acme.freshservice.com" })).toBe(false);
+  });
+
+  test("aliasRedirects needs both hosts", () => {
+    expect(aliasRedirects({ fsAliasHost: "service.example.com", fsAliasTarget: "acme.freshservice.com" }))
+      .toEqual([{ from: "service.example.com", to: "acme.freshservice.com" }]);
+    expect(aliasRedirects({ fsAliasHost: "service.example.com", fsAliasTarget: "" })).toEqual([]);
+    expect(aliasRedirects({ fsAliasHost: "", fsAliasTarget: "acme.freshservice.com" })).toEqual([]);
+    expect(aliasRedirects({ fsAliasHost: "a.freshservice.com", fsAliasTarget: "acme.freshservice.com" })).toEqual([]);
+    expect(aliasRedirects({})).toEqual([]);
+  });
+
+  test("leaves the API domain alone", () => {
+    // The API keeps calling whatever domain is set for it, alias or not.
+    expect(validateSettings({
+      fsApiDomain: "service.example.com", fsAliasHost: "service.example.com", fsAliasTarget: "acme.freshservice.com",
+    })).toBe(true);
   });
 });
 
@@ -198,6 +226,40 @@ describe("freshservice handlers", () => {
     settings = { fsApiEnabled: true, fsApiDomain: "acme.freshservice.com" };
     expect((await handlers["get-ticket"]({ ticketId: "7" })).skipped).toBe(true);
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test("the alias host and the Freshservice host count as the same account", async () => {
+    // The API domain is the company alias; with the redirect on, tabs sit on the Freshservice host.
+    settings = {
+      fsApiEnabled: true, fsApiDomain: "service.example.com", fsApiKeyEncrypted: "enc:" + FAKE_KEY,
+      fsAliasHost: "service.example.com", fsAliasTarget: "acme.freshservice.com",
+    };
+    global.fetch = jest.fn(async (url) => {
+      if (url.includes("/conversations")) return jsonResponse({ conversations: [] });
+      return jsonResponse({ ticket: { id: 7, subject: "VPN down" } });
+    });
+    const result = await handlers["get-ticket"]({ ticketId: "7", host: "acme.freshservice.com" });
+    expect(result.text).toContain("Ticket #7: VPN down");
+    expect(global.fetch.mock.calls[0][0]).toContain("https://service.example.com/api/v2/");
+    expect((await handlers["get-ticket-fields"]({ ticketId: "7", host: "acme.freshservice.com" })).skipped).toBeUndefined();
+
+    // Another Freshservice account is still refused, and so is the pair once the alias is cleared.
+    global.fetch.mockClear();
+    expect((await handlers["get-ticket"]({ ticketId: "7", host: "other.freshservice.com" })).skipped).toBe(true);
+    expect((await handlers["add-time-entry"]({ id: "1", minutes: 5, host: "other.freshservice.com" })).skipped).toBe(true);
+    settings = Object.assign({}, settings, { fsAliasTarget: "" });
+    expect((await handlers["get-ticket"]({ ticketId: "7", host: "acme.freshservice.com" })).skipped).toBe(true);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test("sameInstance matches the alias pair in either order", () => {
+    const s = { fsAliasHost: "service.example.com", fsAliasTarget: "acme.freshservice.com" };
+    expect(sameInstance("acme.freshservice.com", "acme.freshservice.com", {})).toBe(true);
+    expect(sameInstance("acme.freshservice.com", "service.example.com", s)).toBe(true);
+    expect(sameInstance("service.example.com", "acme.freshservice.com", s)).toBe(true);
+    expect(sameInstance("acme.freshservice.com", "service.example.com", {})).toBe(false);
+    expect(sameInstance("other.freshservice.com", "service.example.com", s)).toBe(false);
+    expect(sameInstance("", "service.example.com", s)).toBe(false);
   });
 
   test("API errors are reported without the key", async () => {

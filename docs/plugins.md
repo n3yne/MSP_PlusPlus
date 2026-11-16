@@ -220,6 +220,20 @@ api.log("Hello", { from: "my-plugin" });
 // → [Plugin:my-plugin] Hello { from: 'my-plugin' }
 ```
 
+#### `api.setHostRedirects(list)`
+
+*App 0.8.2 and later.* Sends page loads on one host to another, keeping the path, query and fragment. Each call replaces your plugin's list; `[]` turns redirects off. Call it again when your settings change.
+
+```js
+api.setHostRedirects([{ from: "service.acme.com", to: "acme.freshservice.com" }]);
+// https://service.acme.com/a/tickets/12?x=1#notes → https://acme.freshservice.com/a/tickets/12?x=1#notes
+```
+
+- Both hosts are bare domains. Only an exact `from` host matches, not its subdomains. The target is always `https`, with no port.
+- `to` must be on your plugin's own `site.hosts`, and `from` must not be on any loaded site's hosts, so a plugin can't redirect another site's pages or loop on its own. Pairs that break these rules are skipped with a warning in the log. A plugin without a `site` block can't redirect.
+- Only top-level `GET` page loads are redirected. Form posts (such as a sign-in response posted back to `from`), the page's own requests, and `fetch()` calls from `main.js` go through unchanged.
+- The Freshservice plugin uses it for its **Alias Host** setting.
+
 ---
 
 ## Renderer component (`renderer.js`)
@@ -633,6 +647,7 @@ api.emit(event: string, data?: any): void
 api.getSettings(): Readonly<AppSettings>
 api.addMenuItem(opts: { label: string, accelerator?: string, click: () => void }): void
 api.log(...args: any[]): void
+api.setHostRedirects(list: Array<{ from: string, to: string }>): void   // app 0.8.2+
 ```
 
 ### Renderer (`window.pluginAPI`)

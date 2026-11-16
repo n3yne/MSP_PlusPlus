@@ -1511,6 +1511,30 @@ function installSiteUserAgent() {
   );
 }
 
+// ===================== Host redirects =====================
+
+// Plugins can send page loads on one host to another (api.setHostRedirects), e.g.
+// a company alias of their Freshservice instance to its *.freshservice.com host.
+// Only top-level GET navigations are redirected: form posts (such as a sign-in
+// response posted back to the alias) and the page's own requests go through as
+// they are. Re-installed whenever a plugin changes its list; with none, the
+// listener is removed.
+function installHostRedirects() {
+  const webRequest = electron.session.defaultSession.webRequest;
+  const redirects = pluginManager.getHostRedirects();
+  if (!redirects.length) {
+    webRequest.onBeforeRequest(null);
+    return;
+  }
+  const urls = [];
+  for (const r of redirects) urls.push(`*://${r.from}/*`);
+  webRequest.onBeforeRequest({ urls }, (details, callback) => {
+    if (details.resourceType !== "mainFrame" || details.method !== "GET") return callback({});
+    const redirectURL = pluginManager.redirectUrlFor(details.url, redirects);
+    callback(redirectURL ? { redirectURL } : {});
+  });
+}
+
 // ===================== App Lifecycle =====================
 
 // Prevent multiple instances - if already running, focus the existing window
@@ -1617,6 +1641,8 @@ electron.app.whenReady().then(async () => {
   pluginManager.updateSettings(initialSettings);
 
   installSiteUserAgent();
+  installHostRedirects();
+  pluginManager.setHostRedirectsListener(installHostRedirects);
 
   // Passkey sign-in with no username typed can find several accounts on a security
   // key; Electron has no chooser of its own and would fail the sign-in without this.

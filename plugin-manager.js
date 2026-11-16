@@ -69,6 +69,14 @@ const MAX_MENU_ITEMS = 10;
 // Callback to rebuild the app menu with plugin contributions.
 let _rebuildMenu = null;
 
+// Host redirects asked for by plugins (api.setHostRedirects): pluginId → [{ from, to }].
+// Checked against the loaded sites when read (getHostRedirects), because a plugin's
+// site block is only recorded after its init() has run.
+const _hostRedirectRequests = new Map();
+const MAX_HOST_REDIRECTS = 10;
+// Called with no arguments whenever a plugin changes its redirects (main.js re-installs them).
+let _hostRedirectsListener = null;
+
 // ===================== Semver helpers =====================
 
 function parseSemver(str) {
@@ -149,6 +157,63 @@ function parseSiteManifest(pluginId, site) {
 function hostMatchesSite(hostname, site) {
   const host = String(hostname || "").toLowerCase().replace(/\.$/, "");
   return site.hosts.some(h => host === h || host.endsWith("." + h));
+}
+
+// ===================== Host redirects =====================
+
+// Pairs a plugin may actually use: both hosts bare domains, `to` on one of that
+// plugin's own site hosts, and `from` on nobody's site hosts (so a plugin can't
+// take over another site, or redirect its own pages in a loop).
+function validHostRedirects(pluginId) {
+  const own = _sites.find(si => si.pluginId === pluginId);
+  if (!own) return [];
+  const out = [];
+  for (const r of _hostRedirectRequests.get(pluginId) || []) {
+    if (_sites.some(si => hostMatchesSite(r.from, si))) {
+      console.warn(`[PluginManager] Plugin "${pluginId}" redirect from "${r.from}" is a site host — skipped`);
+      continue;
+    }
+    if (!hostMatchesSite(r.to, own)) {
+      console.warn(`[PluginManager] Plugin "${pluginId}" redirect to "${r.to}" is not one of its site hosts — skipped`);
+      continue;
+    }
+    out.push({ from: r.from, to: r.to, pluginId });
+  }
+  return out;
+}
+
+// [{ from, to, pluginId }] for every loaded plugin. The first plugin to claim a
+// `from` host keeps it.
+function getHostRedirects() {
+  const out = [];
+  for (const pluginId of _hostRedirectRequests.keys()) {
+    for (const r of validHostRedirects(pluginId)) {
+      if (!out.some(o => o.from === r.from)) out.push(r);
+    }
+  }
+  return out;
+}
+
+function setHostRedirectsListener(fn) {
+  _hostRedirectsListener = typeof fn === "function" ? fn : null;
+}
+
+// The address to send a page load to instead of `url`, or null to leave it alone.
+// Only the host changes (to https, without a port or credentials); path, query and
+// fragment are kept. Only exact host matches redirect, not subdomains.
+function redirectUrlFor(url, redirects) {
+  let u;
+  try { u = new URL(url); } catch { return null; }
+  if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+  const host = u.hostname.toLowerCase().replace(/\.$/, "");
+  const r = (redirects || []).find(x => x.from === host);
+  if (!r) return null;
+  u.protocol = "https:";
+  u.username = "";
+  u.password = "";
+  u.port = "";
+  u.hostname = r.to;
+  return u.href;
 }
 
 // ===================== Plugin API factory =====================
@@ -257,6 +322,32 @@ function buildPluginApi(pluginId, ipcMain) {
         if (!electron.safeStorage.isEncryptionAvailable()) return null;
         return electron.safeStorage.decryptString(Buffer.from(encrypted, "base64"));
       } catch { return null; }
+    },
+
+    // Sends page loads (top-level GET navigations) on one host to another, keeping
+    // the path, query and fragment, e.g. a company alias of a helpdesk to its real
+    // host. Each call replaces this plugin's list; [] turns them off. `to` must be
+    // on this plugin's site hosts. API calls made with fetch() in main.js are not
+    // affected.
+    setHostRedirects(list) {
+      const clean = [];
+      for (const r of Array.isArray(list) ? list : []) {
+        const from = r && typeof r.from === "string" ? r.from.trim().toLowerCase() : "";
+        const to = r && typeof r.to === "string" ? r.to.trim().toLowerCase() : "";
+        if (!SITE_HOST_PATTERN.test(from) || !SITE_HOST_PATTERN.test(to) || from === to) {
+          console.warn(`[Plugin:${pluginId}] setHostRedirects: skipped invalid pair ${JSON.stringify(r)}`);
+          continue;
+        }
+        if (clean.length >= MAX_HOST_REDIRECTS) break;
+        if (!clean.some(c => c.from === from)) clean.push({ from, to });
+      }
+      if (clean.length) _hostRedirectRequests.set(pluginId, clean);
+      else _hostRedirectRequests.delete(pluginId);
+      if (_hostRedirectsListener) {
+        try { _hostRedirectsListener(); } catch (err) {
+          console.error("[PluginManager] Host redirect listener threw:", err);
+        }
+      }
     },
 
     registerSettingsTransformer(fn) {
@@ -513,6 +604,7 @@ async function initPlugins(userData, initialSettings, ipcMain, rebuildMenuFn) {
   _pluginValidators.length = 0;
   _settingsTransformers.length = 0;
   _migrators.length = 0;
+  _hostRedirectRequests.clear();
 
   await loadPluginsConfig();
 
@@ -674,5 +766,8 @@ module.exports = {
   getCredentialFields,
   getSites,
   findSiteForUrl,
+  getHostRedirects,
+  setHostRedirectsListener,
+  redirectUrlFor,
   parseSiteManifest,
 };

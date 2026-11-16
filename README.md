@@ -4,7 +4,7 @@
 
 An Electron-based wrapper for MSP and ticketing web apps (Freshservice and ConnectWise Manage today) that adds a persistent note editor, automatic backups, live two-way sync, AI assistance, a live metrics bar, and quality-of-life browser improvements on top of the standard web interface.
 
-**Current version:** 0.8.1
+**Current version:** 0.8.2
 
 > MSP++ was called **Freshservice++** before 0.6.0. Your settings, notes and sign-ins carry over: the app keeps using the existing Freshservice++ data folder.
 
@@ -50,6 +50,7 @@ An Electron-based wrapper for MSP and ticketing web apps (Freshservice and Conne
 ### Freshservice Sync (Freshservice plugin)
 - **Site support is a plugin** – Everything Freshservice-specific (ticket detection, note editor sync, page reading, the API) lives in the **Freshservice** plugin. The core app and the other plugins are site-agnostic, so support for other ticketing systems can be added as further site plugins (see [`docs/sites.md`](docs/sites.md))
 - **Live two-way sync** – With "Live Sync" enabled, the panel and the open Freshservice note editor (the rich-text **Add note** / **Reply** editor, or a note textarea such as the one on the time-entry form) stay in sync as you type — no manual copy-paste needed. When several editors are open, the one you last clicked into is used
+- **Alias host** – If your company reaches Freshservice through its own address (such as `service.yourcompany.com` for `yourcompany.freshservice.com`), set both in **Settings → Freshservice → Alias Host**. Any page opened on the alias loads from the Freshservice host instead, with the rest of the address unchanged. API calls keep using the API domain
 - **Pull from FS / Push to FS** – Manual sync buttons for when live sync is off or you want an explicit transfer
 - **Auto ticket detection** – The ticket number is read from the page URL (`/a/tickets/1234`), so switching tabs or navigating between tickets automatically loads the correct content into the panel. Changes, problems and releases are tracked too, saved as `CHN-45`, `PRB-12` and `RL-3` so they never collide with ticket numbers
 

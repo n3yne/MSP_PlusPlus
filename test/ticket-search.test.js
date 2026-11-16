@@ -192,7 +192,23 @@ describe("freshservice search-tickets handler", () => {
     const res = await handlers["search-tickets"]({ term: "#42" });
     expect(res.tickets).toHaveLength(1);
     expect(res.tickets[0]).toMatchObject({ id: 42, requester: "Sam Roe", matches: ["number"] });
-    expect(global.fetch).toHaveBeenCalledTimes(1);
+    // One ticket read (the status names may be asked for too, at most once).
+    const calls = global.fetch.mock.calls.map((c) => c[0]).filter((u) => !u.includes("/ticket_form_fields"));
+    expect(calls).toHaveLength(1);
+  });
+
+  test("custom status names come from the ticket form fields", async () => {
+    global.fetch = jest.fn(async (url) => {
+      if (url.includes("/ticket_form_fields")) {
+        return jsonResponse({ ticket_fields: [{ name: "status", choices: [{ id: 2, value: "Open" }, { id: 7, value: "Waiting on Vendor" }] }] });
+      }
+      if (url.includes("/tickets/43?include=requester")) {
+        return jsonResponse({ ticket: Object.assign(ticket(43, "Vendor case", 30, "2025-01-01T00:00:00Z"), { status: 7 }) });
+      }
+      return jsonResponse({}, 404);
+    });
+    const res = await handlers["search-tickets"]({ term: "#43" });
+    expect(res.tickets[0]).toMatchObject({ id: 43, statusLabel: "Waiting on Vendor" });
   });
 
   test("an unknown ticket number is an empty result, not an error", async () => {

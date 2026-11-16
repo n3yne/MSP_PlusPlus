@@ -56,6 +56,18 @@ const MAX_SITE_HOSTS = 20;
 // host and every subdomain of it. No scheme, port, path or wildcard.
 const SITE_HOST_PATTERN = /^(?=.{3,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
 
+// Extra hosts plugins add to their own site at run time (api.setSiteHosts), e.g. the
+// address of a self-hosted server from a setting: pluginId → [host]. Unlike manifest
+// hosts these match exactly (no subdomains) and may be a single label or an IPv4
+// address. Checked against the loaded sites when read (siteExtraHosts), because a
+// plugin's site block is only recorded after its init() has run.
+const _siteHostRequests = new Map();
+const MAX_EXTRA_SITE_HOSTS = 10;
+const EXTRA_SITE_HOST_PATTERN = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
+// Called with no arguments whenever a plugin changes its extra hosts (main.js
+// re-installs the user-agent override).
+let _siteHostsListener = null;
+
 // Plugin enable/disable config: { "plugin-id": false } — only entries for disabled plugins.
 // Missing key = enabled by default.
 let _pluginsConfig = {};
@@ -174,6 +186,42 @@ function hostMatchesSite(hostname, site) {
   return site.hosts.some(h => host === h || host.endsWith("." + h));
 }
 
+// The extra hosts (api.setSiteHosts) each loaded site actually gets: pluginId → [host].
+// A plugin without a site block gets none, a host on another plugin's site hosts is
+// skipped (so a plugin can't take over another site), and the first plugin to
+// claim a host keeps it.
+function siteExtraHosts() {
+  const out = new Map();
+  const taken = new Set();
+  for (const [pluginId, hosts] of _siteHostRequests) {
+    if (!_sites.some(si => si.pluginId === pluginId)) continue;
+    const mine = [];
+    for (const host of hosts) {
+      if (taken.has(host)) continue;
+      if (_sites.some(si => si.pluginId !== pluginId && hostMatchesSite(host, si))) {
+        console.warn(`[PluginManager] Plugin "${pluginId}" extra site host "${host}" belongs to another site — skipped`);
+        continue;
+      }
+      taken.add(host);
+      mine.push(host);
+    }
+    if (mine.length) out.set(pluginId, mine);
+  }
+  return out;
+}
+
+// A copy of a site for callers, with its current extra hosts.
+function siteWithExtraHosts(site, extra) {
+  return Object.assign({}, site, {
+    hosts: site.hosts.slice(),
+    extraHosts: (extra.get(site.pluginId) || []).slice(),
+  });
+}
+
+function setSiteHostsListener(fn) {
+  _siteHostsListener = typeof fn === "function" ? fn : null;
+}
+
 // ===================== Host redirects =====================
 
 // Pairs a plugin may actually use: both hosts bare domains, `to` on one of that
@@ -183,13 +231,14 @@ function hostMatchesSite(hostname, site) {
 function validHostRedirects(pluginId) {
   const own = _sites.find(si => si.pluginId === pluginId);
   if (!own) return [];
+  const extraHosts = [].concat(...siteExtraHosts().values());
   const out = [];
   for (const r of _hostRedirectRequests.get(pluginId) || []) {
     if (hostMatchesSite(r.from, { hosts: PROTECTED_REDIRECT_SOURCES })) {
       console.warn(`[PluginManager] Plugin "${pluginId}" redirect from "${r.from}" is a sign-in host — skipped`);
       continue;
     }
-    if (_sites.some(si => hostMatchesSite(r.from, si))) {
+    if (_sites.some(si => hostMatchesSite(r.from, si)) || extraHosts.includes(r.from)) {
       console.warn(`[PluginManager] Plugin "${pluginId}" redirect from "${r.from}" is a site host — skipped`);
       continue;
     }
@@ -366,6 +415,33 @@ function buildPluginApi(pluginId, ipcMain) {
       if (_hostRedirectsListener) {
         try { _hostRedirectsListener(); } catch (err) {
           console.error("[PluginManager] Host redirect listener threw:", err);
+        }
+      }
+    },
+
+    // Adds hosts to this plugin's own site (its manifest "site" block) at run time,
+    // e.g. a self-hosted server's address from a setting. Pages on them get what
+    // the manifest hosts get from core: the Chrome user agent (when the site asks
+    // for it) and sign-in popups as real windows. Each call replaces this plugin's
+    // list; [] removes them. Exact hosts only, not their subdomains.
+    setSiteHosts(list) {
+      const clean = [];
+      for (const h of Array.isArray(list) ? list : []) {
+        const host = typeof h === "string" ? h.trim().toLowerCase() : "";
+        if (!EXTRA_SITE_HOST_PATTERN.test(host)) {
+          console.warn(`[Plugin:${pluginId}] setSiteHosts: skipped invalid host ${JSON.stringify(h)}`);
+          continue;
+        }
+        if (clean.length >= MAX_EXTRA_SITE_HOSTS) break;
+        if (!clean.includes(host)) clean.push(host);
+      }
+      if (clean.length) _siteHostRequests.set(pluginId, clean);
+      else _siteHostRequests.delete(pluginId);
+      // A host that became a site host can no longer be redirected, so both are refreshed.
+      for (const listener of [_siteHostsListener, _hostRedirectsListener]) {
+        if (!listener) continue;
+        try { listener(); } catch (err) {
+          console.error("[PluginManager] Site hosts listener threw:", err);
         }
       }
     },
@@ -635,6 +711,7 @@ async function initPlugins(userData, initialSettings, ipcMain, rebuildMenuFn) {
   _settingsTransformers.length = 0;
   _migrators.length = 0;
   _hostRedirectRequests.clear();
+  _siteHostRequests.clear();
 
   await loadPluginsConfig();
 
@@ -698,17 +775,24 @@ function getPluginInfo() {
   }));
 }
 
-// [{ pluginId, name, shortName, hosts, defaultUrl, chromeUserAgent, color }] for loaded site plugins.
+// [{ pluginId, name, shortName, hosts, extraHosts, defaultUrl, chromeUserAgent, color }]
+// for loaded site plugins. `hosts` (from the manifest) match their subdomains too;
+// `extraHosts` (api.setSiteHosts) match exactly.
 function getSites() {
-  return _sites.map(si => Object.assign({}, si, { hosts: si.hosts.slice() }));
+  const extra = siteExtraHosts();
+  return _sites.map(si => siteWithExtraHosts(si, extra));
 }
 
-// The loaded site whose hosts include this URL's hostname, or null.
+// The loaded site this URL's hostname belongs to (a manifest host, a subdomain
+// of one, or exactly an extra host), or null.
 function findSiteForUrl(url) {
   let hostname;
   try { hostname = new URL(url).hostname; } catch { return null; }
-  const site = _sites.find(si => hostMatchesSite(hostname, si));
-  return site ? Object.assign({}, site, { hosts: site.hosts.slice() }) : null;
+  const host = hostname.toLowerCase().replace(/\.$/, "");
+  const extra = siteExtraHosts();
+  const site = _sites.find(si => hostMatchesSite(host, si)) ||
+    _sites.find(si => (extra.get(si.pluginId) || []).includes(host));
+  return site ? siteWithExtraHosts(site, extra) : null;
 }
 
 async function setPluginEnabled(id, enabled) {
@@ -804,6 +888,7 @@ module.exports = {
   findSiteForUrl,
   getHostRedirects,
   setHostRedirectsListener,
+  setSiteHostsListener,
   redirectUrlFor,
   parseSiteManifest,
 };

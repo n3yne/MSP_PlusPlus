@@ -56,7 +56,7 @@ An Electron-based wrapper for MSP and ticketing web apps (Freshservice and Conne
 
 ### ConnectWise Manage
 - **Works alongside Freshservice** – Open ConnectWise Manage (`*.myconnectwise.net`) in any tab; each tab uses the right site automatically
-- **Your own server or domain** – If ConnectWise Manage runs somewhere other than `myconnectwise.net`, enter its address under **Settings → Plugins → ConnectWise Manage → Custom URL** and pages on that host are treated as ConnectWise Manage too. The Chrome user-agent and sign-in popup handling still apply to `myconnectwise.net` only
+- **Your own server or domain** – If ConnectWise Manage runs somewhere other than `myconnectwise.net`, enter its address under **Settings → Plugins → ConnectWise Manage → Custom URL** and pages on that host are treated as ConnectWise Manage too. From MSP++ 0.8.3 that host also gets the Chrome user-agent and sign-in popups that open as real windows, as `myconnectwise.net` does
 - **Live two-way sync** – The panel syncs with the time-entry notes editor and the stopwatch notes. Stopwatch notes are reached by opening the stopwatch popup out of sight, saving it as a draft and closing it again
 - **Pull from CW / Push to CW** – Manual sync buttons, as for Freshservice
 - **Auto ticket detection** – The ticket number is read from the URL or the page and saved as `CW-123456`, so it never collides with Freshservice numbers
@@ -435,7 +435,7 @@ For plugin development documentation — including the full API reference and a 
 ## Troubleshooting
 
 - **Freshservice doesn't load** – The app sends a standard Chrome user-agent to `*.freshservice.com`, `*.freshworks.com` and `*.myfreshworks.com`. Ensure you have network access to your Freshservice instance, and set your instance URL (e.g. `https://yourcompany.freshservice.com/`) as the **Home URL** in Settings → General.
-- **ConnectWise Manage doesn't load** – The app sends the same Chrome user-agent to `*.myconnectwise.net`. Check that the **ConnectWise Manage** plugin is enabled in Settings → Plugins.
+- **ConnectWise Manage doesn't load** – The app sends the same Chrome user-agent to `*.myconnectwise.net` and to the plugin's **Custom URL** host. Check that the **ConnectWise Manage** plugin is enabled in Settings → Plugins.
 - **Login issues** – The embedded browser keeps its own session cookies. Log in once and the session will persist across launches.
 - **Live sync not working** – Freshservice only shows a note editor after you click **Add note** or **Reply** on a ticket, so open one first. On ConnectWise Manage, open a time entry or the stopwatch. The sync status pill at the bottom of the panel shows the current state (`⇅ Synced`, `⇅ Pushing…`, `⇅ No notes field`).
 - **Ticket number not detected** – On Freshservice, detection relies on the record URL (`/a/tickets/<id>`, `/a/changes/<id>`, …); on ConnectWise Manage it uses the URL or the ticket page. You can always type an ID into the **Ticket / Reference ID** box manually.

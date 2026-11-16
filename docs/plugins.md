@@ -235,6 +235,20 @@ api.setHostRedirects([{ from: "service.acme.com", to: "acme.freshservice.com" }]
 - Only top-level `GET` page loads are redirected. Form posts (such as a sign-in response posted back to `from`), the page's own requests, and `fetch()` calls from `main.js` go through unchanged.
 - The Freshservice plugin uses it for its **Alias Host** setting, and lists those settings in `sensitiveSettings`.
 
+#### `api.setSiteHosts(list)`
+
+*App 0.8.3 and later.* Adds hosts to your plugin's own site (its manifest `site` block) at run time, such as the address of a self-hosted server that the user typed into a setting. Each call replaces your plugin's list; `[]` removes them. Call it again when your settings change.
+
+```js
+if (typeof api.setSiteHosts === "function") api.setSiteHosts(["cw.acme.com"]);
+```
+
+- Pages on these hosts get what core does for the manifest `site.hosts`: the Chrome user agent (when the site sets `chromeUserAgent`) and sign-in popups that open as real windows. Your renderer adapter's `matchesUrl` still has to recognise the host itself.
+- Each entry is a bare host: a domain, a single-label name (`cwserver`) or an IPv4 address, with no scheme, port or path. Only that exact host matches, not its subdomains. Up to 10.
+- A host on another plugin's site hosts is skipped with a warning in the log, and the first plugin to add a host keeps it. A plugin without a `site` block can't add hosts. A host added here can't be the `from` of a redirect.
+- Check that the function exists first if your plugin should still load on apps before 0.8.3.
+- The ConnectWise Manage plugin uses it for its **Custom URL** setting.
+
 ---
 
 ## Renderer component (`renderer.js`)
@@ -319,7 +333,9 @@ Renderer scripts can also call the bundled plugins, so a plugin can use the app'
 | `invoke("freshservice", "count-tickets", { query, vars? })` | `{ count, query }` or `{ error, skipped? }` | Number of tickets matching a [ticket filter query](https://api.freshservice.com/) (no double quotes, 512 characters at most). `{name}` placeholders are filled from `vars`, which may only hold `YYYY-MM-DD` dates. |
 | `invoke("freshservice", "filter-tickets", { query, vars?, maxPages? })` | `{ tickets, total, query }` or `{ error, skipped? }` | The tickets matching a filter query (same rules as `count-tickets`), 30 a page, up to `maxPages` pages (1 to 10, default 1). Each is `{ id, subject, status, priority, responderId, requesterId, createdAt, updatedAt }`. |
 | `invoke("freshservice", "get-conversations", { ticketId })` | `{ ticketId, conversations }` or `{ error, skipped? }` | A ticket's replies and notes, oldest first: `{ id, userId, incoming, private, fromEmail, createdAt, snippet }`, with `snippet` cut to 300 characters. |
-| `invoke("freshservice", "find-agent", { email })` | `{ agent }` or `{ error, skipped? }` | The agent with that email: `{ id, name, email }`. The API has no way to ask who owns the key, so this is how a plugin learns which tickets are "mine". |
+| `invoke("freshservice", "find-agent", { email })` | `{ agent }` or `{ error, skipped? }` | The agent with that email: `{ id, name, email }`. |
+| `invoke("freshservice", "current-agent")` | `{ agent }` or `{ error, skipped? }` | The agent the API key belongs to (`/agents/me`): `{ id, name, email }`. The simplest way for a plugin to learn which tickets are "mine". Freshservice plugin 0.8.2+. |
+| `invoke("freshservice", "account-hosts")` | `{ domain, hosts }` or `{ error, skipped? }` | The page hosts that are the API's account: the API domain and, with an alias host set up, the other end of the alias. Compare a tab's host with these, not with `fsApiDomain`, before treating a ticket number on the page as the API's ticket. Freshservice plugin 0.8.2+. |
 | `invoke("freshservice", "search-tickets", { term, days? })` | `{ tickets, domain, days, scanned, scanFull, warnings }` or `{ error, skipped? }` | Tickets matching a number, subject words or a requester's name or email (up to 50, number matches first, then newest updated). Each is a `filter-tickets` summary plus `statusLabel`, `priorityLabel`, `requester`, `requesterEmail` and `matches` (`"number"`, `"subject"`, `"requester"`). Subjects are matched against up to 300 tickets updated in the last `days` (7, 30, 90, 180 or 365; default 30), cached for two minutes. Prefer the site's `ticketSearch` adapter. |
 
 See `plugins/solutions-chat/renderer.js` for a plugin built on `pluginAPI.sites` and the AI Features handler.
@@ -649,6 +665,7 @@ api.getSettings(): Readonly<AppSettings>
 api.addMenuItem(opts: { label: string, accelerator?: string, click: () => void }): void
 api.log(...args: any[]): void
 api.setHostRedirects(list: Array<{ from: string, to: string }>): void   // app 0.8.2+
+api.setSiteHosts(list: string[]): void   // app 0.8.3+
 ```
 
 ### Renderer (`window.pluginAPI`)

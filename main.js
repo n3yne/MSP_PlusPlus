@@ -1554,31 +1554,42 @@ function registerIpcHandlers() {
 
 // ===================== Site user agent =====================
 
-// Builds the webRequest URL filter for a list of bare domains: each domain and
-// every subdomain of it, over http and https.
-function siteUrlFilter(hosts) {
+// Builds the webRequest URL filter for a list of bare domains (each domain and
+// every subdomain of it) and a list of exact hosts, over http and https.
+function siteUrlFilter(hosts, exactHosts) {
   const urls = [];
   for (const h of hosts) urls.push(`*://${h}/*`, `*://*.${h}/*`);
+  for (const h of exactHosts || []) {
+    if (!urls.includes(`*://${h}/*`)) urls.push(`*://${h}/*`);
+  }
   return { urls };
 }
 
 // Presents a plain Chrome user agent (no "Electron/…" token) to the hosts of site
 // plugins that ask for it ("site.chromeUserAgent": true), so those sites don't treat
-// the app as an unsupported browser. Scoped to those hosts so other services see
+// the app as an unsupported browser. Covers the manifest hosts and the hosts a
+// plugin added with api.setSiteHosts. Scoped to those hosts so other services see
 // the real user agent. The Chrome version tracks the bundled Chromium so it never
-// looks outdated.
+// looks outdated. Re-installed whenever a plugin changes its extra hosts; with
+// no hosts, the listener is removed.
 function installSiteUserAgent() {
+  const webRequest = electron.session.defaultSession.webRequest;
   const hosts = [];
+  const exactHosts = [];
   for (const site of pluginManager.getSites()) {
     if (!site.chromeUserAgent) continue;
     for (const h of site.hosts) if (!hosts.includes(h)) hosts.push(h);
+    for (const h of site.extraHosts) if (!exactHosts.includes(h)) exactHosts.push(h);
   }
-  if (!hosts.length) return;
+  if (!hosts.length && !exactHosts.length) {
+    webRequest.onBeforeSendHeaders(null);
+    return;
+  }
   const chromeUserAgent =
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/" +
     process.versions.chrome + " Safari/537.36";
-  electron.session.defaultSession.webRequest.onBeforeSendHeaders(
-    siteUrlFilter(hosts),
+  webRequest.onBeforeSendHeaders(
+    siteUrlFilter(hosts, exactHosts),
     (details, callback) => {
       details.requestHeaders["User-Agent"] = chromeUserAgent;
       callback({ requestHeaders: details.requestHeaders });
@@ -1716,6 +1727,7 @@ electron.app.whenReady().then(async () => {
   pluginManager.updateSettings(initialSettings);
 
   installSiteUserAgent();
+  pluginManager.setSiteHostsListener(installSiteUserAgent);
   installHostRedirects();
   pluginManager.setHostRedirectsListener(installHostRedirects);
 

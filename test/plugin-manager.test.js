@@ -129,6 +129,7 @@ describe("plugin-manager", () => {
       name: "Site Test",
       shortName: "Site Test",
       hosts: ["example-helpdesk.net"],
+      extraHosts: [],
       defaultUrl: "https://na.example-helpdesk.net/start",
       chromeUserAgent: true,
       color: "#aabbcc",
@@ -231,6 +232,99 @@ describe("plugin-manager", () => {
       expect(pluginManager.redirectUrlFor("https://acme.freshservice.com/", r)).toBeNull();
       expect(pluginManager.redirectUrlFor("ftp://service.example.com/", r)).toBeNull();
       expect(pluginManager.redirectUrlFor("not a url", r)).toBeNull();
+    });
+  });
+
+  describe("extra site hosts", () => {
+    afterEach(() => {
+      pluginManager.setSiteHostsListener(null);
+      pluginManager.setHostRedirectsListener(null);
+      delete global.__siteHostsApi;
+    });
+
+    function writePlugin(userData, id, manifest, mainSource) {
+      const dir = path.join(userData, "plugins", id);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(Object.assign({ id, main: "main.js" }, manifest)));
+      fs.writeFileSync(path.join(dir, "main.js"), mainSource);
+    }
+
+    test("the ConnectWise Custom URL host becomes a site host", async () => {
+      const { userData } = makeUserData();
+      await pluginManager.initPlugins(userData, { cwCustomHost: "cw.acme.com" }, ipcMain);
+      const cwSite = pluginManager.getSites().find((si) => si.pluginId === "connectwise-manage");
+      expect(cwSite.hosts).toEqual(["myconnectwise.net"]);
+      expect(cwSite.extraHosts).toEqual(["cw.acme.com"]);
+      expect(cwSite.chromeUserAgent).toBe(true);
+      expect(pluginManager.findSiteForUrl("https://cw.acme.com/v4_6_release/login/login.aspx").pluginId).toBe("connectwise-manage");
+      expect(pluginManager.findSiteForUrl("http://CW.ACME.COM:8443/").pluginId).toBe("connectwise-manage");
+      expect(pluginManager.findSiteForUrl("https://x.cw.acme.com/")).toBeNull();
+      expect(pluginManager.findSiteForUrl("https://acme.com/")).toBeNull();
+
+      // Changing the setting replaces the host and tells the listener. (Earlier
+      // tests in this file loaded the plugin too, and each load listens.)
+      const extraHosts = () => pluginManager.getSites().find((si) => si.pluginId === "connectwise-manage").extraHosts;
+      const calls = [];
+      pluginManager.setSiteHostsListener(() => calls.push(extraHosts()));
+      pluginManager.fireEvent("settings:changed", { cwCustomHost: "cwserver" });
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls[calls.length - 1]).toEqual(["cwserver"]);
+      expect(pluginManager.findSiteForUrl("https://cwserver/").pluginId).toBe("connectwise-manage");
+      expect(pluginManager.findSiteForUrl("https://cw.acme.com/")).toBeNull();
+      const before = calls.length;
+      pluginManager.fireEvent("settings:changed", { cwCustomHost: "cwserver" }); // unchanged: nothing re-installed
+      expect(calls.length).toBe(before);
+      pluginManager.fireEvent("settings:changed", { cwCustomHost: "" });
+      expect(extraHosts()).toEqual([]);
+    });
+
+    test("no Custom URL means no extra hosts", async () => {
+      const { userData } = makeUserData();
+      await pluginManager.initPlugins(userData, {}, ipcMain);
+      for (const site of pluginManager.getSites()) expect(site.extraHosts).toEqual([]);
+    });
+
+    test("only bare hosts that no other site owns are added, exact match only", async () => {
+      const { userData } = makeUserData();
+      writePlugin(userData, "hosts-test", { site: { name: "Hosts Test", hosts: ["helpdesk-example.net"] } },
+        "module.exports = function (api) { global.__siteHostsApi = api; api.setSiteHosts([" +
+        "'Desk.Example.org'," +             // fine
+        "'deskserver'," +                   // single label
+        "'10.0.0.5'," +                     // IPv4
+        "'desk.example.org'," +             // duplicate
+        "'acme.freshservice.com'," +        // another site's host
+        "'https://x.example.org/'," +       // not a bare host
+        "'*.example.org'," +
+        "42" +
+        "]); };");
+      await pluginManager.initPlugins(userData, {}, ipcMain);
+      const site = pluginManager.getSites().find((si) => si.pluginId === "hosts-test");
+      expect(site.extraHosts).toEqual(["desk.example.org", "deskserver", "10.0.0.5"]);
+      expect(pluginManager.findSiteForUrl("https://deskserver/login").pluginId).toBe("hosts-test");
+      expect(pluginManager.findSiteForUrl("https://10.0.0.5/").pluginId).toBe("hosts-test");
+      expect(pluginManager.findSiteForUrl("https://sub.desk.example.org/")).toBeNull();
+      expect(pluginManager.findSiteForUrl("https://acme.freshservice.com/").pluginId).toBe("freshservice");
+
+      global.__siteHostsApi.setSiteHosts([]);
+      expect(pluginManager.findSiteForUrl("https://deskserver/login")).toBeNull();
+    });
+
+    test("a plugin without a site block can't add hosts", async () => {
+      const { userData } = makeUserData();
+      writePlugin(userData, "nosite-hosts-test", {},
+        "module.exports = function (api) { api.setSiteHosts(['desk.example.org']); };");
+      await pluginManager.initPlugins(userData, {}, ipcMain);
+      expect(pluginManager.findSiteForUrl("https://desk.example.org/")).toBeNull();
+    });
+
+    test("an extra site host can't be redirected away", async () => {
+      const { userData } = makeUserData();
+      await pluginManager.initPlugins(userData, {
+        cwCustomHost: "service.example.com",
+        fsAliasHost: "service.example.com",
+        fsAliasTarget: "acme.freshservice.com",
+      }, ipcMain);
+      expect(pluginManager.getHostRedirects()).toEqual([]);
     });
   });
 

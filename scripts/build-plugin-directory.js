@@ -6,7 +6,12 @@
 // result to the "plugin-directory" release, where the app reads it
 // (plugin-directory.js).
 //
-//   node scripts/build-plugin-directory.js [outDir]     (default: dist-plugins)
+//   node scripts/build-plugin-directory.js [outDir] [--published index.json]
+//
+// With --published (the index.json now on the release), the build fails when a
+// plugin keeps a version number that's already published but its package has
+// changed: users who have that version would never get the change, and one
+// version would mean two different sets of files. Bump the plugin's version.
 //
 // Packages are byte-for-byte the same for the same files, so rebuilding an
 // unchanged plugin gives the same SHA-256.
@@ -105,16 +110,51 @@ function buildDirectory({ root = ROOT, outDir = path.join(ROOT, "dist-plugins") 
   return index;
 }
 
+// Problems where a built package reuses a published version with different
+// contents: returns a list of messages. `published` is the parsed index.json on
+// the release (or null before the first publish).
+function checkAgainstPublished(published, built) {
+  const problems = [];
+  const before = new Map();
+  for (const e of (published && Array.isArray(published.plugins) ? published.plugins : [])) {
+    if (e && typeof e.id === "string") before.set(e.id, e);
+  }
+  for (const e of built.plugins) {
+    const old = before.get(e.id);
+    if (old && old.version === e.version && old.sha256 !== e.sha256) {
+      problems.push(`${e.id} ${e.version} changed but is already published as ${e.version}: bump its version in plugins/${e.id}/manifest.json`);
+    }
+  }
+  return problems;
+}
+
+function parseArgs(argv) {
+  const args = { outDir: path.join(ROOT, "dist-plugins"), published: null };
+  const rest = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === "--published") args.published = argv[++i] || null;
+    else rest.push(argv[i]);
+  }
+  if (rest[0]) args.outDir = rest[0];
+  return args;
+}
+
 if (require.main === module) {
-  const outDir = path.resolve(process.argv[2] || path.join(ROOT, "dist-plugins"));
+  const args = parseArgs(process.argv.slice(2));
+  const outDir = path.resolve(args.outDir);
   try {
     const index = buildDirectory({ outDir });
     console.log(`Built ${index.plugins.length} plugin package(s) in ${outDir}:`);
     for (const e of index.plugins) console.log(`  ${e.url}  ${e.size} bytes  sha256 ${e.sha256}`);
+    if (args.published && fs.existsSync(args.published)) {
+      const problems = checkAgainstPublished(JSON.parse(fs.readFileSync(args.published, "utf8")), index);
+      if (problems.length) throw new Error("Changed plugins need a new version:\n  " + problems.join("\n  "));
+      console.log("Checked against the published index: no version reused with different contents.");
+    }
   } catch (err) {
     console.error(err.message || err);
     process.exit(1);
   }
 }
 
-module.exports = { readPluginManifests, checkManifests, buildDirectory };
+module.exports = { readPluginManifests, checkManifests, buildDirectory, checkAgainstPublished, parseArgs };

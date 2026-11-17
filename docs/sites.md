@@ -75,6 +75,7 @@ window.pluginAPI.sites.register({
   ticketSearch: { … },         // optional: searching tickets
   ticketActions: { … },        // optional: changing status, priority, group, agent
   ticketPreview: { … },        // optional: hover preview of a ticket
+  ticketSla: { … },            // optional: SLA due times for a ticket
   knowledge: { … },            // optional: knowledge base
   timeEntry: { … },            // optional: logging time on a record
 });
@@ -250,6 +251,29 @@ ticketPreview: {
 | `lastReply` | `{ type: "requester" \| "reply" \| "note", from, at, snippet }` or `null` |
 
 The card caches each answer for a minute and drops errors so the next hover tries again. Freshservice reads the ticket and its conversations through the REST API (tickets only, on the configured domain). ConnectWise Manage has no API in MSP++ yet, so it has no preview.
+
+### `ticketSla` (SLA due times)
+
+Lets the SLA Countdown plugin count down to a ticket's deadlines on its tab and in the side panel.
+
+```js
+ticketSla: {
+  refForUrl: (url) => ({ id, label?, url, host? }) | null, // the ticket open at url; cheap and pure
+  get: async (ref) => ({ ticket }),                         // or { error, skipped? }
+  listMine: async () => ({ tickets, total?, warnings? }),   // optional: the user's open tickets
+}
+```
+
+Each `ticket` is `{ id, label, subject, url?, state, frDueBy, dueBy, responded, frEscalated?, statusLabel?, priorityLabel? }`:
+
+| Field | What it is |
+|---|---|
+| `state` | `"running"`, `"paused"` (the SLA clock is stopped, e.g. Pending) or `"done"` (resolved or closed) |
+| `frDueBy`, `dueBy` | ISO times the first response and the resolution are due (either may be empty) |
+| `responded` | `true` once the first response has been sent, `false` if not, `null` when the site didn't check. While `null` the first response deadline counts only while it is still ahead (or `frEscalated` is `true`) |
+| `url` | For `listMine`: the link that opens the ticket |
+
+`refForUrl` runs whenever a tab's address changes, so don't touch the page or the network in it. Check the tab's host in `get`, since the same number is a different ticket on another account. Return `{ error, skipped: true }` when the site isn't set up, so the user is offered Settings. Freshservice reads `fr_due_by`, `due_by` and `stats.first_responded_at` through its REST API; `listMine` filters on `agent_id` with the API key's agent and every status but Resolved and Closed.
 
 ### `knowledge` (knowledge base)
 

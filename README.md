@@ -143,6 +143,16 @@ A **⚡ Actions** tab in the side panel that changes the open ticket's status, p
 - **Requirements** – the domain and API key in **Settings → Plugins → Freshservice**; the key's agent needs permission to edit tickets. Tickets only (not changes, problems or releases)
 - **From the plugin directory** — install it from **Settings → Plugins → Browse** (it no longer comes with MSP++)
 
+### SLA Countdown
+A live countdown to each ticket's **first response** and **resolution** due times, so a breach doesn't creep up while you're in another tab.
+- **On the tab** – every tab with a Freshservice ticket open shows the time left (or how long it's past due, like **−25m**) in front of its title. Hover it for both due times
+- **⏱ SLA tab** – the side panel shows the ticket in the active tab, then **your open tickets** (assigned to the API key's agent), soonest deadline first. Click one to switch to its tab or open it
+- **Amber, then red** – grey while there's time, amber under an hour, red under 15 minutes and dark red once past due. Both thresholds are in **Settings → Plugins → SLA Countdown**
+- **Alerts** – a notification under the bell when a ticket turns red or goes past due (one summary at start-up). Can be turned off
+- **On hold** – tickets in Pending, or a custom status named On Hold, Awaiting… or Waiting…, show **Hold** instead of a countdown, because those normally stop the SLA clock. Resolved and closed tickets show nothing
+- **Requirements** – the domain and API key in **Settings → Plugins → Freshservice** (Freshservice plugin 0.8.5 or later). Due times are read again every 5 minutes (a setting) and when you switch to a ticket's tab
+- **From the plugin directory** — install it from **Settings → Plugins → Browse**
+
 ### Recent Tickets
 A **🕘 Recent** tab in the side panel listing the tickets you've viewed lately, newest first.
 - **Every site** – A ticket is added when it shows in the active tab, on Freshservice (tickets, changes, problems, releases), ConnectWise Manage, or any site plugin that knows its tickets. Each entry shows the site, number, subject and when you last looked at it, grouped into Today, Yesterday, Earlier this week and Older
@@ -190,7 +200,7 @@ A **⏰ Follow-ups** tab in the side panel for coming back to a ticket later.
 Extend the app with self-contained plugin directories — no build step required.
 
 - **Bundled plugins** – Ship with the app: the **Freshservice** site plugin, **Note Backup**, **Recent Tickets**, **Bookmarks Bar** and **Metrics Bar**
-- **Plugin directory** – **Settings → Plugins → Browse** installs, updates and removes more plugins: **ConnectWise Manage**, **AI Features**, **Solutions Chat**, **Canned Responses**, **Follow-up Reminders**, **Time Tracker**, **Quick Actions**, **Ticket Notifications**, **Ticket Search** and **Tree Style Tabs**. Downloads are checked against the directory's SHA-256; MSP++ checks for plugin updates after it starts and once a day. After updating from 0.7, a one-time prompt offers to reinstall the ones you were using, with your settings and data kept
+- **Plugin directory** – **Settings → Plugins → Browse** installs, updates and removes more plugins: **ConnectWise Manage**, **AI Features**, **Solutions Chat**, **Canned Responses**, **Follow-up Reminders**, **Time Tracker**, **Quick Actions**, **SLA Countdown**, **Ticket Notifications**, **Ticket Search** and **Tree Style Tabs**. Downloads are checked against the directory's SHA-256; MSP++ checks for plugin updates after it starts and once a day. After updating from 0.7, a one-time prompt offers to reinstall the ones you were using, with your settings and data kept
 - **Plugin management** – Enable or disable individual plugins from Settings → Plugins, or with the **Enabled** switch at the top of each plugin's own settings tab; restart to apply (**Restart Now**). Every plugin gets a settings tab, and one with nothing to set up says so
 - **Import plugin** – **Import Plugin File** (a `.mspplugin` package) or **Import Folder** in Settings → Plugins; importing a plugin that's already installed replaces it, and installed plugins can be removed with **Remove**
 - Plugins can add side panel tabs, toolbar buttons, Settings panels, notifications, backend IPC handlers, DOM elements, and application menu items

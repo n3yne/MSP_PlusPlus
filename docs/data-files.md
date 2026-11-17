@@ -1,5 +1,7 @@
 # Files and folders MSP++ uses
 
+[Docs home](README.md) › Files and folders MSP++ uses
+
 This page lists every file and folder MSP++ reads from or writes to, so you know what to back up, what to exclude from antivirus or cleanup tools, and what is left behind after uninstalling.
 
 **R** means the app reads it, **W** means it writes it, and **D** means it can delete it.
@@ -63,7 +65,7 @@ Plugins get their own folder through `api.getDataPath()`. It is created the firs
 | `ticket-notifications\state.json` | R W | Which tickets and updates have already been seen. |
 | `ai-features\m365-token.dat` | R W D | The encrypted Microsoft 365 sign-in. Deleted when you sign out. |
 
-Plugins imported before 0.8 were copied into `DATA\plugins\<plugin-id>\` itself (a folder with a `manifest.json`). The app still loads those.
+Plugins imported before 0.8 were copied into `DATA\plugins\<plugin-id>\` itself (a folder with a `manifest.json`). Since 0.8.3 the app no longer loads code from here: at start-up it copies such a plugin to `DATA\installed-plugins\<plugin-id>\` and renames the old `manifest.json` to `manifest.json.moved-to-installed-plugins` (R W). The plugin's data stays in this folder.
 
 ## Installed plugins: `DATA\installed-plugins\`
 

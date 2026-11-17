@@ -1,8 +1,10 @@
 # Site Plugins
 
+[Docs home](README.md) › Site Plugins
+
 MSP++ wraps ticketing sites in tabs and adds features on top of them: a Notes tab that syncs with the page's note editor, AI summaries, knowledge base chat. The core app knows nothing about any particular site. Everything that knows what a site's pages look like lives in a **site plugin**, and the feature plugins talk to whichever site plugin claims the page open in a tab.
 
-Bundled site plugins:
+Site plugins in this repository (installed from the plugin directory, like every plugin):
 
 | Plugin | Folder | Hosts |
 |---|---|---|

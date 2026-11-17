@@ -1,6 +1,8 @@
 # Plugin Development Guide
 
-MSP++ supports an external plugin system that lets you add new features without modifying the core application source. Plugins are self-contained directories dropped into a `plugins/` folder — no build step required.
+[Docs home](README.md) › Plugin Development Guide
+
+MSP++ supports an external plugin system that lets you add new features without modifying the core application source. Plugins are self-contained folders: installed from the plugin directory, imported from a file or folder, or kept in `plugins/` in a development checkout. No build step required.
 
 ---
 
@@ -32,7 +34,7 @@ The plugin system has three tiers:
 
 A plugin can include any combination of these three components.
 
-On startup the app scans the `plugins/` directories, loads each `main.js` inside the main Electron process, and injects each `renderer.js` as a `<script>` tag into the main window after settings have loaded. Renderer scripts run one after another in folder order (bundled plugins first, alphabetically), so don't rely on a plugin that sorts after yours having run yet: use events or `notes.onReady()` instead. `settings.js` files are injected into the Settings window after `window.pluginSettingsAPI` has been constructed.
+On startup the app loads every plugin folder from two places: `plugins/` next to the app (bundled plugins; empty in release builds, every plugin in this repo in a development checkout) and `installed-plugins/` in the [data folder](data-files.md#installed-plugins-datainstalled-plugins). It loads each `main.js` inside the main Electron process, and injects each `renderer.js` as a `<script>` tag into the main window after settings have loaded. Renderer scripts run one after another in folder order (bundled plugins first, then installed ones, each alphabetically), so don't rely on a plugin that sorts after yours having run yet: use events or `notes.onReady()` instead. `settings.js` files are injected into the Settings window after `window.pluginSettingsAPI` has been constructed.
 
 Notes themselves are a plugin too: the **Note Backup** plugin (`plugins/note-backup`) owns the Notes tab, its files on disk and live sync with the page's note editor, and backs `pluginAPI.notes` for everyone else. It is a good reference for a larger plugin.
 
@@ -87,7 +89,9 @@ Every plugin must have a `manifest.json` at its root:
 | `renderer` | No | Relative path to the main-window renderer entry file. |
 | `settings` | No | Relative path to the settings-window entry file. |
 | `minAppVersion` | No | Minimum app version required. Plugins below this threshold are skipped with a warning. |
-| `site` | No | Makes this a site plugin: `{ name, shortName?, hosts, defaultUrl?, chromeUserAgent? }`. See [Site Plugins](sites.md). |
+| `site` | No | Makes this a site plugin: `{ name, shortName?, hosts, defaultUrl?, chromeUserAgent?, color? }`. See [Site Plugins](sites.md). |
+| `distribution` | No | `"bundled"` (the default) or `"directory"`. See [Publishing a plugin to the directory](#publishing-a-plugin-to-the-directory). |
+| `requires` | No | Ids of other plugins this one needs, such as `["ai-features"]`. Installing it from the directory installs those too. |
 | `credentials` | No | Setting names that hold secrets, e.g. `["myApiKey"]` (`/^[a-z][A-Za-z0-9]{0,40}$/`). Your settings transformer should encrypt `myApiKey` with `api.encryptCredential` into `myApiKeyEncrypted` and delete the plain value. The app then keeps the encrypted value out of renderer processes (they see a `myApiKeySet` boolean instead), preserves it across saves that don't include a new key, refuses to save a new key it can't encrypt, and deletes it when settings are saved with `myApiKeyRemove: true`. |
 | `sensitiveSettings` | No | *App 0.8.3+.* Settings that a settings import must point out before changing, as `{ "settingName": "Label" }` (up to 10), for example one that sends page loads to another host. When an imported file would set one to a new value, the import prompt lists it with its new value and offers **Import Without These**. |
 
@@ -126,6 +130,24 @@ module.exports = {
   init(api) {
     api.log("Plugin ready");
   },
+};
+```
+
+### Settings metadata
+
+Besides the function (or `init`), `main.js` can export three optional fields, read once at start-up:
+
+| Export | What it does |
+|---|---|
+| `defaultSettings` | An object of default values for this plugin's settings, merged under the saved settings. |
+| `validateSettings(settings) → boolean` | Called on every save with the whole settings object. Return `false` to reject the save (check only your own keys, and allow them to be missing). |
+| `migrateSettings(raw)` | Called on the raw saved settings at start-up, before defaults are merged. Change the object in place to rename or convert old keys. |
+
+```js
+module.exports = {
+  defaultSettings: { myPluginEnabled: true },
+  validateSettings: (s) => s.myPluginEnabled === undefined || typeof s.myPluginEnabled === "boolean",
+  init(api) { /* ... */ },
 };
 ```
 
@@ -220,6 +242,14 @@ Logs a message to the console with a `[Plugin:<id>]` prefix.
 api.log("Hello", { from: "my-plugin" });
 // → [Plugin:my-plugin] Hello { from: 'my-plugin' }
 ```
+
+#### `api.encryptCredential(plaintext)` / `api.decryptCredential(encrypted)`
+
+Encrypts a secret with the operating system's credential storage (Electron `safeStorage`: Windows DPAPI, the macOS keychain) and returns it as base64, or decrypts one back. Both return `null` when encryption isn't available or the input is empty or can't be read. Use them with the manifest's `credentials` field and a settings transformer (below); decrypt only in `main.js`, never send the plain key to a renderer.
+
+#### `api.registerSettingsTransformer(fn)`
+
+Registers `fn(settings)`, which runs on the full settings object every time settings are saved, after validation and before writing. Change the object in place or return a new one. Use it to encrypt a newly entered key and delete the plain value, or to tidy a value (see `plugins/freshservice/main.js`). A transformer that throws is logged and skipped.
 
 #### `api.setHostRedirects(list)`
 
@@ -318,9 +348,9 @@ console.log(result.report);
 
 > Calling an unregistered `action`, or a plugin that is disabled or not installed, rejects the Promise.
 
-##### Handlers from bundled plugins
+##### Handlers from other plugins
 
-Renderer scripts can also call the bundled plugins, so a plugin can use the app's AI provider and Freshservice connection without asking for keys of its own. To stay site-agnostic, prefer `pluginAPI.sites` (`readActiveRecord()`, a site's `knowledge`) over calling the Freshservice plugin directly:
+Renderer scripts can also call other plugins' handlers, so a plugin can use the app's AI provider and Freshservice connection without asking for keys of its own. To stay site-agnostic, prefer `pluginAPI.sites` (`readActiveRecord()`, a site's `knowledge`) over calling the Freshservice plugin directly:
 
 | Call | Returns | Notes |
 |---|---|---|
@@ -339,6 +369,8 @@ Renderer scripts can also call the bundled plugins, so a plugin can use the app'
 | `invoke("freshservice", "ticket-sla", { ticketId, host? })` | `{ ticket }` or `{ error, skipped? }` | A ticket's SLA view (read with `?include=stats`): `{ id, subject, status, statusLabel, priority, priorityLabel, state, frDueBy, dueBy, frEscalated, isEscalated, firstRespondedAt, responded, updatedAt }`. `state` is `"done"` (resolved or closed), `"paused"` (Pending, or a status named On Hold, Awaiting… or Waiting…) or `"running"`. Prefer the site's `ticketSla` adapter. Freshservice plugin 0.8.5+. |
 | `invoke("freshservice", "my-sla-tickets")` | `{ tickets, total, domain, accountHosts, warnings }` or `{ error, skipped? }` | The open tickets (every status but Resolved and Closed, up to 90) assigned to the API key's agent, each as `ticket-sla` returns it. `responded` is read for up to 25 tickets still waiting on a first response (soonest first) and is `null` for the rest; the answer is cached until the ticket's `updated_at` changes. Freshservice plugin 0.8.5+. |
 | `invoke("freshservice", "search-tickets", { term, days? })` | `{ tickets, domain, days, scanned, scanFull, warnings }` or `{ error, skipped? }` | Tickets matching a number, subject words or a requester's name or email (up to 50, number matches first, then newest updated). Each is a `filter-tickets` summary plus `statusLabel`, `priorityLabel`, `requester`, `requesterEmail` and `matches` (`"number"`, `"subject"`, `"requester"`). Subjects are matched against up to 300 tickets updated in the last `days` (7, 30, 90, 180 or 365; default 30), cached for two minutes. Prefer the site's `ticketSearch` adapter. |
+
+The Freshservice plugin's other handlers (`get-ticket-options`, `get-ticket-state`, `update-ticket`, `preview-ticket`, `test-connection`) back its site adapter's `ticketActions` and `ticketPreview` parts and its settings page; use the adapter (see [sites.md](sites.md)) rather than calling them. Each call needs the other plugin installed and turned on: list it in your manifest's `requires`.
 
 See `plugins/solutions-chat/renderer.js` for a plugin built on `pluginAPI.sites` and the AI Features handler.
 
@@ -668,6 +700,9 @@ api.addMenuItem(opts: { label: string, accelerator?: string, click: () => void }
 api.log(...args: any[]): void
 api.setHostRedirects(list: Array<{ from: string, to: string }>): void   // app 0.8.2+
 api.setSiteHosts(list: string[]): void   // app 0.8.3+
+api.encryptCredential(plaintext: string): string | null
+api.decryptCredential(encrypted: string): string | null
+api.registerSettingsTransformer(fn: (settings: AppSettings) => AppSettings | void): void
 ```
 
 ### Renderer (`window.pluginAPI`)
@@ -715,6 +750,12 @@ pluginAPI.notes.setContent(html: string): void
 pluginAPI.notes.getTicketId(): string | null
 pluginAPI.notes.getPlainText(): string
 pluginAPI.notes.saveSnapshot(incomingText: string, options?: { force?: boolean }): Promise<boolean>
+pluginAPI.notes.registerProvider(impl: object): void   // only for a plugin that replaces Note Backup
+
+pluginAPI.commands.register(cmd: object): () => void          // see pluginAPI.commands above
+pluginAPI.commands.addProvider(provider: object): () => void
+pluginAPI.commands.open(text?: string): void
+pluginAPI.commands.close(): void
 
 pluginAPI.sites.register(adapter: SiteAdapter): SiteAdapter   // see docs/sites.md
 pluginAPI.sites.list(): SiteAdapter[]
@@ -756,9 +797,9 @@ pluginSettingsAPI.onSettingsChanged(fn: (settings: AppSettings) => void): void
 
 ## Installing plugins
 
-### Bundled plugins (version-controlled)
+### Plugins in this repository
 
-Place your plugin directory inside the `plugins/` folder at the root of the project:
+Plugin source lives in the `plugins/` folder at the root of the project:
 
 ```
 MSP_PlusPlus/
@@ -769,7 +810,7 @@ MSP_PlusPlus/
       renderer.js
 ```
 
-These plugins ship with the app and are loaded for all users.
+In a development checkout (`npm start`) every folder here loads as a bundled plugin. Release builds ship none of them: every plugin in this repo is published to the plugin directory instead (see below). A new plugin added here needs a built-in `category`, `"distribution": "directory"` and a `"!plugins/<id>/**"` entry in `build.files`, or the tests fail.
 
 ### The plugin directory
 
@@ -832,7 +873,7 @@ Installed plugins go in `installed-plugins\<id>\` in the app's data folder, sepa
 
 Every install, update and removal is staged in `installed-plugins\.pending\` and applied at the next start, before any plugin loads, because a plugin's main-process code can't be unloaded while the app runs.
 
-Plugins imported before 0.8 were copied straight into `plugins\<id>\`, where their code and data share one folder. They still load (shown as **Imported**). Removing one removes that folder, data included; Settings says so before you confirm.
+Plugins imported before 0.8 were copied straight into `plugins\<id>\`, where their code and data shared one folder. Since 0.8.3 code never loads from a data folder: at start-up each such plugin is copied into `installed-plugins\<id>\` (shown as **Imported**), and the old folder's `manifest.json` is renamed to `manifest.json.moved-to-installed-plugins`, so its data stays put.
 
 If you upgraded from Freshservice++, the data folder is still `%APPDATA%\Freshservice++\` (or `%APPDATA%\freshservice-pp\`). See [`data-files.md`](data-files.md) for every folder the app uses.
 
@@ -843,6 +884,8 @@ If you upgraded from Freshservice++, the data folder is still `%APPDATA%\Freshse
 ## Walkthrough: building a simple plugin
 
 This walkthrough builds a plugin that adds a **"Word Count"** button to the toolbar. Clicking it shows the current word count in the note.
+
+The quickest way to try it is to create the folder anywhere and load it with **Settings → Plugins → Import Folder**. (A plugin added to `plugins/` in this repo also needs a `category` and the other fields described under [Plugins in this repository](#plugins-in-this-repository).)
 
 ### Step 1 — Create the directory
 
@@ -891,8 +934,8 @@ This plugin only needs a renderer script — no main-process work required.
 
 ### Step 4 — Restart and test
 
-1. Restart the app (`npm start` or the packaged executable)
-2. Open a note — a **Wc** button appears at the end of the toolbar
+1. Import the folder (**Settings → Plugins → Import Folder**) and restart the app, or restart `npm start` if it's in `plugins/`
+2. Open a note in the Notes tab ([Note Backup](plugins/note-backup.md) must be on) — a **Wc** button appears at the end of the toolbar
 3. Click it — an alert shows the word count
 
 ### Going further

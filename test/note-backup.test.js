@@ -283,6 +283,30 @@ describe("saveNoteSync", () => {
     expect(fs.readdirSync(dir).filter((f) => f.endsWith(".tmp"))).toEqual([]);
   });
 
+  test("a save already in flight doesn't put older drafts back over a close-time save", async () => {
+    await store.saveNote({ ticketId: "300", noteContent: "<p>other</p>", isManual: false });
+    const orig = fs.promises.writeFile;
+    let fired = false;
+    const spy = jest.spyOn(fs.promises, "writeFile").mockImplementation(async function (file, ...rest) {
+      if (!fired && String(file).endsWith("autosave.json.tmp")) {
+        // The window closes while the async save is writing its temp file.
+        fired = true;
+        store.saveNoteSync({ ticketId: "200", noteContent: "<p>close 200</p>" });
+        store.saveNoteSync({ ticketId: "100", noteContent: "<p>close 100</p>" });
+      }
+      return orig.call(fs.promises, file, ...rest);
+    });
+    try {
+      await store.saveNote({ ticketId: "100", noteContent: "<p>older 100</p>", isManual: false });
+    } finally {
+      spy.mockRestore();
+    }
+    const data = await store.loadAutosave();
+    expect(data["100"].content).toBe("<p>close 100</p>");
+    expect(data["200"].content).toBe("<p>close 200</p>");
+    expect(data["300"].content).toBe("<p>other</p>");
+  });
+
   test("refuses an oversized note and leaves the file alone", async () => {
     await store.saveNote({ ticketId: "100", noteContent: "<p>kept</p>", isManual: false });
     const res = store.saveNoteSync({ ticketId: "100", noteContent: "x".repeat(10 * 1024 * 1024 + 1) });

@@ -1417,23 +1417,30 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // --- Persist open tabs (debounced) ---
   let saveTabsTimer = null;
+  // The tabs to save for next time. A tab whose page hasn't loaded yet can't
+  // report its URL, so its src attribute (the URL it was opened with) is used:
+  // closing soon after start must not drop the tabs that were still loading.
+  // Nothing is saved until the last session's tabs have been reopened.
+  let tabsRestored = false;
+  function sessionTabs() {
+    const tabData = [];
+    for (let i = 0; i < tabs.length; i++) {
+      let url = "";
+      try { url = tabs[i].webview.getURL() || ""; } catch { /* not attached yet */ }
+      if (!url) {
+        try { url = tabs[i].webview.getAttribute("src") || ""; } catch { /* element gone */ }
+      }
+      if (url && url !== "about:blank") tabData.push({ url, pinned: tabs[i].pinned || false });
+    }
+    return tabData;
+  }
+
   function saveTabSession() {
     clearTimeout(saveTabsTimer);
     saveTabsTimer = setTimeout(function () {
-      const tabData = [];
-      for (let i = 0; i < tabs.length; i++) {
-        try {
-          const url = tabs[i].webview.getURL();
-          if (url && url !== "" && url !== "about:blank") {
-            tabData.push({ url, pinned: tabs[i].pinned || false });
-          }
-        } catch {
-          // webview may not be ready yet
-        }
-      }
-      if (tabData.length > 0) {
-        window.backupAPI.saveTabs(tabData);
-      }
+      if (!tabsRestored) return;
+      // An empty list is saved too, so closing every tab doesn't bring back old ones.
+      window.backupAPI.saveTabs(sessionTabs());
     }, 1000);
   }
 
@@ -1485,13 +1492,17 @@ document.addEventListener("DOMContentLoaded", function () {
     on(webview, "render-process-gone", function (e) {
       const reason = (e && e.details && e.details.reason) || "unknown";
       if (reason === "clean-exit") return;
+      const lastTitle = titleSpan.textContent;
+      const tabTitleForNotice = function () { return lastTitle && lastTitle !== "Page stopped" ? lastTitle.slice(0, 60) : ""; };
       console.error("[Tabs] Page process gone:", reason);
       titleSpan.textContent = "Page stopped";
       addUniqueNotification({
         id: notifNextId++,
-        type: "tab-crashed",
+        // One notice per tab, so a second crashed tab gets its own Reload button.
+        type: "tab-crashed-" + id,
         title: "A tab stopped working",
-        desc: "The page in a tab closed unexpectedly (" + reason + "). Reload the tab to carry on.",
+        desc: "The page in a tab" + (tabTitleForNotice() ? " (" + tabTitleForNotice() + ")" : "") +
+          " closed unexpectedly (" + reason + "). Reload the tab to carry on.",
         action: {
           label: "Reload tab",
           kind: "callback",
@@ -2398,6 +2409,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
   async function initTabs() {
     try {
+      await reopenSavedTabs();
+    } finally {
+      tabsRestored = true;
+    }
+  }
+
+  async function reopenSavedTabs() {
+    try {
       // { tabs: [{ url, pinned }], openHome, homeUrl } — see tabsToRestore in utils.js.
       const saved = await window.backupAPI.loadTabs();
       const list = (saved && Array.isArray(saved.tabs)) ? saved.tabs : [];
@@ -2872,19 +2891,10 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   window.addEventListener("beforeunload", function () {
-    const tabData = [];
-    for (let i = 0; i < tabs.length; i++) {
-      try {
-        const url = tabs[i].webview.getURL();
-        if (url && url !== "" && url !== "about:blank") {
-          tabData.push({ url, pinned: tabs[i].pinned || false });
-        }
-      } catch { /* webview may have been destroyed already */ }
-    }
-    if (tabData.length > 0) {
-      // ipcRenderer.send (not invoke) because the renderer may be destroyed before an async
-      // round-trip completes; main handles this with synchronous fs.writeFileSync.
-      window.backupAPI.saveTabsSync(tabData);
-    }
+    if (!tabsRestored) return;
+    clearTimeout(saveTabsTimer);
+    // ipcRenderer.send (not invoke) because the renderer may be destroyed before an async
+    // round-trip completes; main writes the file synchronously.
+    window.backupAPI.saveTabsSync(sessionTabs());
   });
 });

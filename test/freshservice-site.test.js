@@ -80,6 +80,8 @@ describe("freshservice site adapter", () => {
     expect(runPageScript(adapter.recordScript, { path: "/x", headers: [{ innerText: "PRB-9 Outage" }] }))
       .toMatchObject({ ticket: "PRB-9", kind: "problem", id: "9", source: "header" });
     expect(runPageScript(adapter.recordScript, { path: "/a/tickets", title: "INC-1" }).ticket).toBeNull();
+    expect(runPageScript(adapter.recordScript, { path: "/a/solutions/articles/12", title: "Fix for INC-55" }).ticket).toBeNull();
+    expect(runPageScript(adapter.recordScript, { path: "/support/solutions/5", headers: [{ innerText: "SR-3 workaround" }] }).ticket).toBeNull();
   });
 
   test("reads tickets through the API and leaves other records to the page", async () => {

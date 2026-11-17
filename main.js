@@ -4,7 +4,7 @@ const electron = require("electron");
 const path = require("path");
 const fs = require("fs");
 const fsp = fs.promises;
-const { DEFAULT_SETTINGS, validateSettings, migrateCoreSettings, findLegacyUserDataDir, tabsToRestore } = require("./utils");
+const { DEFAULT_SETTINGS, validateSettings, migrateCoreSettings, findLegacyUserDataDir, tabsToRestore, repairStoredSettings } = require("./utils");
 const { tabShortcutForKey } = require("./tab-shortcuts");
 const pluginManager = require("./plugin-manager");
 const PluginDirectory = require("./plugin-directory");
@@ -13,6 +13,7 @@ const { createUpdater } = require("./updater");
 const { zoomActionForKey } = require("./page-zoom");
 const { createPermissionPolicy, installPermissionHandlers } = require("./permissions");
 const settingsTransfer = require("./settings-transfer");
+const safeFile = require("./safe-file");
 
 // Keep using the Freshservice++ data folder after the rename to MSP++. This must
 // run before anything touches userData (the single-instance lock, sessions).
@@ -117,15 +118,44 @@ function lockDownWindow(win) {
 
 // ===================== Settings Persistence =====================
 
-// Reads and parses settings.json with no transformations applied.
+// Set when settings.json couldn't be read: { status: "recovered" | "corrupt",
+// corruptCopy }. Shown to the user once the main window is up.
+let settingsReadProblem = null;
+
+// Reads and parses settings.json with no transformations applied. A damaged
+// file is kept aside and settings.json.bak (the last good save) used instead,
+// so a bad file never quietly becomes {} with defaults saved over it.
 async function readSettingsFile() {
+  let res;
   try {
-    const raw = await fsp.readFile(SETTINGS_FILE, "utf-8");
-    return JSON.parse(raw);
+    res = await safeFile.readJsonFile(SETTINGS_FILE);
   } catch (e) {
-    if (e.code !== "ENOENT") console.error("[Settings] Error reading settings file:", e);
+    console.error("[Settings] Error reading settings file:", e);
     return {};
   }
+  if (res.status === "recovered" || res.status === "corrupt") {
+    if (!settingsReadProblem) settingsReadProblem = { status: res.status, corruptCopy: res.corruptCopy };
+  }
+  const value = res.value;
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+}
+
+function showSettingsReadProblem(win) {
+  const problem = settingsReadProblem;
+  if (!problem || problem.shown || !win || win.isDestroyed()) return;
+  problem.shown = true;
+  const copy = problem.corruptCopy ? "\n\nThe damaged file was kept as:\n" + problem.corruptCopy : "";
+  electron.dialog.showMessageBox(win, {
+    type: "warning",
+    title: "MSP++ settings",
+    message: problem.status === "recovered"
+      ? "Your settings file was damaged, so MSP++ loaded the backup from your last save."
+      : "Your settings file was damaged and there was no backup, so MSP++ started with default settings.",
+    detail: (problem.status === "recovered"
+      ? "Check that your settings look right."
+      : "Your notes, timers and other plugin data aren't affected. You can import a settings export to get your settings back.") + copy,
+    buttons: ["OK"],
+  }).catch(() => {});
 }
 
 // Merges core + plugin defaults onto a raw parsed object. Does NOT run migrations —
@@ -138,14 +168,20 @@ async function loadSettings() {
   return applySettingsDefaults(await readSettingsFile());
 }
 
+// Saves settings.json atomically (and settings.json.bak after it). Returns
+// false when the write failed, so callers don't report a save that didn't happen.
 async function saveSettings(settings) {
   try {
     await ensureDataDir();
-    await fsp.writeFile(SETTINGS_FILE, JSON.stringify(settings, null, 2), "utf-8");
+    await safeFile.writeJsonWithBackup(SETTINGS_FILE, settings);
+    return true;
   } catch (e) {
     console.error("[Settings] Error saving settings:", e);
+    return false;
   }
 }
+
+const SETTINGS_WRITE_ERROR = "Your settings couldn't be saved to disk. Check that the disk isn't full and try again.";
 
 // Returns a copy of settings safe to broadcast to renderer processes and plugins.
 // Strips the credentials plugins declare in their manifests ("credentials") and
@@ -201,6 +237,7 @@ function createWindow() {
       mainWindow.maximize();
     }
     mainWindow.show();
+    showSettingsReadProblem(mainWindow);
   });
 
   mainWindow.on("close", () => {
@@ -948,7 +985,7 @@ async function forgetPluginCredentials(id) {
       if (names.some((n) => key.startsWith(n))) { delete raw[key]; changed = true; }
     }
     if (!changed) return;
-    await saveSettings(raw);
+    if (!(await saveSettings(raw))) return;
     const settings = applySettingsDefaults(raw);
     pluginManager.updateSettings(settings);
     const publicSettings = toPublicSettings(settings);
@@ -1060,7 +1097,7 @@ function registerIpcHandlers() {
   electron.ipcMain.handle("save-tabs", async (event, tabUrls) => {
     await ensureDataDir();
     try {
-      await fsp.writeFile(TABS_FILE, JSON.stringify(sanitizeTabUrls(tabUrls), null, 2), "utf-8");
+      await safeFile.writeFileAtomic(TABS_FILE, JSON.stringify(sanitizeTabUrls(tabUrls), null, 2));
       return { success: true };
     } catch (e) {
       console.error("[Tabs] Error saving tabs:", e);
@@ -1072,7 +1109,7 @@ function registerIpcHandlers() {
   electron.ipcMain.on("save-tabs-sync", (event, tabUrls) => {
     try {
       fs.mkdirSync(DATA_DIR, { recursive: true });
-      fs.writeFileSync(TABS_FILE, JSON.stringify(sanitizeTabUrls(tabUrls), null, 2), "utf-8");
+      safeFile.writeFileAtomicSync(TABS_FILE, JSON.stringify(sanitizeTabUrls(tabUrls), null, 2));
     } catch (e) {
       console.error("[Tabs] Error saving tabs (sync):", e);
     }
@@ -1149,11 +1186,19 @@ function registerIpcHandlers() {
         if (existing[c.plain]) merged[c.plain] = existing[c.plain]; // backward compat
       }
     }
-    if (!validateSettings(merged) || !pluginManager.validatePluginSettings(merged)) {
+    const isValid = (s) => validateSettings(s) && pluginManager.validatePluginSettings(s);
+    // API keys are never reset: losing one is worse than a refused save.
+    const keepKeys = Object.keys(settings).concat(credentialFields.flatMap((c) => [c.plain, c.encrypted]));
+    const repaired = repairStoredSettings(merged, keepKeys,
+      Object.assign({}, DEFAULT_SETTINGS, pluginManager.getPluginDefaultSettings()), isValid);
+    if (!repaired) {
       console.warn("[Settings] Rejected invalid settings payload");
       return { success: false };
     }
-    const toSave = pluginManager.transformSettingsForSave(merged);
+    if (repaired.reset.length) {
+      console.warn("[Settings] Reset invalid stored settings so the save could go ahead:", repaired.reset.join(", "));
+    }
+    const toSave = pluginManager.transformSettingsForSave(repaired.settings);
     // Plugin transformers always strip the plaintext key; if one couldn't encrypt
     // a newly entered key (OS credential storage unavailable, or its plugin is
     // disabled), saving would drop or expose the key, so refuse and tell the
@@ -1167,10 +1212,12 @@ function registerIpcHandlers() {
         };
       }
     }
-    await saveSettings(toSave);
+    if (!(await saveSettings(toSave))) return { success: false, error: SETTINGS_WRITE_ERROR };
     const publicMerged = toPublicSettings(toSave);
-    pluginManager.fireEvent("settings:changed", publicMerged);
+    // Plugins get the new settings before the event, so one that calls
+    // getSettings() in its handler sees them.
     pluginManager.updateSettings(toSave);
+    pluginManager.fireEvent("settings:changed", publicMerged);
     const sender = electron.BrowserWindow.fromWebContents(event.sender);
     electron.BrowserWindow.getAllWindows().forEach((win) => {
       if (win !== sender && !win.isDestroyed()) {
@@ -1192,8 +1239,10 @@ function registerIpcHandlers() {
     });
     if (result.canceled || !result.filePath) return { cancelled: true };
     try {
+      // With defaults filled in, so the file carries every setting of the plugins
+      // this PC has (an import keeps settings the file doesn't have).
       const data = settingsTransfer.buildSettingsExport(
-        await readSettingsFile(),
+        await loadSettings(),
         pluginManager.getPluginInfo(),
         pluginManager.getCredentialFields(),
         electron.app.getVersion(),
@@ -1275,14 +1324,14 @@ function registerIpcHandlers() {
         return { success: false, error: "Some settings in the file aren't valid, so nothing was imported." };
       }
       const toSave = pluginManager.transformSettingsForSave(merged);
-      await saveSettings(toSave);
+      if (!(await saveSettings(toSave))) return { success: false, error: SETTINGS_WRITE_ERROR };
 
       const changes = settingsTransfer.pluginChanges(pluginManager.getPluginInfo(), imported.plugins);
       for (const c of changes) await pluginManager.setPluginEnabled(c.id, c.enabled);
 
       const publicSettings = toPublicSettings(toSave);
-      pluginManager.fireEvent("settings:changed", publicSettings);
       pluginManager.updateSettings(toSave);
+      pluginManager.fireEvent("settings:changed", publicSettings);
       electron.BrowserWindow.getAllWindows().forEach((win) => {
         if (!win.isDestroyed()) win.webContents.send("settings-changed", publicSettings);
       });

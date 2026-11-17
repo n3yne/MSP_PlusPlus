@@ -473,9 +473,12 @@
     return null;
   }
 
-  // Only trust the title/header on record pages, not list views.
+  // Only trust the title/header on record pages, not list views, and not on
+  // pages of other modules (a Solutions article or a dashboard can mention a
+  // ticket without being it).
   var onListPage = /\\/(?:a|helpdesk|itil)\\/(?:tickets|changes|problems|releases)\\/?(?:[?#]|$)/i.test(path);
-  if (!onListPage) {
+  var onOtherModule = /\\/(?:a|helpdesk|itil|support)\\/(?:solutions|dashboard|reports|analytics|admin|assets|cmdb|contracts|purchase_orders|software|users|requesters|agents|groups|search|projects|announcements|service_catalog|catalog)(?:[/?#]|$)/i.test(path);
+  if (!onListPage && !onOtherModule) {
     var fromTitle = fromDisplayId(document.title, "title");
     if (fromTitle) return fromTitle;
     var headers = document.querySelectorAll("h1, h2, [class*=display-id], [class*=displayId], [class*=ticket-id], [class*=ticketId]");

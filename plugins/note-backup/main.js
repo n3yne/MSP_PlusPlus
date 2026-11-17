@@ -52,8 +52,14 @@ function createNoteStore(dir) {
   // live-sync snapshot, ticket-swap snapshot) can't interleave and overwrite
   // each other with stale data.
   let autosaveQueue = Promise.resolve();
+  // Close-time saves (saveNoteSync) can't wait for the lock. Each one records
+  // the ticket it wrote; an async write that started before it keeps those
+  // drafts as the close-time save left them instead of writing older ones back.
+  const syncTouched = [];
+  let lockGen = 0;
+
   function withAutosaveLock(fn) {
-    const queued = autosaveQueue.then(fn);
+    const queued = autosaveQueue.then(function () { lockGen = syncTouched.length; return fn(); });
     autosaveQueue = queued.catch((err) => { console.error("[NoteBackup] Autosave write failed:", err); });
     return queued;
   }
@@ -63,10 +69,30 @@ function createNoteStore(dir) {
   }
 
   // tmp-file + rename so a crash mid-write can't truncate the file.
+  // Runs under the lock. The rename is synchronous so a close-time save can't
+  // land between the check and the rename.
   async function writeAutosaveAtomic(data) {
-    const tmp = autosaveFile + ".tmp";
-    await fsp.writeFile(tmp, JSON.stringify(data, null, 2), "utf-8");
-    await fsp.rename(tmp, autosaveFile);
+    let gen = lockGen;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      if (syncTouched.length !== gen) {
+        let fresh = {};
+        try { fresh = JSON.parse(fs.readFileSync(autosaveFile, "utf-8")) || {}; } catch { /* keep ours */ }
+        for (const t of syncTouched.slice(gen)) {
+          if (Object.prototype.hasOwnProperty.call(fresh, t)) data[t] = fresh[t];
+        }
+        gen = syncTouched.length;
+      }
+      const tmp = autosaveFile + ".tmp";
+      await fsp.writeFile(tmp, JSON.stringify(data, null, 2), "utf-8");
+      if (syncTouched.length !== gen) {
+        try { await fsp.unlink(tmp); } catch { /* already gone */ }
+        continue;
+      }
+      fs.renameSync(tmp, autosaveFile);
+      lockGen = gen;
+      return;
+    }
+    throw new Error("autosave.json kept changing while saving");
   }
 
   async function readAutosave() {
@@ -136,6 +162,7 @@ function createNoteStore(dir) {
     const tmp = autosaveFile + ".close.tmp";
     fs.writeFileSync(tmp, JSON.stringify(data, null, 2), "utf-8");
     fs.renameSync(tmp, autosaveFile);
+    syncTouched.push(safeTicketId);
     return { success: true, timestamp, ticketId: safeTicketId };
   }
 

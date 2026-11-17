@@ -124,10 +124,12 @@ describe("parseSettingsExport", () => {
 });
 
 describe("mergeImportedSettings", () => {
-  test("replaces settings but keeps this PC's keys and install-specific values", () => {
+  test("replaces settings but keeps this PC's keys, install-specific values and settings the file lacks", () => {
     const existing = { ...RAW, oldSetting: true };
     const merged = mergeImportedSettings(existing, { theme: "dark", bookmarks: [] }, CREDENTIALS);
     expect(merged).toEqual({
+      ...RAW,
+      oldSetting: true,
       theme: "dark",
       bookmarks: [],
       dismissedReleaseVersion: "0.7.4",
@@ -144,6 +146,11 @@ describe("mergeImportedSettings", () => {
     const merged = mergeImportedSettings({}, { fsApiKeyEncrypted: "x", aiApiKey: "sk", theme: "dark" }, CREDENTIALS);
     expect(merged).toEqual({ theme: "dark" });
   });
+});
+
+test("an export without Note Backup's settings doesn't reset its retention", () => {
+  const merged = mergeImportedSettings({ theme: "light", backupRetentionDays: 90 }, { theme: "dark" }, CREDENTIALS);
+  expect(merged).toEqual({ theme: "dark", backupRetentionDays: 90 });
 });
 
 describe("pluginChanges", () => {

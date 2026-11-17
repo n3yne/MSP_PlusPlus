@@ -272,7 +272,20 @@
     return options;
   }
 
-  async function load(force) {
+  // The latest load, so a caller can wait until the panel has caught up with the
+  // active tab (a newer load can supersede the one it started).
+  let loadPromise = Promise.resolve();
+  function load(force) {
+    const p = loadNow(force);
+    loadPromise = p;
+    return p;
+  }
+  async function settledLoad() {
+    let p;
+    do { p = loadPromise; await p; } while (p !== loadPromise);
+  }
+
+  async function loadNow(force) {
     const seq = ++loadSeq;
     const found = await recordInActiveTab();
     if (seq !== loadSeq) return;
@@ -347,9 +360,15 @@
     return true;
   }
 
-  async function apply(changes, what) {
+  // expected: the { current, ticket } a confirmation was asked for; if the active
+  // ticket changed while the dialog was open, nothing is saved.
+  async function apply(changes, what, expected) {
     if (!current || !ticket || busy) return;
     if (!Object.keys(changes).length) return;
+    if (expected && (expected.current !== current || expected.ticket.id !== ticket.id)) {
+      setNote("The ticket changed before you confirmed, so nothing was saved.", "error");
+      return;
+    }
     const before = ticket;
     const target = current;
     busy = true;
@@ -375,17 +394,18 @@
     else setNote(text + " The page still shows the old values" + (settings.quickActionsReloadTab !== false ? " (it wasn't reloaded because something is typed on it)" : "") + ".", "ok", true);
   }
 
-  async function confirmResolve() {
+  async function confirmResolve(forTicket) {
     if (settings.quickActionsConfirmResolve === false) return true;
-    const msg = "Resolve ticket #" + ticket.id + "? Freshservice may email the requester.";
+    const msg = "Resolve ticket #" + forTicket.id + "? Freshservice may email the requester.";
     if (api.ui.confirm) return api.ui.confirm(msg, { defaultYes: true });
     return true;
   }
 
   el.save.addEventListener("click", async function () {
     const changes = diffChanges(ticket, formValues());
-    if ("status" in changes && changes.status === resolvedStatus(options && options.statuses) && !(await confirmResolve())) return;
-    apply(changes);
+    const expected = { current: current, ticket: ticket };
+    if ("status" in changes && changes.status === resolvedStatus(options && options.statuses) && !(await confirmResolve(ticket))) return;
+    apply(changes, undefined, expected);
   });
   el.reset.addEventListener("click", function () { renderTicket(); });
   [el.status, el.priority, el.group, el.agent].forEach(function (s) { s.addEventListener("change", updateButtons); });
@@ -399,8 +419,9 @@
   async function resolve() {
     const v = resolvedStatus(options && options.statuses);
     if (!ticket || v == null) return;
-    if (!(await confirmResolve())) return;
-    apply({ status: v }, "Resolving");
+    const expected = { current: current, ticket: ticket };
+    if (!(await confirmResolve(ticket))) return;
+    apply({ status: v }, "Resolving", expected);
   }
   el.me.addEventListener("click", assignToMe);
   el.pending.addEventListener("click", setPending);
@@ -429,10 +450,13 @@
 
   // ===================== Command palette =====================
 
-  // Runs fn once the active tab's ticket (and the choices) are loaded.
+  // Runs fn on the active tab's ticket. The panel stops following the active
+  // tab while it's hidden, so it always reads the ticket again first: acting on
+  // what the panel last showed could change a ticket that's no longer open.
   async function withTicket(fn) {
-    if (!ticket || !current) await load(false);
-    if (!ticket) { tab.activate(); return; }
+    load(false);
+    await settledLoad();
+    if (!ticket || !current) { tab.activate(); return; }
     fn();
   }
 
@@ -449,20 +473,29 @@
         id: "quick-actions.set",
         group: "Quick Actions",
         items: function (query) {
-          if (!options || !ticket || !query || query.length < 3) return [];
+          // The panel's ticket may be stale (it isn't followed while hidden), so
+          // these don't name it; run() reads the active tab's ticket first.
+          if (!options || !query || query.length < 3) return [];
           const out = [];
+          const has = function (list, v) { return (list || []).some(function (x) { return x.value === v; }); };
           (options.statuses || []).forEach(function (s) {
-            if (s.value === ticket.status) return;
-            out.push({ id: "status-" + s.value, title: "Set Ticket Status: " + s.label, subtitle: "#" + ticket.id,
+            out.push({ id: "status-" + s.value, title: "Set Ticket Status: " + s.label, subtitle: "Ticket in the active tab",
               run: function () {
-                if (s.value === resolvedStatus(options.statuses)) withTicket(resolve);
-                else withTicket(function () { apply({ status: s.value }, "Saving"); });
+                withTicket(function () {
+                  if (!has(options && options.statuses, s.value) || ticket.status === s.value) return;
+                  if (s.value === resolvedStatus(options.statuses)) resolve();
+                  else apply({ status: s.value }, "Saving");
+                });
               } });
           });
           (options.priorities || []).forEach(function (p) {
-            if (p.value === ticket.priority) return;
-            out.push({ id: "priority-" + p.value, title: "Set Ticket Priority: " + p.label, subtitle: "#" + ticket.id,
-              run: function () { withTicket(function () { apply({ priority: p.value }, "Saving"); }); } });
+            out.push({ id: "priority-" + p.value, title: "Set Ticket Priority: " + p.label, subtitle: "Ticket in the active tab",
+              run: function () {
+                withTicket(function () {
+                  if (!has(options && options.priorities, p.value) || ticket.priority === p.value) return;
+                  apply({ priority: p.value }, "Saving");
+                });
+              } });
           });
           return out;
         },

@@ -271,19 +271,35 @@
 
   // ===================== Saving =====================
 
+  // True when the saved follow-up reminders couldn't be loaded: nothing is saved then, so
+  // an empty list never replaces them on disk.
+  let loadFailed = false;
+
   let saveTimer = null;
   function scheduleSave() {
     if (!loaded) return;
     clearTimeout(saveTimer);
+    if (loadFailed) return;
     saveTimer = setTimeout(function () {
       saveTimer = null;
-      api.invoke(PLUGIN_ID, "save", { reminders: reminders }).catch(function (err) {
+      api.invoke(PLUGIN_ID, "save", { reminders: reminders }).then(function (res) {
+        if (res && res.ok === false) saveFailed(res.error);
+      }, function (err) {
         console.error("[Follow-ups] save:", err);
+        saveFailed();
       });
     }, 300);
   }
 
+  // Shown when the follow-up reminders couldn't be written, so a failed save isn't silent.
+  function saveFailed(error) {
+    if (!api.ui || typeof api.ui.notify !== "function") return;
+    api.ui.notify({ type: PLUGIN_ID + "-save-failed", title: "Follow-ups: changes not saved",
+      desc: error || "The follow-up reminders couldn't be saved to disk." });
+  }
+
   window.addEventListener("beforeunload", function () {
+    if (loadFailed) return;
     if (!loaded || !saveTimer) return;
     clearTimeout(saveTimer);
     try { api.send(PLUGIN_ID, "save-sync", { reminders: reminders }); } catch { /* closing anyway */ }
@@ -845,6 +861,11 @@
     reminders = sortReminders(store && Array.isArray(store.reminders) ? store.reminders : []);
   }).catch(function (err) {
     console.error("[Follow-ups] load:", err);
+    loadFailed = true;
+    if (api.ui && typeof api.ui.notify === "function") {
+      api.ui.notify({ type: PLUGIN_ID + "-load-failed", title: "Follow-ups: couldn't load",
+        desc: "Your saved follow-up reminders couldn't be read, so changes won't be saved until MSP++ restarts." });
+    }
   }).then(function () {
     loaded = true;
     render();

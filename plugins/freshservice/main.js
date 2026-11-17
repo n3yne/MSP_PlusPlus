@@ -45,6 +45,22 @@ const ACTION_OPTIONS_CACHE_MS = 10 * 60 * 1000;
 const MAX_AGENT_PAGES = 10;
 const MAX_GROUP_PAGES = 5;
 
+// SLA Countdown: the signed-in agent's open tickets with their due times. Up to
+// MAX_SLA_PAGES pages of the ticket filter; the first response time (which the
+// filter doesn't return) is read per ticket for up to MAX_SLA_STATS_LOOKUPS of
+// them, and kept until the ticket's updated_at changes.
+const MAX_SLA_PAGES = 3;
+const MAX_SLA_STATS_LOOKUPS = 25;
+const SLA_STATS_CONCURRENCY = 4;
+const SLA_STATS_CACHE_MS = 30 * 60 * 1000;
+// The filter for "open": every status but Resolved (4) and Closed (5). The
+// filter has no NOT, so it is two ranges; custom statuses are 6 and up.
+const SLA_OPEN_STATUS_QUERY = "(status:<4 OR status:>5)";
+// Statuses whose names mean the SLA clock is normally stopped (Pending, and
+// custom ones such as "Awaiting Vendor" or "On Hold"). Freshservice's API
+// doesn't say which statuses stop the clock, so this goes by name.
+const SLA_PAUSED_LABEL_PATTERN = /^(?:pending|on[ -]?hold|awaiting\b.*|waiting\b.*)$/i;
+
 const STATUS_LABELS = { 2: "Open", 3: "Pending", 4: "Resolved", 5: "Closed" };
 const PRIORITY_LABELS = { 1: "Low", 2: "Medium", 3: "High", 4: "Urgent" };
 
@@ -757,6 +773,117 @@ module.exports = {
       }
     });
 
+    // ===== SLA Countdown =====
+    //
+    // A ticket's due times (first response and resolution) and whether it has
+    // had its first response yet (?include=stats), for the SLA Countdown plugin
+    // through the site adapter's ticketSla part.
+    api.handle("ticket-sla", async function (data) {
+      const ticketId = String((data && data.ticketId) || "");
+      if (!/^\d{1,12}$/.test(ticketId)) return { skipped: true, error: "SLA times are read for tickets only." };
+      const conn = connection();
+      if (conn.error) return conn;
+      const wrongHost = checkHost(data, conn);
+      if (wrongHost) return wrongHost;
+      try {
+        const [json, labels] = await Promise.all([
+          apiGet(Object.assign({}, conn, { what: "Ticket" }), "/tickets/" + ticketId + "?include=stats"),
+          fieldLabels(conn),
+        ]);
+        const t = json && json.ticket;
+        if (t && isId(t.id)) rememberSlaStats(conn, t);
+        const sla = formatTicketSla(t, labels);
+        return sla ? { ticket: sla } : { error: "Freshservice returned no ticket." };
+      } catch (err) {
+        if (err && err.status === 404) return { error: "Ticket #" + ticketId + " wasn't found (it may have been deleted)." };
+        api.log("ticket-sla failed:", err.message);
+        return { error: err.message || String(err) };
+      }
+    });
+
+    // domain|ticket id → { updatedAt, firstRespondedAt, at }
+    const slaStatsCache = new Map();
+    function rememberSlaStats(conn, t) {
+      const stats = t.stats && typeof t.stats === "object" ? t.stats : {};
+      slaStatsCache.set(conn.domain + "|" + t.id, {
+        updatedAt: typeof t.updated_at === "string" ? t.updated_at : "",
+        firstRespondedAt: typeof stats.first_responded_at === "string" ? stats.first_responded_at : "",
+        at: Date.now(),
+      });
+      if (slaStatsCache.size > 500) slaStatsCache.delete(slaStatsCache.keys().next().value);
+    }
+    function cachedSlaStats(conn, t) {
+      const hit = slaStatsCache.get(conn.domain + "|" + t.id);
+      if (!hit || hit.updatedAt !== t.updated_at || Date.now() - hit.at > SLA_STATS_CACHE_MS) return null;
+      return { first_responded_at: hit.firstRespondedAt || null };
+    }
+
+    // The open tickets assigned to the API key's agent, with due times, soonest
+    // first. Tickets still waiting on a first response get their stats read
+    // (cached until the ticket changes), so a response already sent isn't
+    // counted down.
+    api.handle("my-sla-tickets", async function () {
+      const conn = connection();
+      if (conn.error) return conn;
+      try {
+        const me = Number(await currentAgentId(conn));
+        const built = buildFilterQuery("agent_id:" + me + " AND " + SLA_OPEN_STATUS_QUERY);
+        if (built.error) return built;
+        const what = Object.assign({ what: "Ticket filter" }, conn);
+        const q = encodeURIComponent("\"" + built.query + "\"");
+        const raw = [];
+        let total = 0;
+        for (let page = 1; page <= MAX_SLA_PAGES; page++) {
+          const json = await apiGet(what, "/tickets/filter?query=" + q + "&page=" + page);
+          const batch = Array.isArray(json.tickets) ? json.tickets.filter((t) => t && isId(t.id)) : [];
+          if (typeof json.total === "number") total = json.total;
+          raw.push(...batch);
+          if (batch.length < FILTER_PAGE_SIZE || raw.length >= total) break;
+        }
+        const labels = await fieldLabels(conn);
+        // Which tickets need their first response time: a response due time,
+        // a running clock, and nothing cached for this version of the ticket.
+        const warnings = [];
+        const needStats = [];
+        for (const t of raw) {
+          const cached = cachedSlaStats(conn, t);
+          if (cached) { t.stats = cached; continue; }
+          const sla = formatTicketSla(t, labels);
+          if (sla && sla.frDueBy && sla.state === "running") needStats.push(t);
+        }
+        needStats.sort((a, b) => String(a.fr_due_by).localeCompare(String(b.fr_due_by)));
+        const lookups = needStats.slice(0, MAX_SLA_STATS_LOOKUPS);
+        if (needStats.length > lookups.length) {
+          warnings.push("First responses were checked for the " + lookups.length + " tickets due soonest only.");
+        }
+        let failed = 0;
+        for (let i = 0; i < lookups.length; i += SLA_STATS_CONCURRENCY) {
+          await Promise.all(lookups.slice(i, i + SLA_STATS_CONCURRENCY).map(async (t) => {
+            try {
+              const json = await apiGet(Object.assign({}, conn, { what: "Ticket" }), "/tickets/" + t.id + "?include=stats");
+              const full = json && json.ticket;
+              if (full && isId(full.id)) {
+                rememberSlaStats(conn, full);
+                t.stats = full.stats || {};
+              }
+            } catch { failed++; }
+          }));
+        }
+        if (failed) warnings.push("Couldn't check the first response on " + failed + " ticket" + (failed === 1 ? "" : "s") + ".");
+        const tickets = raw.map((t) => formatTicketSla(t, labels)).filter(Boolean);
+        return {
+          tickets,
+          total: Math.max(total, tickets.length),
+          domain: conn.domain,
+          accountHosts: accountHosts(conn.domain, api.getSettings()),
+          warnings,
+        };
+      } catch (err) {
+        api.log("my-sla-tickets failed:", err.message);
+        return { error: err.message || String(err) };
+      }
+    });
+
     api.handle("test-connection", async function () {
       const conn = connection();
       if (conn.error) return { error: conn.error };
@@ -796,6 +923,7 @@ module.exports = {
   fieldChoices,
   formatTicketState,
   buildTicketUpdate,
+  formatTicketSla,
 };
 
 // What the user typed in ticket search → the parts each kind of search uses:
@@ -1252,6 +1380,38 @@ function formatTicketState(t) {
     agentId: isId(t.responder_id) ? t.responder_id : null,
     groupId: isId(t.group_id) ? t.group_id : null,
     updatedAt: typeof t.updated_at === "string" ? t.updated_at : "",
+  };
+}
+
+// A ticket from the API (raw, with or without ?include=stats) → its SLA view
+// for the SLA Countdown plugin. state is "done" (resolved or closed), "paused"
+// (a status that normally stops the clock, by name) or "running". responded is
+// true / false when the stats were read, null when they weren't.
+function formatTicketSla(t, labels) {
+  if (!t || typeof t !== "object" || !isId(t.id)) return null;
+  const names = labels || choicesToLabels({});
+  const status = Number.isInteger(t.status) ? t.status : null;
+  const statusLabel = status != null && names.status[status] ? String(names.status[status]) : "";
+  const time = (v) => (typeof v === "string" && !Number.isNaN(Date.parse(v)) ? v : "");
+  const stats = t.stats && typeof t.stats === "object" ? t.stats : null;
+  let state = "running";
+  if (status === 4 || status === 5 || /^(?:resolved|closed)$/i.test(statusLabel)) state = "done";
+  else if (status === 3 || SLA_PAUSED_LABEL_PATTERN.test(statusLabel)) state = "paused";
+  return {
+    id: t.id,
+    subject: typeof t.subject === "string" ? t.subject.substring(0, 300) : "",
+    status,
+    statusLabel,
+    priority: Number.isInteger(t.priority) ? t.priority : null,
+    priorityLabel: Number.isInteger(t.priority) && names.priority[t.priority] ? String(names.priority[t.priority]) : "",
+    state,
+    frDueBy: time(t.fr_due_by),
+    dueBy: time(t.due_by),
+    frEscalated: t.fr_escalated === true,
+    isEscalated: t.is_escalated === true,
+    firstRespondedAt: stats ? time(stats.first_responded_at) : "",
+    responded: stats ? !!time(stats.first_responded_at) : null,
+    updatedAt: time(t.updated_at),
   };
 }
 

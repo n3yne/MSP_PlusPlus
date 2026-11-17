@@ -603,6 +603,31 @@
     return base.origin + "/" + portal + "/" + kind + "/" + Number(m[2]);
   }
 
+  // Results from the API account link to an open tab's host only when that tab
+  // is the same account (the alias pair counts); else to the API domain.
+  // res is { domain, accountHosts? }; tabUrls are the open tabs, active first.
+  function accountTicketLinker(res, tabUrls) {
+    const account = Array.isArray(res.accountHosts) && res.accountHosts.length ? res.accountHosts : [res.domain];
+    let base = null;
+    for (const u of tabUrls || []) {
+      const b = instanceBase(u);
+      let host = "";
+      try { host = new URL(u).hostname.toLowerCase(); } catch { /* not a URL */ }
+      if (b && account.includes(host)) { base = b; break; }
+    }
+    return function (id) {
+      return base ? base.origin + "/" + base.portal + "/tickets/" + id : "https://" + res.domain + "/a/tickets/" + id;
+    };
+  }
+
+  function openTabUrls() {
+    try {
+      const list = api.browser.getTabs();
+      list.sort(function (a, b) { return (b.active ? 1 : 0) - (a.active ? 1 : 0); });
+      return list.map(function (t) { return t.url; });
+    } catch { return []; }
+  }
+
   // Ticket search (the Ticket Search plugin's side panel tab, and anything else
   // that wants it, such as a command palette): by number, subject or requester,
   // through the REST API. Each result links to the account the API searched, on
@@ -611,25 +636,8 @@
     const opts = options || {};
     const res = await api.invoke(PLUGIN_ID, "search-tickets", { term: term, days: opts.days });
     if (!res || res.error) return { error: (res && res.error) || "Freshservice didn't answer the search.", skipped: !!(res && res.skipped) };
-    let tabUrls = [];
-    try {
-      const list = api.browser.getTabs();
-      list.sort(function (a, b) { return (b.active ? 1 : 0) - (a.active ? 1 : 0); });
-      tabUrls = list.map(function (t) { return t.url; });
-    } catch { /* no tabs yet */ }
-    // Results come from the API account, so links go to an open tab's host only
-    // when that tab is the same account (the alias pair counts); else the API domain.
-    const account = Array.isArray(res.accountHosts) && res.accountHosts.length ? res.accountHosts : [res.domain];
-    let base = null;
-    for (const u of tabUrls) {
-      const b = instanceBase(u);
-      let host = "";
-      try { host = new URL(u).hostname.toLowerCase(); } catch { /* not a URL */ }
-      if (b && account.includes(host)) { base = b; break; }
-    }
-    const linkFor = function (id) {
-      return base ? base.origin + "/" + base.portal + "/tickets/" + id : "https://" + res.domain + "/a/tickets/" + id;
-    };
+    const tabUrls = openTabUrls();
+    const linkFor = accountTicketLinker(res, tabUrls);
     const tickets = (res.tickets || []).map(function (t) {
       return {
         id: String(t.id),
@@ -700,6 +708,39 @@
     return { preview: Object.assign({}, res.preview, { label: "#" + id }) };
   }
 
+  // SLA countdown (the SLA Countdown plugin's tab badges and side panel tab):
+  // due times for first response and resolution, through the REST API.
+  // Tickets only, and only on the configured API account.
+  function slaRefForUrl(url) {
+    let parsed;
+    try { parsed = new URL(url); } catch { return null; }
+    if (!matchesUrl(parsed.href) || SIGN_IN_HOSTNAME_PATTERN.test(parsed.hostname)) return null;
+    const m = (parsed.pathname + parsed.hash).match(RECORD_LINK_PATTERN);
+    if (!m || m[2].toLowerCase() !== "tickets" || m[3].length > 12) return null;
+    const id = String(Number(m[3]));
+    return { id: id, label: "#" + id, url: parsed.href, host: parsed.hostname.toLowerCase() };
+  }
+
+  async function slaGet(ref) {
+    const r = ref || {};
+    if (!/^\d{1,12}$/.test(String(r.id || ""))) return { skipped: true, error: "SLA times are read for tickets only." };
+    const res = await api.invoke(PLUGIN_ID, "ticket-sla", { ticketId: String(r.id), host: r.host || hostOf(r.url) });
+    if (!res || res.error || !res.ticket) {
+      return { error: (res && res.error) || "Freshservice didn't send the ticket.", skipped: !!(res && res.skipped) };
+    }
+    return { ticket: Object.assign({}, res.ticket, { label: "#" + res.ticket.id }) };
+  }
+
+  async function slaListMine() {
+    const res = await api.invoke(PLUGIN_ID, "my-sla-tickets", {});
+    if (!res || res.error) return { error: (res && res.error) || "Freshservice didn't send your tickets.", skipped: !!(res && res.skipped) };
+    const linkFor = accountTicketLinker(res, openTabUrls());
+    const tickets = (res.tickets || []).map(function (t) {
+      return Object.assign({}, t, { label: "#" + t.id, url: linkFor(Number(t.id)) });
+    });
+    return { tickets: tickets, total: res.total || tickets.length, warnings: res.warnings || [] };
+  }
+
   // ==================== Register ====================
 
   api.sites.register({
@@ -744,6 +785,11 @@
     ticketPreview: {
       supports: function (ref) { return !!previewId(ref); },
       preview: previewTicket,
+    },
+    ticketSla: {
+      refForUrl: slaRefForUrl,
+      get: slaGet,
+      listMine: slaListMine,
     },
     knowledge: {
       name: "Solutions",

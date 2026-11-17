@@ -336,6 +336,8 @@ Renderer scripts can also call the bundled plugins, so a plugin can use the app'
 | `invoke("freshservice", "find-agent", { email })` | `{ agent }` or `{ error, skipped? }` | The agent with that email: `{ id, name, email }`. |
 | `invoke("freshservice", "current-agent")` | `{ agent }` or `{ error, skipped? }` | The agent the API key belongs to (`/agents/me`): `{ id, name, email }`. The simplest way for a plugin to learn which tickets are "mine". Freshservice plugin 0.8.2+. |
 | `invoke("freshservice", "account-hosts")` | `{ domain, hosts }` or `{ error, skipped? }` | The page hosts that are the API's account: the API domain and, with an alias host set up, the other end of the alias. Compare a tab's host with these, not with `fsApiDomain`, before treating a ticket number on the page as the API's ticket. Freshservice plugin 0.8.2+. |
+| `invoke("freshservice", "ticket-sla", { ticketId, host? })` | `{ ticket }` or `{ error, skipped? }` | A ticket's SLA view (read with `?include=stats`): `{ id, subject, status, statusLabel, priority, priorityLabel, state, frDueBy, dueBy, frEscalated, isEscalated, firstRespondedAt, responded, updatedAt }`. `state` is `"done"` (resolved or closed), `"paused"` (Pending, or a status named On Hold, Awaiting… or Waiting…) or `"running"`. Prefer the site's `ticketSla` adapter. Freshservice plugin 0.8.5+. |
+| `invoke("freshservice", "my-sla-tickets")` | `{ tickets, total, domain, accountHosts, warnings }` or `{ error, skipped? }` | The open tickets (every status but Resolved and Closed, up to 90) assigned to the API key's agent, each as `ticket-sla` returns it. `responded` is read for up to 25 tickets still waiting on a first response (soonest first) and is `null` for the rest; the answer is cached until the ticket's `updated_at` changes. Freshservice plugin 0.8.5+. |
 | `invoke("freshservice", "search-tickets", { term, days? })` | `{ tickets, domain, days, scanned, scanFull, warnings }` or `{ error, skipped? }` | Tickets matching a number, subject words or a requester's name or email (up to 50, number matches first, then newest updated). Each is a `filter-tickets` summary plus `statusLabel`, `priorityLabel`, `requester`, `requesterEmail` and `matches` (`"number"`, `"subject"`, `"requester"`). Subjects are matched against up to 300 tickets updated in the last `days` (7, 30, 90, 180 or 365; default 30), cached for two minutes. Prefer the site's `ticketSearch` adapter. |
 
 See `plugins/solutions-chat/renderer.js` for a plugin built on `pluginAPI.sites` and the AI Features handler.
@@ -350,7 +352,7 @@ Adds a tab to the side panel on the right of the window and returns a handle for
 | `label` | Text on the tab. |
 | `icon` | Optional emoji or short text shown before the label. |
 | `title` | Optional tooltip. |
-| `order` | Optional number; lower comes first. Notes uses `10`, Ticket Search `15`, Solutions Chat `20`, Canned Responses `30`, Time Tracker `40`, Follow-up Reminders `45`, Recent Tickets `50`, the default is `100`. |
+| `order` | Optional number; lower comes first. Notes uses `10`, Ticket Search `15`, Quick Actions `16`, SLA Countdown `17`, Solutions Chat `20`, Canned Responses `30`, Time Tracker `40`, Follow-up Reminders `45`, Recent Tickets `50`, the default is `100`. |
 
 The handle:
 

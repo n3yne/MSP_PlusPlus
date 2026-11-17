@@ -1,5 +1,7 @@
 # Files and folders MSP++ uses
 
+[Docs home](README.md) › Files and folders MSP++ uses
+
 This page lists every file and folder MSP++ reads from or writes to, so you know what to back up, what to exclude from antivirus or cleanup tools, and what is left behind after uninstalling.
 
 **R** means the app reads it, **W** means it writes it, and **D** means it can delete it.

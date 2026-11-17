@@ -99,7 +99,10 @@ function sanitizeLog(list, now) {
   return out.length > MAX_LOG ? out.slice(out.length - MAX_LOG) : out;
 }
 
-// Cleans the whole store: at most MAX_TIMERS timers, unique ids and keys.
+// Cleans the whole store: unique ids and keys, at most MAX_TIMERS timers, but
+// timers with unlogged time are kept past that (up to HARD_MAX_TIMERS) so a long
+// list never loses time; idle ones are dropped first.
+const HARD_MAX_TIMERS = MAX_TIMERS * 5;
 function sanitizeStore(data) {
   const list = data && Array.isArray(data.timers) ? data.timers : [];
   const seenIds = new Set();
@@ -113,7 +116,10 @@ function sanitizeStore(data) {
     seenIds.add(t.id);
     seenKeys.add(scopedKey);
     timers.push(t);
-    if (timers.length >= MAX_TIMERS) break;
+    if (timers.length >= HARD_MAX_TIMERS) break;
+  }
+  for (let i = timers.length - 1; i >= 0 && timers.length > MAX_TIMERS; i--) {
+    if (!timers[i].runningSince && !timers[i].accumulatedMs) timers.splice(i, 1);
   }
   const savedAt = Number(data && data.savedAt);
   return {
@@ -156,14 +162,27 @@ module.exports = {
       }
     }
 
-    let writing = Promise.resolve();
+    // Each save gets a number. One that a later save (the close-time save too)
+    // has overtaken is dropped instead of being renamed over the newer file, and
+    // the rename is synchronous so a close-time save can't land between the
+    // check and the rename. Resolves false when the write failed.
+    let writing = Promise.resolve(true);
+    let saveGen = 0;
     function writeAsync(store) {
-      writing = writing.then(async function () {
+      const gen = ++saveGen;
+      const result = writing.then(async function () {
+        if (gen !== saveGen) return true;
         const tmp = file + ".tmp";
         await fsp.writeFile(tmp, JSON.stringify(store, null, 2), "utf-8");
-        await fsp.rename(tmp, file);
-      }).catch(function (err) { api.log("Couldn't save timers:", err.message); });
-      return writing;
+        if (gen !== saveGen) {
+          try { await fsp.unlink(tmp); } catch { /* already gone */ }
+          return true;
+        }
+        fs.renameSync(tmp, file);
+        return true;
+      }).catch(function (err) { api.log("Couldn't save timers:", err.message); return false; });
+      writing = result;
+      return result;
     }
 
     api.handle("load", async function () {
@@ -172,12 +191,13 @@ module.exports = {
 
     api.handle("save", async function (data) {
       const store = sanitizeStore(data);
-      await writeAsync(store);
+      if (!(await writeAsync(store))) return { ok: false, error: "Couldn't save the timers to disk." };
       return { ok: true, count: store.timers.length };
     });
 
     // Sent while the window closes, when an awaited reply may never arrive.
     api.onMessage("save-sync", function (data) {
+      saveGen++; // any save still in flight is older than this one
       try {
         const store = sanitizeStore(data);
         const tmp = file + ".close.tmp";

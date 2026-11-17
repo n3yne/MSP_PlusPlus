@@ -1,6 +1,6 @@
 {
   "name": "msp-pp",
-  "version": "0.8.3",
+  "version": "0.8.4",
   "description": "MSP++: a wrapper for MSP and ticketing sites with a plugin side panel and ticket note backup",
   "main": "main.js",
   "scripts": {
@@ -55,6 +55,7 @@
       "webauthn.js",
       "permissions.js",
       "settings-transfer.js",
+      "safe-file.js",
       "plugin-manager.js",
       "plugin-directory.js",
       "plugin-package.js",

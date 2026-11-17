@@ -114,4 +114,47 @@ function findLegacyUserDataDir(appDataDir, currentDir, exists, join) {
   return null;
 }
 
-module.exports = { DEFAULT_SETTINGS, validateSettings, migrateCoreSettings, findLegacyUserDataDir, tabsToRestore };
+// When a settings save fails validation, the problem may be a value already
+// stored (say, written by an older version), not the change being saved; then
+// every later save would fail too. This resets stored keys the change didn't
+// touch, one at a time, to their default (or removes them when there's none)
+// until the settings pass. Returns { settings, reset: [keys] }, or null when the
+// change itself is the problem.
+function repairStoredSettings(merged, changedKeys, defaults, isValid) {
+  if (isValid(merged)) return { settings: merged, reset: [] };
+  const changed = new Set(changedKeys || []);
+  let current = Object.assign({}, merged);
+  const reset = [];
+  for (let pass = 0; pass < 5; pass++) {
+    let fixed = false;
+    for (const key of Object.keys(current)) {
+      if (changed.has(key)) continue;
+      const hasDefault = Object.prototype.hasOwnProperty.call(defaults, key);
+      if (hasDefault && JSON.stringify(defaults[key]) === JSON.stringify(current[key])) continue;
+      const candidate = Object.assign({}, current);
+      if (hasDefault) candidate[key] = defaults[key];
+      else delete candidate[key];
+      if (isValid(candidate)) return { settings: candidate, reset: reset.concat(key) };
+    }
+    // No single key fixes it: reset the first key that is invalid on its own
+    // terms (its default validates where it doesn't) and try again.
+    for (const key of Object.keys(defaults)) {
+      if (changed.has(key) || !Object.prototype.hasOwnProperty.call(current, key)) continue;
+      if (JSON.stringify(defaults[key]) === JSON.stringify(current[key])) continue;
+      const withDefault = Object.assign({}, current, { [key]: defaults[key] });
+      const allDefaults = Object.assign({}, defaults);
+      const withValue = Object.assign({}, defaults, { [key]: current[key] });
+      if (isValid(allDefaults) && !isValid(withValue)) {
+        current = withDefault;
+        reset.push(key);
+        fixed = true;
+        break;
+      }
+    }
+    if (!fixed) return null;
+    if (isValid(current)) return { settings: current, reset };
+  }
+  return null;
+}
+
+module.exports = { DEFAULT_SETTINGS, validateSettings, migrateCoreSettings, findLegacyUserDataDir, tabsToRestore, repairStoredSettings };

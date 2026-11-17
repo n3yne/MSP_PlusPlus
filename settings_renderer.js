@@ -115,8 +115,33 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Sends only the keys that changed. Other windows and plugin panels save too,
   // so this window's copy can be out of date and is never sent whole.
+  // A failed save (invalid value, or the file couldn't be written) shows a
+  // banner instead of looking saved.
   function saveSettings(patch) {
-    return window.backupAPI.saveSettings(patch);
+    return Promise.resolve(window.backupAPI.saveSettings(patch)).then(function (result) {
+      showSaveResult(result);
+      return result;
+    }, function (err) {
+      showSaveResult({ success: false });
+      throw err;
+    });
+  }
+
+  function showSaveResult(result) {
+    let banner = document.getElementById("settings-save-error");
+    if (result && result.success === false) {
+      if (!banner) {
+        banner = document.createElement("div");
+        banner.id = "settings-save-error";
+        banner.className = "settings-save-error";
+        banner.setAttribute("role", "alert");
+        document.body.appendChild(banner);
+      }
+      banner.textContent = result.error || "That change couldn't be saved.";
+      banner.hidden = false;
+    } else if (banner) {
+      banner.hidden = true;
+    }
   }
 
   // ==================== Form Population ====================

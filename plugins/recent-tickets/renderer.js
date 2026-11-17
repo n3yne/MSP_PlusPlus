@@ -192,19 +192,35 @@
 
   // ===================== Saving =====================
 
+  // True when the saved recent tickets couldn't be loaded: nothing is saved then, so
+  // an empty list never replaces them on disk.
+  let loadFailed = false;
+
   let saveTimer = null;
   function scheduleSave() {
     if (!loaded) return;
     clearTimeout(saveTimer);
+    if (loadFailed) return;
     saveTimer = setTimeout(function () {
       saveTimer = null;
-      api.invoke(PLUGIN_ID, "save", { entries: entries }).catch(function (err) {
+      api.invoke(PLUGIN_ID, "save", { entries: entries }).then(function (res) {
+        if (res && res.ok === false) saveFailed(res.error);
+      }, function (err) {
         console.error("[Recent Tickets] save:", err);
+        saveFailed();
       });
     }, 500);
   }
 
+  // Shown when the recent tickets couldn't be written, so a failed save isn't silent.
+  function saveFailed(error) {
+    if (!api.ui || typeof api.ui.notify !== "function") return;
+    api.ui.notify({ type: PLUGIN_ID + "-save-failed", title: "Recent Tickets: changes not saved",
+      desc: error || "The recent tickets couldn't be saved to disk." });
+  }
+
   window.addEventListener("beforeunload", function () {
+    if (loadFailed) return;
     if (!loaded || !saveTimer) return;
     clearTimeout(saveTimer);
     try { api.send(PLUGIN_ID, "save-sync", { entries: entries }); } catch { /* closing anyway */ }
@@ -537,6 +553,11 @@
     entries = store && Array.isArray(store.entries) ? store.entries : [];
   }).catch(function (err) {
     console.error("[Recent Tickets] load:", err);
+    loadFailed = true;
+    if (api.ui && typeof api.ui.notify === "function") {
+      api.ui.notify({ type: PLUGIN_ID + "-load-failed", title: "Recent Tickets: couldn't load",
+        desc: "Your saved recent tickets couldn't be read, so changes won't be saved until MSP++ restarts." });
+    }
   }).then(function () {
     loaded = true;
     // A visit seen before the list loaded would be lost; look again now.

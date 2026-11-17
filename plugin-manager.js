@@ -10,6 +10,7 @@ const { version: APP_VERSION } = require("./package.json");
 const SiteColors = require("./site-colors");
 const PluginDirectory = require("./plugin-directory");
 const PluginCategories = require("./plugin-categories");
+const safeFile = require("./safe-file");
 
 const pluginBus = new EventEmitter();
 pluginBus.setMaxListeners(100);
@@ -125,9 +126,10 @@ function semverLt(a, b) {
 
 async function loadPluginsConfig() {
   if (!_pluginsConfigFile) return;
+  // A damaged file falls back to plugins-config.json.bak (the last good save).
   try {
-    const raw = await fsp.readFile(_pluginsConfigFile, "utf-8");
-    _pluginsConfig = JSON.parse(raw) || {};
+    const res = await safeFile.readJsonFile(_pluginsConfigFile);
+    _pluginsConfig = res.value && typeof res.value === "object" && !Array.isArray(res.value) ? res.value : {};
   } catch {
     _pluginsConfig = {};
   }
@@ -136,7 +138,7 @@ async function loadPluginsConfig() {
 async function savePluginsConfig() {
   if (!_pluginsConfigFile) return;
   try {
-    await fsp.writeFile(_pluginsConfigFile, JSON.stringify(_pluginsConfig, null, 2), "utf-8");
+    await safeFile.writeJsonWithBackup(_pluginsConfigFile, _pluginsConfig);
   } catch (err) {
     console.error("[PluginManager] Failed to save plugins config:", err);
   }

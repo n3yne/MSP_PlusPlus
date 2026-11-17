@@ -1,5 +1,7 @@
 "use strict";
 
+const crypto = require("crypto");
+
 // Main-process half of the Freshservice site plugin: reads ticket details and
 // Solutions articles through the Freshservice REST API v2 (the page-side half,
 // the site adapter, is renderer.js). The API key is
@@ -220,17 +222,24 @@ module.exports = {
       return resp.json();
     }
 
+    // Caches of what depends on whose API key it is (the agent, the choices
+    // offered to them) are keyed by domain and a hash of the key, so entering
+    // another agent's key takes effect without a restart.
+    function keyCacheId(conn) {
+      return conn.domain + "|" + crypto.createHash("sha256").update(String(conn.key)).digest("hex").slice(0, 16);
+    }
+
     // The signed-in agent's id, which a time entry has to name. Looked up once
-    // per domain through /agents/me (the agent the API key belongs to).
-    const agentIdByDomain = new Map();
+    // per domain and key through /agents/me (the agent the API key belongs to).
+    const agentIdByKey = new Map();
     async function currentAgentId(conn) {
-      if (agentIdByDomain.has(conn.domain)) return agentIdByDomain.get(conn.domain);
+      if (agentIdByKey.has(keyCacheId(conn))) return agentIdByKey.get(keyCacheId(conn));
       const json = await apiGet(Object.assign({}, conn, { what: "Agent" }), "/agents/me");
       const id = json && json.agent && json.agent.id;
       if (typeof id !== "number" && !(typeof id === "string" && /^\d{1,20}$/.test(id))) {
         throw new Error("Freshservice didn't say which agent the API key belongs to.");
       }
-      agentIdByDomain.set(conn.domain, id);
+      agentIdByKey.set(keyCacheId(conn), id);
       return id;
     }
 
@@ -393,8 +402,8 @@ module.exports = {
       }
     });
 
-    // Looks up an agent by email, so a plugin can tell which tickets are
-    // "mine" (the API has no endpoint for the agent who owns the key).
+    // Looks up an agent by email (for a plugin that asks which agent you are;
+    // current-agent below finds the key's own agent through /agents/me).
     api.handle("find-agent", async function (data) {
       const email = String((data && data.email) || "").trim().toLowerCase();
       if (!EMAIL_PATTERN.test(email)) return { error: "Enter the email address you sign in to Freshservice with." };
@@ -616,7 +625,7 @@ module.exports = {
     // Used by the Quick Actions plugin through the site adapter's ticketActions.
     // The choices (statuses incl. custom ones, agents, groups) are cached per
     // domain for a few minutes; data.force refreshes them.
-    const optionsCache = new Map(); // domain → { at, value }
+    const optionsCache = new Map(); // keyCacheId → { at, value }
 
     async function listAll(conn, path, key, maxPages) {
       const all = [];
@@ -641,7 +650,7 @@ module.exports = {
     api.handle("get-ticket-options", async function (data) {
       const conn = connection();
       if (conn.error) return conn;
-      const cached = optionsCache.get(conn.domain);
+      const cached = optionsCache.get(keyCacheId(conn));
       if (cached && !(data && data.force) && Date.now() - cached.at < ACTION_OPTIONS_CACHE_MS) return cached.value;
       const [fields, agents, groups, me] = await Promise.allSettled([
         apiGet(Object.assign({}, conn, { what: "Ticket fields" }), "/ticket_form_fields"),
@@ -663,7 +672,7 @@ module.exports = {
         me: me.status === "fulfilled" ? Number(me.value) : null,
         warnings,
       };
-      if (!warnings.length) optionsCache.set(conn.domain, { at: Date.now(), value });
+      if (!warnings.length) optionsCache.set(keyCacheId(conn), { at: Date.now(), value });
       return value;
     });
 
@@ -756,7 +765,7 @@ module.exports = {
         const json = await apiGet(Object.assign({}, conn, { what: "Agent" }), "/agents/me");
         const agent = formatAgent(json && json.agent);
         if (!agent) return { error: "Freshservice didn't say which agent the API key belongs to." };
-        agentIdByDomain.set(conn.domain, agent.id);
+        agentIdByKey.set(keyCacheId(conn), agent.id);
         return { agent };
       } catch (err) {
         api.log("current-agent failed:", err.message);

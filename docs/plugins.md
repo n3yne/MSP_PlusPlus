@@ -83,7 +83,7 @@ Every plugin must have a `manifest.json` at its root:
 | `name` | No | Human-readable display name. |
 | `version` | No | Plugin version string (semver recommended). |
 | `description` | No | One-line summary. |
-| `category` | No | The group the plugin is listed under in Settings → Plugins and in the Settings nav. The built-in categories, in display order, are `Sites`, `Tickets`, `Notes & Replies`, `Time & Reminders`, `AI` and `Tabs & Toolbars` (matched case-insensitively). Any other name (up to 40 characters) becomes its own group after those. Without one, a site plugin goes under `Sites` and anything else under `Other`. See `plugin-categories.js`. |
+| `category` | No | The group the plugin is listed under in Settings → Plugins and in the Settings nav. The built-in categories, in display order, are `Sites`, `Tickets`, `Notes & Replies`, `Time & Reminders`, `AI`, `Tabs & Toolbars` and `Security` (matched case-insensitively). Any other name (up to 40 characters) becomes its own group after those. Without one, a site plugin goes under `Sites` and anything else under `Other`. See `plugin-categories.js`. |
 | `author` | No | Plugin author name. |
 | `main` | No | Relative path to the main-process entry file. |
 | `renderer` | No | Relative path to the main-window renderer entry file. |
@@ -384,7 +384,7 @@ Adds a tab to the side panel on the right of the window and returns a handle for
 | `label` | Text on the tab. |
 | `icon` | Optional emoji or short text shown before the label. |
 | `title` | Optional tooltip. |
-| `order` | Optional number; lower comes first. Notes uses `10`, Ticket Search `15`, Quick Actions `16`, SLA Countdown `17`, Solutions Chat `20`, Canned Responses `30`, Time Tracker `40`, Follow-up Reminders `45`, Recent Tickets `50`, the default is `100`. |
+| `order` | Optional number; lower comes first. Notes uses `10`, Ticket Search `15`, Quick Actions `16`, SLA Countdown `17`, Solutions Chat `20`, Canned Responses `30`, Time Tracker `40`, Follow-up Reminders `45`, Recent Tickets `50`, Password Vault `60`, the default is `100`. |
 
 The handle:
 

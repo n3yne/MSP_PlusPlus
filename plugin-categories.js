@@ -18,6 +18,7 @@
     { name: "Time & Reminders", description: "Tracking time on tickets and following up on them." },
     { name: "AI",               description: "AI suggestions, summaries and answers." },
     { name: "Tabs & Toolbars",  description: "Extra bars and ways to arrange tabs." },
+    { name: "Security",         description: "Keeping passwords safe." },
   ];
   const OTHER = "Other";
   const MAX_LENGTH = 40;

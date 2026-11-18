@@ -32,7 +32,7 @@ describe("plugin-manager", () => {
     const { userData } = makeUserData();
     const rebuilt = [];
     await pluginManager.initPlugins(userData, {}, ipcMain, (items) => rebuilt.push(items.slice()));
-    const last = rebuilt[rebuilt.length - 1];
+    const last = rebuilt[rebuilt.length - 1].filter((i) => i.pluginId === "menu-test");
     expect(last).toEqual([expect.objectContaining({ label: "Do thing", pluginId: "menu-test" })]);
   });
 

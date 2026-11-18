@@ -54,6 +54,12 @@ A site plugin teaches MSP++ about a ticketing site: how to find the ticket numbe
 | [Metrics Bar](metrics-bar.md) | Live numbers from dashboards (or Freshservice counts) above the tab bar | – |
 | [Tree Style Tabs](tree-tabs.md) | 🌲 Tree tab: your tabs as a tree with groups | – |
 
+### Security
+
+| Plugin | What it does | Needs |
+|---|---|---|
+| [Password Vault](password-vault.md) | 🔑 Vault tab: your passwords, encrypted with a master password, with Windows Hello | – |
+
 ## Installing and managing plugins
 
 All of this is under **Settings → Plugins**.

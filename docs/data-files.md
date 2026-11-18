@@ -63,6 +63,8 @@ Plugins get their own folder through `api.getDataPath()`. It is created the firs
 | `follow-ups\reminders.json` | R W | Follow-up reminders (site, ticket, subject, link, note, when it's due, whether it has gone off). If it can't be read, it is kept as `reminders.json.corrupt-<time>` and a new list is started. |
 | `recent-tickets\recent.json` | R W | The Recent Tickets list (site, ticket, subject, link, when it was last viewed, pinned). If it can't be read, it is kept as `recent.json.corrupt-<time>` and a new list is started. |
 | `ticket-notifications\state.json` | R W | Which tickets and updates have already been seen. |
+| `password-vault\vault.json` | R W D | The [Password Vault](plugins/password-vault.md), fully encrypted with your master password. Deleted only by **Delete the vault**. |
+| `password-vault\vault.json.bak` | R W D | The vault as it was before the last save, encrypted the same way. |
 | `ai-features\m365-token.dat` | R W D | The encrypted Microsoft 365 sign-in. Deleted when you sign out. |
 
 Plugins imported before 0.8 were copied into `DATA\plugins\<plugin-id>\` itself (a folder with a `manifest.json`). Since 0.8.3 the app no longer loads code from here: at start-up it copies such a plugin to `DATA\installed-plugins\<plugin-id>\` and renames the old `manifest.json` to `manifest.json.moved-to-installed-plugins` (R W). The plugin's data stays in this folder.
@@ -106,6 +108,7 @@ Electron (Chromium) keeps the browsing data for the tabs here. This is where you
 - **Downloads** and **Save Image As** go wherever you pick in the Save dialog. The download list in the app is kept in memory only and is cleared on restart.
 - **Import Plugin** reads the folder you pick.
 - **Export Settings** (Settings → General) writes a `.json` file where you pick, with the contents of `settings.json` and `plugins-config.json` minus API keys and anything tied to them. **Import Settings** reads the file you pick and replaces the settings it contains in `settings.json` (keeping the API keys saved on this PC, and any setting the file doesn't have, such as those of a plugin the exporting PC didn't have) and the plugin on/off choices in `plugins-config.json`.
+- **Save an encrypted copy…** ([Password Vault](plugins/password-vault.md)) writes a copy of `vault.json`, still encrypted, where you pick (`msp-pp-vault-<date>.json` in Documents by default).
 
 ## Logs
 

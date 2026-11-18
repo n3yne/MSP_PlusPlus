@@ -26,6 +26,7 @@ Start with the page that matches what you want to do.
 - **Time & Reminders:** [Time Tracker](plugins/time-tracker.md) · [Follow-up Reminders](plugins/follow-ups.md)
 - **AI:** [AI Features](plugins/ai-features.md) · [Solutions Chat](plugins/solutions-chat.md)
 - **Tabs & Toolbars:** [Bookmarks Bar](plugins/bookmarks-bar.md) · [Metrics Bar](plugins/metrics-bar.md) · [Tree Style Tabs](plugins/tree-tabs.md)
+- **Security:** [Password Vault](plugins/password-vault.md)
 
 ## Reference
 

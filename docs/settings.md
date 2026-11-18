@@ -42,7 +42,7 @@ Under **Settings → General → Move Settings to Another PC**:
 - **Export Settings…** saves your app and plugin settings, bookmarks, canned responses and which plugins are on to a `.json` file.
 - **Import Settings…** on the other PC loads it.
 
-API keys are never in the file: they're encrypted for this PC and couldn't be read elsewhere, so enter them again on the new PC (importing keeps any keys already saved there). Notes, timers, reminders and other plugin data aren't included; to move those, copy the [data folder](data-files.md#the-data-folder).
+API keys are never in the file: they're encrypted for this PC and couldn't be read elsewhere, so enter them again on the new PC (importing keeps any keys already saved there). Notes, timers, reminders, the [Password Vault](plugins/password-vault.md) and other plugin data aren't included; to move those, copy the [data folder](data-files.md#the-data-folder).
 
 ## Window
 

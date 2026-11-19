@@ -46,7 +46,9 @@ In the Vault tab, behind the **⚙** button (the vault must be unlocked). They'r
 
 ### How Windows Hello works here
 
-When you turn it on, Windows Hello makes a key for MSP++ ("MSP++ Password Vault") that never leaves Windows and only works after your face, fingerprint or PIN. The vault's key is then encrypted with a key that can only be rebuilt from that Windows Hello key, so **only Windows Hello can open that copy**. Bitwarden's desktop app works the same way.
+Windows Hello needs MSP++ 0.8.5 or later. When you turn it on, Windows Hello makes a key for the vault ("MSP++ password-vault") that never leaves Windows and only works after your face, fingerprint or PIN. The vault's key is then encrypted with a key that can only be rebuilt from that Windows Hello key, so **only Windows Hello can open that copy**. Bitwarden's desktop app works the same way.
+
+MSP++ talks to Windows Hello through a small built-in Windows module (Windows' own KeyCredentialManager), not through scripts.
 
 That copy is kept inside the encrypted vault, so it can only be read after the master password has opened the vault once. That's why Windows Hello can never open the vault when MSP++ starts.
 
@@ -70,8 +72,8 @@ Argon2id comes from [hash-wasm](https://github.com/Daninet/hash-wasm) (MIT, incl
 
 ## Limits and known issues
 
-- **Not tested on Windows yet.** It has been tested on Linux and with automated tests only, and nobody has reviewed it for security professionally.
-- **Windows Hello** runs through Windows PowerShell. If your company blocks PowerShell scripts, Windows Hello won't work, but the master password always does. The Windows Hello prompt may open behind the MSP++ window, and some antivirus tools may warn about an app starting PowerShell.
+- **Not tested on a Windows PC yet.** It has been tested on Linux, with automated tests, and by building and loading the Windows Hello module on a Windows build server (which has no Windows Hello), and nobody has reviewed it for security professionally.
+- **Windows Hello** needs MSP++ 0.8.5 or later; on older versions the option doesn't show and the master password works as usual. MSP++ brings the Windows Hello prompt to the front, but if you don't see it, check behind the MSP++ window.
 - If Windows Hello's key for MSP++ is removed or reset (for example after a Windows Hello PIN reset), Windows Hello can't open the vault any more. Use the master password, then turn Windows Hello off and on again.
 - **Malware on the PC** can read the vault while it's unlocked. No password manager can stop that; short re-prompt times and locking on sleep keep the window small.
 - **Other plugins** run with full access inside MSP++, so a harmful plugin could reach the vault. Only install plugins from the MSP++ plugin directory.

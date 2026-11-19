@@ -1,16 +1,17 @@
 {
   "name": "msp-pp",
-  "version": "0.8.4",
+  "version": "0.8.5",
   "description": "MSP++: a wrapper for MSP and ticketing sites with a plugin side panel and ticket note backup",
   "main": "main.js",
   "scripts": {
     "start": "node launch.js",
     "lint": "eslint .",
     "test": "jest",
-    "build": "electron-builder --win",
-    "build-portable": "electron-builder --win portable",
-    "build-installer": "electron-builder --win nsis",
-    "build-mac": "electron-builder --mac"
+    "build": "node scripts/build-native.js && electron-builder --win",
+    "build-portable": "node scripts/build-native.js && electron-builder --win portable",
+    "build-installer": "node scripts/build-native.js && electron-builder --win nsis",
+    "build-mac": "electron-builder --mac",
+    "build-native": "node scripts/build-native.js"
   },
   "author": "",
   "license": "MIT",
@@ -20,7 +21,8 @@
     "electron-builder": "^26.8.1",
     "eslint": "^10.0.0",
     "globals": "^17.0.0",
-    "jest": "^30.0.0"
+    "jest": "^30.0.0",
+    "node-gyp": "^12.4.0"
   },
   "jest": {
     "testEnvironment": "node",
@@ -34,6 +36,9 @@
   "build": {
     "appId": "com.n3yne.freshservicepp",
     "productName": "MSP++",
+    "asarUnpack": [
+      "native/windows-hello/build/Release/*.node"
+    ],
     "files": [
       "main.js",
       "preload.js",
@@ -56,6 +61,10 @@
       "permissions.js",
       "settings-transfer.js",
       "safe-file.js",
+      "windows-hello.js",
+      "native/windows-hello/index.js",
+      "native/windows-hello/package.json",
+      "native/windows-hello/build/Release/*.node",
       "plugin-manager.js",
       "plugin-directory.js",
       "plugin-package.js",

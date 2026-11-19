@@ -14,7 +14,6 @@
 const path = require("path");
 const { VaultSession, VaultError } = require("./vault-session");
 const { generate, createClipboardGuard } = require("./vault-tools");
-const { createWindowsHello } = require("./windows-hello");
 
 const TICK_MS = 15000;
 
@@ -23,7 +22,7 @@ const KNOWN_ERRORS = new Set([
   "locked", "no-vault", "exists", "wrong-password", "wait", "password-too-short", "password-too-long",
   "password-required", "bad-entry", "too-many", "not-found", "bad-field", "bad-file", "bad-version",
   "decrypt-failed", "hello-unavailable", "hello-cancelled", "hello-not-set-up", "hello-locked-out",
-  "hello-timeout", "hello-busy", "hello-failed", "hello-mismatch",
+  "hello-busy", "hello-failed", "hello-mismatch",
 ]);
 
 function errorResult(err, log) {
@@ -47,7 +46,9 @@ module.exports = {
   init(api) {
     const electron = require("electron");
     const { app, clipboard, powerMonitor, dialog, BrowserWindow } = electron;
-    const hello = process.platform === "win32" ? createWindowsHello() : null;
+    // Windows Hello comes from the app (api.windowsHello, app 0.8.5+), which
+    // keeps a Windows Hello key just for this plugin. Older apps: no Hello.
+    const hello = api.windowsHello && process.platform === "win32" ? api.windowsHello : null;
     const session = new VaultSession({
       filePath: path.join(api.getDataPath(), "vault.json"),
       hello,

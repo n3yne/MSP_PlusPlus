@@ -60,7 +60,6 @@
     "hello-cancelled": "Windows Hello was cancelled.",
     "hello-not-set-up": "Windows Hello's key for MSP++ is gone. Use your master password, then turn Windows Hello off and on again in the vault's settings.",
     "hello-locked-out": "Windows Hello is locked after too many tries. Use your master password.",
-    "hello-timeout": "Windows Hello didn't answer. Use your master password.",
     "hello-busy": "Windows Hello is already open. Check behind the MSP++ window.",
     "hello-failed": "Windows Hello didn't work. Use your master password.",
     "hello-mismatch": "Windows Hello's key has changed, so it can't open this vault. Use your master password, then turn Windows Hello off and on again.",

@@ -1,0 +1,9 @@
+{
+  "name": "msp-windows-hello",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MSP++ Windows Hello: a small Node-API addon over Windows' KeyCredentialManager",
+  "main": "index.js",
+  "gypfile": true,
+  "license": "MIT"
+}

@@ -52,6 +52,13 @@ jobs:
       - name: Test
         run: npm test -- --ci
 
+      # Builds the Windows Hello addon (native/windows-hello) for Node and checks
+      # it loads and Windows answers it.
+      - name: Build and check the Windows Hello addon
+        run: |
+          node scripts/build-native.js --node
+          node scripts/check-windows-hello.js
+
   # Packs the app into a folder (no installer) to catch a broken "build" block
   # in package.json or a missing file before a release tag finds it.
   package-windows:
@@ -74,6 +81,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build the Windows Hello addon
+        run: node scripts/build-native.js
+
       - name: Pack unpacked app
         run: npx electron-builder --win --dir --publish never
         env:
@@ -84,6 +94,8 @@ jobs:
         run: |
           test -f "dist/win-unpacked/MSP++.exe" || { echo "dist/win-unpacked/MSP++.exe is missing"; ls dist dist/win-unpacked || true; exit 1; }
           test -f "dist/win-unpacked/resources/app.asar" || { echo "app.asar is missing"; exit 1; }
+          # The Windows Hello addon has to sit outside app.asar to load.
+          test -f "dist/win-unpacked/resources/app.asar.unpacked/native/windows-hello/build/Release/windows_hello.node" || { echo "windows_hello.node is missing from app.asar.unpacked"; exit 1; }
           npx --yes @electron/asar@3.4.1 list dist/win-unpacked/resources/app.asar > asar-files.txt
           # Every file the build block lists must end up in the package.
           node -e '

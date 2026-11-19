@@ -247,6 +247,18 @@ api.log("Hello", { from: "my-plugin" });
 
 Encrypts a secret with the operating system's credential storage (Electron `safeStorage`: Windows DPAPI, the macOS keychain) and returns it as base64, or decrypts one back. Both return `null` when encryption isn't available or the input is empty or can't be read. Use them with the manifest's `credentials` field and a settings transformer (below); decrypt only in `main.js`, never send the plain key to a renderer.
 
+#### `api.windowsHello`
+
+*App 0.8.5 and later, Windows only.* Your plugin's own Windows Hello key, kept by Windows (in the TPM where there is one) as "MSP++ &lt;plugin id&gt;". You can only ask it to sign; Windows asks for face, fingerprint or PIN first. The signature (RSA PKCS#1 v1.5) is the same every time for the same challenge, so you can derive an encryption key from it that only Windows Hello can recreate. Check that `api.windowsHello` exists before using it, for older apps.
+
+| Method | What it does |
+|---|---|
+| `isSupported()` | Resolves `true` when this PC has Windows Hello set up and the app's Windows Hello module loaded. |
+| `sign(challenge, { create })` | Signs `challenge` (a Buffer of 16-1024 bytes) with your key and resolves to the signature (a Buffer; wipe it when done). `create: true` makes the key first if you have none. |
+| `remove()` | Deletes your key. Best effort. |
+
+`sign()` rejects with an error whose `code` is `hello-unavailable`, `hello-cancelled`, `hello-not-set-up` (your key is gone), `hello-locked-out`, `hello-busy` (a prompt is already open) or `hello-failed`. See `plugins/password-vault/` for a full example.
+
 #### `api.registerSettingsTransformer(fn)`
 
 Registers `fn(settings)`, which runs on the full settings object every time settings are saved, after validation and before writing. Change the object in place or return a new one. Use it to encrypt a newly entered key and delete the plain value, or to tidy a value (see `plugins/freshservice/main.js`). A transformer that throws is logged and skipped.
@@ -702,6 +714,7 @@ api.setHostRedirects(list: Array<{ from: string, to: string }>): void   // app 0
 api.setSiteHosts(list: string[]): void   // app 0.8.3+
 api.encryptCredential(plaintext: string): string | null
 api.decryptCredential(encrypted: string): string | null
+api.windowsHello?: { isSupported(): Promise<boolean>, sign(challenge: Buffer, opts?: { create?: boolean }): Promise<Buffer>, remove(): Promise<void> }   // app 0.8.5+, Windows
 api.registerSettingsTransformer(fn: (settings: AppSettings) => AppSettings | void): void
 ```
 

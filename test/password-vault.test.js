@@ -8,7 +8,7 @@ const crypto = require("crypto");
 const C = require("../plugins/password-vault/vault-crypto");
 const V = require("../plugins/password-vault/vault-session");
 const T = require("../plugins/password-vault/vault-tools");
-const H = require("../plugins/password-vault/windows-hello");
+const H = require("../windows-hello");
 
 // The lightest Argon2 settings a vault file may have, so the tests stay quick.
 const FAST_KDF = { m: 19456, t: 2, p: 1 };
@@ -594,89 +594,101 @@ describe("password-vault Windows Hello", () => {
   });
 });
 
-// ==================== Windows Hello adapter ====================
+// ==================== Windows Hello in the app (api.windowsHello) ====================
 
-describe("password-vault Windows Hello adapter", () => {
-  const { EventEmitter } = require("events");
-
-  function fakeSpawn(stdout, record) {
-    return (cmd, args, opts) => {
-      if (record) record.push({ cmd, args, opts });
-      const child = new EventEmitter();
-      child.stdout = new EventEmitter();
-      child.stderr = new EventEmitter();
-      child.kill = () => {};
-      setImmediate(() => {
-        if (stdout !== null) child.stdout.emit("data", Buffer.from(stdout));
-        child.emit("close", 0);
-      });
-      return child;
+describe("password-vault Windows Hello through the app", () => {
+  function fakeNative(answer) {
+    const calls = [];
+    return {
+      calls,
+      loader: () => ({
+        available: true,
+        native: {
+          isSupported: async () => { calls.push(["isSupported"]); return true; },
+          sign: async (name, challenge, create) => { calls.push(["sign", name, challenge.length, create]); return typeof answer === "function" ? answer() : answer; },
+          remove: async (name) => { calls.push(["remove", name]); },
+        },
+      }),
     };
   }
 
-  test("the script only takes fixed values and base64", () => {
-    const s = H.buildScript("sign", { challenge: Buffer.alloc(32, 255), create: true });
-    expect(s).toContain("'" + Buffer.alloc(32, 255).toString("base64") + "'");
-    expect(s).toContain("'1' -eq '1'");
-    expect(s).toContain("$mode = 'sign'");
-    expect(s).not.toMatch(/__[A-Z]+__/);
-    expect(s).toContain("IAsyncOperation`1");
-    expect(() => H.buildScript("evil")).toThrow();
-  });
-
-  test("runs Windows PowerShell hidden, with no profile", async () => {
-    const calls = [];
-    const sig = crypto.randomBytes(256).toString("base64");
-    const h = H.createWindowsHello({ platform: "win32", env: { SystemRoot: "C:\\Windows" }, spawn: fakeSpawn('noise\r\n{"ok":true,"sig":"' + sig + '"}\r\n', calls) });
-    const out = await h.sign(crypto.randomBytes(32), { create: false });
-    expect(out.toString("base64")).toBe(sig);
-    expect(calls[0].cmd).toBe("C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe");
-    expect(calls[0].args).toEqual(expect.arrayContaining(["-NoProfile", "-NonInteractive", "-EncodedCommand"]));
-    expect(calls[0].opts.windowsHide).toBe(true);
-    const script = Buffer.from(calls[0].args[calls[0].args.length - 1], "base64").toString("utf16le");
-    expect(script).toContain("RequestSignAsync");
+  test("each plugin signs with its own Windows Hello key", async () => {
+    const sig = crypto.randomBytes(256);
+    const f = fakeNative({ status: "Success", signature: sig });
+    const hello = H.createWindowsHello({ platform: "win32", loader: f.loader });
+    const api = hello.forPlugin("password-vault");
+    expect(Object.isFrozen(api)).toBe(true);
+    expect((await api.sign(crypto.randomBytes(32), { create: true })).equals(sig)).toBe(true);
+    await hello.forPlugin("other").sign(crypto.randomBytes(32));
+    await api.remove();
+    expect(f.calls).toEqual([
+      ["sign", "MSP++ password-vault", 32, true],
+      ["sign", "MSP++ other", 32, false],
+      ["remove", "MSP++ password-vault"],
+    ]);
   });
 
   test("Windows Hello answers map to error codes", async () => {
-    for (const [status, code] of [["UserCanceled", "hello-cancelled"], ["NotFound", "hello-not-set-up"], ["SecurityDeviceLocked", "hello-locked-out"], ["Error", "hello-failed"]]) {
-      const h = H.createWindowsHello({ platform: "win32", spawn: fakeSpawn('{"ok":false,"status":"' + status + '"}') });
-      await rejectsCode(h.sign(crypto.randomBytes(32)), code);
+    for (const [status, code] of [["UserCanceled", "hello-cancelled"], ["UserPrefersPassword", "hello-cancelled"], ["NotFound", "hello-not-set-up"], ["SecurityDeviceLocked", "hello-locked-out"], ["UnknownError", "hello-failed"]]) {
+      const hello = H.createWindowsHello({ platform: "win32", loader: fakeNative({ status }).loader });
+      await rejectsCode(hello.forPlugin("p").sign(crypto.randomBytes(32)), code);
     }
-    const h2 = H.createWindowsHello({ platform: "win32", spawn: fakeSpawn("") });
-    await rejectsCode(h2.sign(crypto.randomBytes(32)), "hello-failed");
-    const h3 = H.createWindowsHello({ platform: "win32", spawn: fakeSpawn('{"ok":true,"sig":"AAAA"}') });
-    await rejectsCode(h3.sign(crypto.randomBytes(32)), "hello-failed");
+    const short = H.createWindowsHello({ platform: "win32", loader: fakeNative({ status: "Success", signature: Buffer.alloc(8) }).loader });
+    await rejectsCode(short.forPlugin("p").sign(crypto.randomBytes(32)), "hello-failed");
+    const throws = H.createWindowsHello({ platform: "win32", loader: fakeNative(() => { throw new Error("boom"); }).loader });
+    await rejectsCode(throws.forPlugin("p").sign(crypto.randomBytes(32)), "hello-failed");
   });
 
-  test("not Windows: unsupported, sign refused, no PowerShell run", async () => {
-    const calls = [];
-    const h = H.createWindowsHello({ platform: "linux", spawn: fakeSpawn("{}", calls) });
-    expect(await h.isSupported()).toBe(false);
-    await rejectsCode(h.sign(crypto.randomBytes(32)), "hello-unavailable");
-    expect(calls).toEqual([]);
+  test("bad challenges are refused before Windows is asked", async () => {
+    const f = fakeNative({ status: "Success", signature: crypto.randomBytes(256) });
+    const api = H.createWindowsHello({ platform: "win32", loader: f.loader }).forPlugin("p");
+    await rejectsCode(api.sign(Buffer.alloc(4)), "hello-failed");
+    await rejectsCode(api.sign("not a buffer"), "hello-failed");
+    expect(f.calls).toEqual([]);
+  });
+
+  test("one prompt at a time", async () => {
+    let release;
+    const f = fakeNative(() => new Promise((r) => { release = r; }));
+    const api = H.createWindowsHello({ platform: "win32", loader: f.loader }).forPlugin("p");
+    const first = api.sign(crypto.randomBytes(32));
+    await rejectsCode(api.sign(crypto.randomBytes(32)), "hello-busy");
+    release({ status: "Success", signature: crypto.randomBytes(256) });
+    await first;
+    api.sign(crypto.randomBytes(32)).catch(() => {}); // free again: Windows is asked
+    expect(f.calls.filter((c) => c[0] === "sign")).toHaveLength(2);
+  });
+
+  test("not Windows, or the addon isn't built: unsupported, never loaded or asked", async () => {
+    let loaded = 0;
+    const linux = H.createWindowsHello({ platform: "linux", loader: () => { loaded++; return {}; } });
+    expect(await linux.isSupported()).toBe(false);
+    await rejectsCode(linux.forPlugin("p").sign(crypto.randomBytes(32)), "hello-unavailable");
+    expect(loaded).toBe(0);
+    const missing = H.createWindowsHello({ platform: "win32", loader: () => ({ available: false, loadError: new Error("not built") }) });
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await missing.isSupported()).toBe(false);
+    await rejectsCode(missing.forPlugin("p").sign(crypto.randomBytes(32)), "hello-unavailable");
+    warn.mockRestore();
   });
 
   test("isSupported asks Windows once", async () => {
-    const calls = [];
-    const h = H.createWindowsHello({ platform: "win32", spawn: fakeSpawn('{"ok":true,"supported":true}', calls) });
-    expect(await h.isSupported()).toBe(true);
-    expect(await h.isSupported()).toBe(true);
-    expect(calls).toHaveLength(1);
+    const f = fakeNative({ status: "Success" });
+    const hello = H.createWindowsHello({ platform: "win32", loader: f.loader });
+    expect(await hello.forPlugin("p").isSupported()).toBe(true);
+    expect(await hello.forPlugin("q").isSupported()).toBe(true);
+    expect(f.calls).toEqual([["isSupported"]]);
   });
 
-  test("a stuck prompt times out", async () => {
-    const h = H.createWindowsHello({
-      platform: "win32",
-      timeoutMs: 20,
-      spawn: () => {
-        const child = new EventEmitter();
-        child.stdout = new EventEmitter();
-        child.stderr = new EventEmitter();
-        child.kill = () => {};
-        return child;
-      },
-    });
-    await rejectsCode(h.sign(crypto.randomBytes(32)), "hello-timeout");
+  test("the addon loader is safe off Windows", () => {
+    const mod = require("../native/windows-hello");
+    if (process.platform !== "win32") expect(mod.available).toBe(false);
+    expect(typeof mod.available).toBe("boolean");
+  });
+
+  test("plugins get api.windowsHello", () => {
+    const src = fs.readFileSync(require.resolve("../plugin-manager.js"), "utf8");
+    expect(src).toMatch(/windowsHello: WindowsHello\.getShared\(\)\.forPlugin\(pluginId\)/);
   });
 
   test("a real PKCS#1 v1.5 signature is repeatable (what the design relies on)", () => {

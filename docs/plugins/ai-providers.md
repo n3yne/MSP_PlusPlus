@@ -21,6 +21,15 @@ Each AI request (Suggest, Summarize, a Solutions Chat question) opens a new chat
 
 If MSP++ can't find Copilot's message box (it hasn't loaded, you're signed out, or Microsoft has changed the page), the bar turns amber and the request is on your clipboard: click the message box, paste (Ctrl+V) and press Send. If **Use this reply** can't find the reply on the page, select the reply text (or click Copilot's own Copy button) and click it again.
 
+**Windows device sign-on**
+
+*MSP++ 0.8.6 and later, Windows.* Many companies only allow Microsoft sign-in from a managed or compliant device (Conditional Access). Edge proves the device to Microsoft automatically; plain browser windows can't, so sign-in fails with error **53000** ("Your device is required to be managed"). With **Use Windows Device Sign-On** on (the default), the Copilot window does what Edge does: on a PC registered with your company's Microsoft Entra ID, MSP++ asks Windows for a short-lived signed proof of the device and sends it to Microsoft's sign-in page.
+
+- It only works on a PC your company already manages (if Copilot signs in in Edge without asking about the device, it should work here). On any other PC Windows has no proof to give, and nothing changes.
+- The proof goes only to `login.microsoftonline.com` and `login.microsoft.com`, over https, on page loads. It's made fresh by Windows for each request and never saved or shown to plugins.
+- The setting shows whether Windows has a proof on this PC. It only appears on Windows.
+- If you were already shown error 53000, click **Sign out**, then **Open and sign in** again.
+
 **Send Automatically (experimental)**
 
 Off by default. When on, the Copilot window stays hidden: MSP++ types the request, presses Send and reads the reply once it stops changing, so it behaves like the API providers. If it can't send or read the reply, the window opens so you can finish by hand.
@@ -33,7 +42,7 @@ Things to know before turning it on:
 **Limits**
 
 - Prompts are capped at what the site's message box accepts: 16,000 characters for Copilot with a work account, 10,000 for copilot.microsoft.com, 30,000 for other sites. Summarize and Suggest leave out ticket context to fit, and Solutions Chat shortens articles.
-- Your company's sign-in rules may block signing in inside MSP++, for example if Conditional Access requires a managed device or Edge. If so, use Copilot in Edge and copy and paste.
+- Your company's sign-in rules may still block signing in inside MSP++, for example on a PC that isn't company-managed, on a Mac, or if Conditional Access requires Edge itself. See [Windows device sign-on](#copilot-website) above. If it's blocked, use Copilot in Edge and copy and paste.
 - Requests go to Microsoft like anything you type into Copilot, are covered by your organisation's [enterprise data protection](https://learn.microsoft.com/copilot/plan/enterprise-data-protection), and show in your Copilot history. Free Copilot Chat answers from the request and the web, not your mailbox or files.
 - **Sign out** clears the Copilot window's sign-in and cookies.
 

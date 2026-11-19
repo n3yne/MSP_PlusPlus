@@ -25,6 +25,7 @@ module.exports = {
     aiWebSite: "copilot-work",
     aiWebUrl: "",
     aiWebAutoSend: false,
+    aiWebDeviceSso: true,
   },
 
   validateSettings: function (s) {
@@ -48,6 +49,7 @@ module.exports = {
       if (s.aiWebUrl && normalizeSiteUrl(s.aiWebUrl) === null) return false;
     }
     if (s.aiWebAutoSend !== undefined && typeof s.aiWebAutoSend !== "boolean") return false;
+    if (s.aiWebDeviceSso !== undefined && typeof s.aiWebDeviceSso !== "boolean") return false;
     return true;
   },
 
@@ -361,6 +363,10 @@ module.exports = {
       } catch (err) {
         return { error: err.message || String(err) };
       }
+    });
+
+    api.handle("copilotweb-sso-status", async function () {
+      return copilotWeb.deviceSsoStatus();
     });
 
     api.handle("copilotweb-sign-out", async function () {

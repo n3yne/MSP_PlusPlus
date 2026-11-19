@@ -463,6 +463,7 @@ function createCopilotWeb(api, deps) {
 
     const autoSend = settings && settings.aiWebAutoSend === true;
     const returnTo = electron.BrowserWindow.getFocusedWindow && electron.BrowserWindow.getFocusedWindow();
+    applyDeviceSso(settings);
     ensureWindow();
 
     let resolve;
@@ -526,10 +527,37 @@ function createCopilotWeb(api, deps) {
     return done;
   }
 
+  // Windows device sign-on (app 0.8.6+, api.windowsSso): Windows' proof that
+  // this PC is registered with the organisation goes to Microsoft's sign-in
+  // page in this session, as Edge does, so a "compliant device" Conditional
+  // Access policy lets sign-in through. On by default (aiWebDeviceSso); it does
+  // nothing on a PC that isn't registered, or on older MSP++ versions.
+  function applyDeviceSso(settings) {
+    if (!api.windowsSso) return false;
+    const on = !settings || settings.aiWebDeviceSso !== false;
+    try {
+      return api.windowsSso.setForPartition(PARTITION, on);
+    } catch (err) {
+      api.log("Windows device sign-on unavailable:", err && err.message ? err.message : String(err));
+      return false;
+    }
+  }
+
+  // Whether this MSP++ has device sign-on, and whether this PC has a proof to send.
+  async function deviceSsoStatus() {
+    if (!api.windowsSso) return { supported: false, available: false };
+    try {
+      return { supported: true, available: !!(await api.windowsSso.isAvailable()) };
+    } catch {
+      return { supported: true, available: false };
+    }
+  }
+
   // Opens the site so the user can sign in.
   function open(settings) {
     const site = siteFor(settings);
     if (!site.url) return { error: "Enter the chat site's address first." };
+    applyDeviceSso(settings);
     ensureWindow();
     if (!pending) setBar({ mode: "idle", text: "Sign in here if asked. MSP++ keeps you signed in. Close this window when you're done." });
     view.webContents.loadURL(site.url).catch(() => {});
@@ -549,7 +577,7 @@ function createCopilotWeb(api, deps) {
     return { ok: true };
   }
 
-  return { chat, open, signOut, siteFor, _onBarAction: onBarAction, _pending: () => pending };
+  return { chat, open, signOut, siteFor, applyDeviceSso, deviceSsoStatus, _onBarAction: onBarAction, _pending: () => pending };
 }
 
 module.exports = {

@@ -259,6 +259,17 @@ Encrypts a secret with the operating system's credential storage (Electron `safe
 
 `sign()` rejects with an error whose `code` is `hello-unavailable`, `hello-cancelled`, `hello-not-set-up` (your key is gone), `hello-locked-out`, `hello-busy` (a prompt is already open) or `hello-failed`. See `plugins/password-vault/` for a full example.
 
+#### `api.windowsSso`
+
+*App 0.8.6 and later, Windows only.* Windows device sign-on for Microsoft sign-in pages in one of your plugin's own `persist:` sessions, the way Edge does it. On a PC registered with Microsoft Entra ID, MSP++ asks Windows for short-lived signed proofs (`x-ms-RefreshTokenCredential`, `x-ms-DeviceCredential`) and adds them to page loads on `https://login.microsoftonline.com` and `https://login.microsoft.com` only, so Conditional Access sees a known, compliant device. Your plugin never sees the proofs. Check that `api.windowsSso` exists before using it, for older apps.
+
+| Method | What it does |
+|---|---|
+| `isAvailable()` | Resolves `true` when Windows has a device sign-on proof here: the PC is registered with Entra ID and a work account is signed in to Windows. Cached for a minute. |
+| `setForPartition(partition, on)` | Turns the headers on or off for a session such as `"persist:my-plugin-web"` and returns `on`. Only `persist:` names (letters, digits, `.`, `_`, `-`). It takes over that session's `webRequest.onBeforeSendHeaders` listener, and throws if another plugin has turned it on for the same session. |
+
+See `plugins/ai-features/copilot-web.js` for an example.
+
 #### `api.registerSettingsTransformer(fn)`
 
 Registers `fn(settings)`, which runs on the full settings object every time settings are saved, after validation and before writing. Change the object in place or return a new one. Use it to encrypt a newly entered key and delete the plain value, or to tidy a value (see `plugins/freshservice/main.js`). A transformer that throws is logged and skipped.
@@ -715,6 +726,7 @@ api.setSiteHosts(list: string[]): void   // app 0.8.3+
 api.encryptCredential(plaintext: string): string | null
 api.decryptCredential(encrypted: string): string | null
 api.windowsHello?: { isSupported(): Promise<boolean>, sign(challenge: Buffer, opts?: { create?: boolean }): Promise<Buffer>, remove(): Promise<void> }   // app 0.8.5+, Windows
+api.windowsSso?: { isAvailable(): Promise<boolean>, setForPartition(partition: string, on: boolean): boolean }   // app 0.8.6+, Windows
 api.registerSettingsTransformer(fn: (settings: AppSettings) => AppSettings | void): void
 ```
 

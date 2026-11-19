@@ -12,6 +12,7 @@ const PluginDirectory = require("./plugin-directory");
 const PluginCategories = require("./plugin-categories");
 const safeFile = require("./safe-file");
 const WindowsHello = require("./windows-hello");
+const WindowsSso = require("./windows-sso");
 
 const pluginBus = new EventEmitter();
 pluginBus.setMaxListeners(100);
@@ -390,6 +391,12 @@ function buildPluginApi(pluginId, ipcMain) {
     // Windows Hello (app 0.8.5+): sign a challenge with this plugin's own
     // Windows Hello key after face, fingerprint or PIN. See windows-hello.js.
     windowsHello: WindowsHello.getShared().forPlugin(pluginId),
+
+    // Windows device sign-on (app 0.8.6+): sends Windows' proof that this PC is
+    // registered with Entra ID to Microsoft sign-in pages in one of the plugin's
+    // "persist:" sessions, as Edge does, so "compliant device" Conditional Access
+    // lets sign-in through. The plugin never sees the proof. See windows-sso.js.
+    windowsSso: WindowsSso.getShared().forPlugin(pluginId),
 
     decryptCredential(encrypted) {
       if (typeof encrypted !== "string" || !encrypted) return null;

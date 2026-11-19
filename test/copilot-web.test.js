@@ -414,3 +414,49 @@ describe("copilot-web hands-off requests", () => {
     await expect(result).rejects.toThrow(/Cancelled/);
   });
 });
+
+describe("copilot-web Windows device sign-on", () => {
+  function withSso(available) {
+    const page = copilotPage();
+    const fake = fakeElectron(page);
+    const c = clock();
+    const windowsSso = {
+      setForPartition: jest.fn((partition, on) => !!on),
+      isAvailable: jest.fn(async () => available),
+    };
+    const client = web.createCopilotWeb({ log: jest.fn(), windowsSso }, { electron: fake.electron, now: c.now, sleep: c.sleep });
+    return { client, windowsSso, fake };
+  }
+
+  test("is turned on for the Copilot session by default when opening", () => {
+    const { client, windowsSso } = withSso(true);
+    client.open({});
+    expect(windowsSso.setForPartition).toHaveBeenCalledWith(web.PARTITION, true);
+  });
+
+  test("the setting turns it off", async () => {
+    const { client, windowsSso, fake } = withSso(true);
+    const result = client.chat("Prompt", { aiWebDeviceSso: false });
+    expect(windowsSso.setForPartition).toHaveBeenCalledWith(web.PARTITION, false);
+    await until(() => fake.bar() && fake.bar().mode === "waiting");
+    await client._onBarAction("cancel");
+    await expect(result).rejects.toThrow(/Cancelled/);
+  });
+
+  test("reports whether this MSP++ and this PC have it", async () => {
+    expect(await withSso(true).client.deviceSsoStatus()).toEqual({ supported: true, available: true });
+    expect(await withSso(false).client.deviceSsoStatus()).toEqual({ supported: true, available: false });
+    const { client } = setup();
+    expect(await client.deviceSsoStatus()).toEqual({ supported: false, available: false });
+    expect(client.applyDeviceSso({})).toBe(false);
+  });
+
+  test("an error from the app is logged, not thrown", () => {
+    const page = copilotPage();
+    const fake = fakeElectron(page);
+    const api = { log: jest.fn(), windowsSso: { setForPartition: () => { throw new Error("belongs to another plugin"); }, isAvailable: async () => false } };
+    const client = web.createCopilotWeb(api, { electron: fake.electron });
+    expect(client.applyDeviceSso({})).toBe(false);
+    expect(api.log).toHaveBeenCalled();
+  });
+});

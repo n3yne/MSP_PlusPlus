@@ -70,6 +70,21 @@ describe("compareVersions", () => {
     expect(PluginDirectory.compareVersions("0.10.0", "0.9.0")).toBe(1);
     expect(PluginDirectory.compareVersions("", "0.0.1")).toBe(-1);
   });
+
+  test("counts an optional fourth part, with a missing one as 0", () => {
+    expect(PluginDirectory.compareVersions("0.8.7.1", "0.8.7")).toBe(1);
+    expect(PluginDirectory.compareVersions("0.8.7", "0.8.7.0")).toBe(0);
+    expect(PluginDirectory.compareVersions("0.8.7.2", "0.8.7.10")).toBe(-1);
+    expect(PluginDirectory.compareVersions("0.8.8", "0.8.7.9")).toBe(1);
+    expect(PluginDirectory.compareVersions("0.8.6.1", "0.8.7")).toBe(-1);
+  });
+});
+
+describe("VERSION_PATTERN", () => {
+  test("accepts three or four numeric parts", () => {
+    for (const v of ["0.8.7", "0.8.7.1", "1.2.3-beta.1", "0.8.7.1-beta"]) expect(PluginDirectory.VERSION_PATTERN.test(v)).toBe(true);
+    for (const v of ["0.8", "0.8.7.1.2", "0.8.7.x", "v0.8.7"]) expect(PluginDirectory.VERSION_PATTERN.test(v)).toBe(false);
+  });
 });
 
 describe("parseIndex", () => {
@@ -96,6 +111,13 @@ describe("parseIndex", () => {
       ],
     }, INDEX_URL, quiet);
     expect(plugins.map((p) => p.id)).toEqual(["ok"]);
+  });
+
+  test("keeps four-part versions", () => {
+    const { plugins } = PluginDirectory.parseIndex({
+      plugins: [Object.assign({}, good, { version: "0.8.7.1", minAppVersion: "0.8.7" })],
+    }, INDEX_URL, quiet);
+    expect(plugins.map((p) => p.version)).toEqual(["0.8.7.1"]);
   });
 
   test("throws on an index that isn't the expected shape", () => {

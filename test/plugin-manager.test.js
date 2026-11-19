@@ -70,6 +70,22 @@ describe("plugin-manager", () => {
     expect(info.credentials).toEqual(["credTestKey"]);
   });
 
+  test("minAppVersion counts a fourth version part", async () => {
+    const { version } = require("../package.json");
+    const { userData } = makeUserData();
+    const add = (id, minAppVersion) => {
+      const dir = path.join(userData, "plugins", id);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, "manifest.json"), JSON.stringify({ id, version: "1.0.0", minAppVersion }));
+    };
+    add("needs-same", version);
+    add("needs-same-fix", version + ".1");
+    await pluginManager.initPlugins(userData, {}, ipcMain);
+    const info = pluginManager.getPluginInfo();
+    expect(info.find((p) => p.id === "needs-same").loadError).toBeFalsy();
+    expect(info.find((p) => p.id === "needs-same-fix").loadError).toBe(`Requires app >= ${version}.1`);
+  });
+
   test("bundled plugins declare their API keys as credentials", async () => {
     const { userData } = makeUserData();
     await pluginManager.initPlugins(userData, {}, ipcMain);

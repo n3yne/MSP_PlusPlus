@@ -109,19 +109,9 @@ let _hostRedirectsListener = null;
 
 // ===================== Semver helpers =====================
 
-function parseSemver(str) {
-  const m = String(str || "0.0.0").match(/^(\d+)\.(\d+)\.(\d+)/);
-  return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0];
-}
-
+// Same rules as the plugin directory (including the optional fourth part).
 function semverLt(a, b) {
-  const pa = parseSemver(a);
-  const pb = parseSemver(b);
-  for (let i = 0; i < 3; i++) {
-    if (pa[i] < pb[i]) return true;
-    if (pa[i] > pb[i]) return false;
-  }
-  return false;
+  return PluginDirectory.compareVersions(a, b) < 0;
 }
 
 // ===================== Config persistence =====================

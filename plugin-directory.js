@@ -29,7 +29,10 @@ const PluginPackage = require("./plugin-package");
 
 const DEFAULT_INDEX_URL = "https://github.com/n3yne/MSP_PlusPlus/releases/download/plugin-directory/index.json";
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}$/;
-const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]{1,40})?$/;
+// major.minor.patch, plus an optional fourth part for a plugin-only fix made
+// between app releases (0.8.7.1 belongs to app 0.8.7). Apps before 0.8.7 only
+// accept three parts and skip four-part index entries.
+const VERSION_PATTERN = /^\d+\.\d+\.\d+(?:\.\d+)?(?:[-+][0-9A-Za-z.-]{1,40})?$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 const MAX_INDEX_BYTES = 1024 * 1024;
 const MAX_INDEX_ENTRIES = 500;
@@ -41,15 +44,16 @@ const PENDING_DIR = ".pending";
 // ===================== Versions =====================
 
 function parseVersion(str) {
-  const m = String(str || "").match(/^(\d+)\.(\d+)\.(\d+)/);
-  return m ? [+m[1], +m[2], +m[3]] : [0, 0, 0];
+  const m = String(str || "").match(/^(\d+)\.(\d+)\.(\d+)(?:\.(\d+))?/);
+  return m ? [+m[1], +m[2], +m[3], +(m[4] || 0)] : [0, 0, 0, 0];
 }
 
-// -1, 0 or 1. Only major.minor.patch count.
+// -1, 0 or 1. major.minor.patch and the optional fourth part count (a missing
+// fourth part is 0, so 0.8.7 < 0.8.7.1 < 0.8.8); any -/+ suffix is ignored.
 function compareVersions(a, b) {
   const pa = parseVersion(a);
   const pb = parseVersion(b);
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     if (pa[i] !== pb[i]) return pa[i] < pb[i] ? -1 : 1;
   }
   return 0;
@@ -778,6 +782,8 @@ module.exports = {
   INSTALLED_DIR,
   PENDING_DIR,
   compareVersions,
+  parseVersion,
+  VERSION_PATTERN,
   parseIndex,
   readRegistry,
   readPending,

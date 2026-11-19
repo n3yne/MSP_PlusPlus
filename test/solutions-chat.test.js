@@ -85,3 +85,36 @@ describe("solutions-chat answerToHtml", () => {
     expect(html).toContain("<ol><li><strong>First</strong></li><li>Second</li></ol>");
   });
 });
+
+describe("solutions-chat for chat-website providers", () => {
+  const source = { site: "Freshservice", kb: "Solutions" };
+  const articles = [
+    { id: 1, title: "Long", text: "a".repeat(9000) },
+    { id: 2, title: "Short", text: "b".repeat(500) },
+  ];
+
+  test("localQueries uses the question and the ticket's first line", () => {
+    expect(chat.localQueries("How do I reset MFA?", "VPN client fails to connect\nmore")).toEqual(["reset mfa", "vpn client fails connect"]);
+    expect(chat.localQueries("reset mfa", "")).toEqual(["reset mfa"]);
+  });
+
+  test("buildAnswerPrompt trims the longest articles to fit", () => {
+    const full = chat.buildAnswerPrompt("q?", [], "", articles, source);
+    expect(full.length).toBeGreaterThan(9000);
+    const fitted = chat.buildAnswerPrompt("q?", [], "", articles, source, 4000);
+    expect(fitted.length).toBeLessThanOrEqual(4000);
+    expect(fitted).toContain("b".repeat(500));
+    expect(fitted).toContain("[article continues]");
+  });
+
+  test("buildAnswerPrompt leaves a prompt that already fits alone", () => {
+    expect(chat.buildAnswerPrompt("q?", [], "", articles, source, 60000)).toBe(chat.buildAnswerPrompt("q?", [], "", articles, source));
+  });
+
+  test("fitArticles doesn't change the originals", () => {
+    const out = chat.fitArticles(articles, 5000);
+    expect(articles[0].text.length).toBe(9000);
+    expect(out[0].text.length).toBe(4000);
+    expect(out[0].truncated).toBe(true);
+  });
+});

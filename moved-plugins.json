@@ -99,7 +99,10 @@
         "aiAzureEndpoint": "",
         "aiAzureDeployment": "",
         "aiM365TenantId": "",
-        "aiM365ClientId": ""
+        "aiM365ClientId": "",
+        "aiWebSite": "copilot-work",
+        "aiWebUrl": "",
+        "aiWebAutoSend": false
       },
       "credentials": [
         "aiApiKey"

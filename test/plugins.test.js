@@ -318,6 +318,89 @@ describe("ai-features validateSettings", () => {
 
 });
 
+// ===================== ai-features: Copilot website settings =====================
+
+describe("ai-features Copilot website settings", () => {
+  test("accepts the website provider and its settings", () => {
+    expect(validateAi({ aiProvider: "copilotweb", aiWebSite: "copilot-work", aiWebAutoSend: true })).toBe(true);
+    expect(validateAi({ aiWebSite: "custom", aiWebUrl: "https://chat.example.com/" })).toBe(true);
+    expect(validateAi({ aiWebUrl: "" })).toBe(true);
+  });
+  test("rejects unknown sites, non-https addresses and non-boolean auto send", () => {
+    expect(validateAi({ aiWebSite: "chatgpt" })).toBe(false);
+    expect(validateAi({ aiWebUrl: "http://chat.example.com/" })).toBe(false);
+    expect(validateAi({ aiWebUrl: "x".repeat(501) })).toBe(false);
+    expect(validateAi({ aiWebAutoSend: "yes" })).toBe(false);
+  });
+});
+
+describe("ai-features Copilot website provider", () => {
+  function load(chat) {
+    let plugin;
+    jest.isolateModules(() => {
+      jest.doMock("../plugins/ai-features/copilot-web", () => {
+        const real = jest.requireActual("../plugins/ai-features/copilot-web");
+        return Object.assign({}, real, { createCopilotWeb: () => ({ chat, open: jest.fn(() => ({ ok: true })), signOut: jest.fn(async () => ({ ok: true })) }) });
+      });
+      plugin = require("../plugins/ai-features/main");
+    });
+    jest.dontMock("../plugins/ai-features/copilot-web");
+    return plugin;
+  }
+
+  function init(plugin, settings) {
+    const handlers = {};
+    plugin.init({
+      handle: (name, fn) => { handlers[name] = fn; },
+      getSettings: () => settings,
+      getDataPath: () => require("os").tmpdir(),
+      encryptCredential: (v) => v,
+      decryptCredential: (v) => v,
+      registerSettingsTransformer: () => {},
+      log: () => {},
+    });
+    return handlers;
+  }
+
+  test("complete goes to the website with no API key", async () => {
+    const chat = jest.fn(async () => "OK");
+    const settings = { aiProvider: "copilotweb", aiWebSite: "copilot-work" };
+    const handlers = init(load(chat), settings);
+    expect(await handlers.complete({ prompt: "Say OK" })).toEqual({ result: "OK" });
+    expect(chat).toHaveBeenCalledWith("Say OK", settings);
+  });
+
+  test("info tells other plugins to make one request with a shorter prompt", async () => {
+    const handlers = init(load(jest.fn()), { aiProvider: "copilotweb", aiWebSite: "copilot-consumer" });
+    expect(await handlers.info()).toEqual({ provider: "copilotweb", singleRequest: true, maxPromptChars: 10000 });
+    const apiHandlers = init(load(jest.fn()), { aiProvider: "openai" });
+    expect(await apiHandlers.info()).toEqual({ provider: "openai", singleRequest: false, maxPromptChars: 60000 });
+  });
+
+  test("a custom site without an address is reported, not opened", async () => {
+    const chat = jest.fn();
+    const handlers = init(load(chat), { aiProvider: "copilotweb", aiWebSite: "custom", aiWebUrl: "" });
+    expect((await handlers.complete({ prompt: "hi" })).error).toMatch(/address/);
+    expect(chat).not.toHaveBeenCalled();
+  });
+
+  test("suggest drops ticket context to fit the site's limit", async () => {
+    const chat = jest.fn(async () => "Better.");
+    const handlers = init(load(chat), { aiProvider: "copilotweb", aiWebSite: "copilot-consumer" });
+    const res = await handlers.suggest({ text: "n".repeat(8000), ticketContext: "c".repeat(4000), settings: { aiProvider: "copilotweb" } });
+    expect(res).toEqual({ result: "Better." });
+    expect(chat.mock.calls[0][0].length).toBeLessThanOrEqual(10000);
+    expect(chat.mock.calls[0][0]).toContain("n".repeat(8000));
+  });
+
+  test("summarize trims the notes to fit the site's limit", async () => {
+    const chat = jest.fn(async () => "- summary");
+    const handlers = init(load(chat), { aiProvider: "copilotweb", aiWebSite: "copilot-consumer" });
+    await handlers.summarize({ text: "t".repeat(12000), settings: { aiProvider: "copilotweb" } });
+    expect(chat.mock.calls[0][0].length).toBeLessThanOrEqual(10000);
+  });
+});
+
 // ===================== ai-features: provider calls =====================
 
 describe("ai-features providers", () => {

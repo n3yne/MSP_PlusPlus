@@ -11,7 +11,7 @@ Uses the Copilot website, signed in inside MSP++, instead of an API. There's no 
 **Setting it up**
 
 1. In **Settings → Plugins → AI Features**, choose **Copilot website (no setup)**.
-2. Pick the **Chat site**: **Microsoft Copilot (work account)** (`m365.cloud.microsoft/chat`, the default), **Microsoft Copilot (copilot.microsoft.com)**, or **Other chat site** with its address.
+2. Pick the **Chat site**: **Microsoft Copilot (work account)** (`copilot.cloud.microsoft/chat`, the default), **Microsoft Copilot (copilot.microsoft.com)**, or **Other chat site** with its address.
 3. Click **Open and sign in** and sign in in the Copilot window. MSP++ keeps the sign-in in its own browser profile, separate from your tabs.
 4. Click **Test**. A test request appears in the Copilot window; press **Send**, then **Use this reply**. The status should say "Working".
 

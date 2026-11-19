@@ -13,7 +13,7 @@ function copilotPage(options) {
   const body = [thread];
   if (input) body.push(input);
   body.push(send);
-  const page = makePage({ url: "https://m365.cloud.microsoft/chat", body });
+  const page = makePage({ url: "https://copilot.cloud.microsoft/chat", body });
   page.selection.toString = () => "";
   page.input = input;
   page.thread = thread;
@@ -30,7 +30,7 @@ describe("copilot-web sites", () => {
   test("defaults to Copilot with a work account", () => {
     const site = web.siteFor({});
     expect(site.key).toBe("copilot-work");
-    expect(site.url).toBe("https://m365.cloud.microsoft/chat");
+    expect(site.url).toBe("https://copilot.cloud.microsoft/chat");
     expect(site.maxPromptChars).toBe(16000);
   });
 
@@ -273,7 +273,7 @@ describe("copilot-web one-click requests", () => {
     const { page, fake, client } = setup();
     const result = client.chat("Summarize this ticket", {});
     await until(() => fake.bar() && fake.bar().mode === "waiting");
-    expect(fake.state.loads).toEqual(["https://m365.cloud.microsoft/chat"]);
+    expect(fake.state.loads).toEqual(["https://copilot.cloud.microsoft/chat"]);
     expect(page.input.value).toBe("Summarize this ticket");
     expect(fake.win().visible).toBe(true);
     expect(fake.state.partition).toBe(web.PARTITION);
@@ -427,6 +427,32 @@ describe("copilot-web hands-off on a changed page", () => {
     expect(page.input.value).toBe("Prompt");
   });
 
+  test("types and presses Enter through DevTools in the hidden window", async () => {
+    const { page, fake, client } = setup();
+    const sent = [];
+    let editorHasText = false;
+    const result = client.chat("Prompt", { aiWebAutoSend: true });
+    await until(() => fake.state.windows[0] && fake.state.windows[0].child);
+    const wc = fake.state.windows[0].child.webContents;
+    wc.insertText = () => {}; // Electron's typing doesn't reach a hidden window
+    let attached = false;
+    wc.debugger = {
+      isAttached: () => attached,
+      attach: () => { attached = true; },
+      sendCommand: async (method, params) => {
+        sent.push(method);
+        if (method === "Input.insertText") { page.input.value = params.text; editorHasText = true; }
+        if (method === "Input.dispatchKeyEvent" && params.type === "keyDown" && params.key === "Enter" && editorHasText) {
+          page.addReply("Answer via DevTools");
+        }
+      },
+    };
+    page.sendButton.click = () => {}; // Copilot's Send ignores the click here
+    await expect(result).resolves.toBe("Answer via DevTools");
+    expect(sent[0]).toBe("Emulation.setFocusEmulationEnabled");
+    expect(sent).toContain("Input.insertText");
+  });
+
   test("presses Enter when the Send button does nothing", async () => {
     const { page, client } = setup();
     page.sendButton.click = () => {};
@@ -465,7 +491,7 @@ describe("copilot-web hands-off on a changed page", () => {
     expect(line).toMatch(/aria-label=\\"Send\\"/);
     expect(line).not.toMatch(/Secret ticket text/);
     await client._onBarAction("details");
-    expect(JSON.parse(fake.state.clipboard).page).toBe("m365.cloud.microsoft/chat");
+    expect(JSON.parse(fake.state.clipboard).page).toBe("copilot.cloud.microsoft/chat");
     expect(fake.bar().text).toMatch(/Page details copied/);
     await client._onBarAction("cancel");
     await expect(result).rejects.toThrow(/Cancelled/);

@@ -37,7 +37,8 @@ const STABLE_MS = 2500;
 const SITES = {
   "copilot-work": {
     label: "Microsoft Copilot (work account)",
-    url: "https://m365.cloud.microsoft/chat",
+    // m365.cloud.microsoft/chat now redirects here.
+    url: "https://copilot.cloud.microsoft/chat",
     maxPromptChars: 16000,
   },
   "copilot-consumer": {
@@ -483,11 +484,23 @@ function createCopilotWeb(api, deps) {
   // Types the prompt into the message box. Returns true if the box now holds it.
   // Typing through Electron needs the window to have focus, which a hidden
   // hands-off window doesn't, so it falls back to typing from inside the page.
-  async function typePrompt(prompt) {
+  //
+  // Hands-off mode types through the Chrome DevTools protocol instead: its
+  // input events reach a page in a hidden window like real typing, and focus
+  // emulation makes the page act as if its window had focus. Copilot's editor
+  // (Lexical) only takes text that arrives that way; text put into the box
+  // from inside the page shows up but Send ignores it.
+  async function typePrompt(prompt, hidden) {
     if (!(await page("focus"))) return false;
+    let p;
+    if (hidden && (await devtools("Input.insertText", { text: prompt }))) {
+      await sleep(300);
+      p = await page("probe");
+      if (p && p.inputLength > 0) return true;
+    }
     view.webContents.insertText(prompt);
     await sleep(200);
-    let p = await page("probe");
+    p = await page("probe");
     if (p && p.inputLength > 0) return true;
     await page("insert", prompt);
     await sleep(300);
@@ -511,8 +524,33 @@ function createCopilotWeb(api, deps) {
   async function sendPrompt() {
     const before = (await page("probe")) || { replyCount: 0, lastReply: "" };
     if ((await page("send")) && (await wentThrough(before))) return true;
+    if ((await page("focus")) && (await pressEnter()) && (await wentThrough(before))) return true;
     if ((await page("enter")) && (await wentThrough(before))) return true;
     return false;
+  }
+
+  async function pressEnter() {
+    const key = { key: "Enter", code: "Enter", windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 };
+    return (await devtools("Input.dispatchKeyEvent", Object.assign({ type: "keyDown", text: "\r" }, key))) &&
+      devtools("Input.dispatchKeyEvent", Object.assign({ type: "keyUp" }, key));
+  }
+
+  // Sends one DevTools protocol command to the chat page, attaching first
+  // (with focus emulation on). Returns false if that isn't possible.
+  async function devtools(method, params) {
+    const dbg = alive() && view.webContents.debugger;
+    if (!dbg) return false;
+    try {
+      if (!dbg.isAttached()) {
+        dbg.attach("1.3");
+        await dbg.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
+      }
+      await dbg.sendCommand(method, params || {});
+      return true;
+    } catch (e) {
+      api.log("Copilot website: " + method + " failed:", e && e.message ? e.message : String(e));
+      return false;
+    }
   }
 
   // Logs what's on the page (structure only, no message text) when hands-off
@@ -644,7 +682,7 @@ function createCopilotWeb(api, deps) {
       if (ready) {
         req.base = (await page("probe")) || req.base;
       }
-      const typed = ready && (await typePrompt(prompt));
+      const typed = ready && (await typePrompt(prompt, autoSend));
       if (pending !== req) return;
 
       if (autoSend && !typed) await diagnose(ready ? "couldn't type the request" : "message box not found");

@@ -1,0 +1,123 @@
+/* ===== Password Vault: its side panel tab ===== */
+.pv-panel {
+  background: var(--panel-content-bg);
+  overflow-y: auto;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.pv-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.pv-title { font-size: 13px; font-weight: 600; margin: 0; }
+.pv-subtitle { font-size: 12px; font-weight: 600; margin: 0 0 2px; }
+.pv-muted { color: var(--text-muted); font-size: 11px; margin: 0; }
+.pv-spacer { flex: 1; }
+.pv-count { white-space: nowrap; }
+.pv-mono { font-family: Consolas, "Cascadia Mono", monospace; }
+
+.pv-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.pv-section { border-bottom: 1px solid var(--border); }
+.pv-danger .pv-subtitle { color: var(--warning); }
+
+.pv-locked { align-items: stretch; text-align: center; padding-top: 32px; }
+.pv-lock-icon { font-size: 32px; }
+.pv-or { color: var(--text-muted); font-size: 11px; }
+.pv-form .btn { justify-content: center; }
+
+.pv-input,
+.pv-select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  background: var(--input-bg);
+  color: var(--text);
+  font-size: 12px;
+}
+.pv-input:focus,
+.pv-select:focus { outline: none; border-color: var(--primary); }
+.pv-notes { resize: vertical; font-family: inherit; }
+
+.pv-field { display: flex; flex-direction: column; gap: 3px; }
+.pv-field-label { font-size: 11px; color: var(--text-muted); }
+
+.pv-check { display: flex; align-items: flex-start; gap: 6px; font-size: 12px; cursor: pointer; }
+.pv-check input { margin-top: 2px; }
+.pv-warning-box {
+  padding: 8px;
+  border: 1px solid var(--warning);
+  border-radius: 6px;
+}
+
+.pv-meter-row { display: flex; align-items: center; gap: 8px; }
+.pv-meter { flex: 1; height: 6px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.pv-meter-bar { display: block; height: 100%; width: 0; background: var(--warning); transition: width 0.2s; }
+.pv-meter[data-level="2"] .pv-meter-bar { background: var(--saving-color); }
+.pv-meter[data-level="3"] .pv-meter-bar,
+.pv-meter[data-level="4"] .pv-meter-bar { background: var(--success); }
+
+.pv-tools { display: flex; gap: 6px; padding: 8px 12px; }
+.pv-tools .pv-select { width: 40%; }
+
+.pv-list { display: flex; flex-direction: column; }
+.pv-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.pv-row:hover,
+.pv-row:focus { background: var(--surface-hover); outline: none; }
+.pv-row-main { flex: 1; min-width: 0; }
+.pv-row-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-row-sub { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-row-actions { display: flex; gap: 4px; flex-shrink: 0; }
+.pv-row-actions .btn-small { padding: 3px 6px; }
+
+.pv-empty { color: var(--text-muted); padding: 16px 12px; margin: 0; }
+
+.pv-pw-row { display: flex; gap: 4px; align-items: center; }
+.pv-pw-row .pv-input { flex: 1; min-width: 0; }
+
+.pv-generator {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+}
+.pv-gen-opts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pv-gen-opts .pv-select { width: auto; }
+.pv-gen-opts input[type="range"] { flex: 1; min-width: 80px; }
+
+.pv-actions { display: flex; gap: 6px; align-items: center; }
+
+.btn-small.pv-primary-small { background: var(--primary); color: #fff; border-color: var(--primary); }
+.btn-small.pv-primary-small:hover { background: var(--primary-hover); }
+
+.pv-flash {
+  margin: 8px 12px 0;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  word-break: break-word;
+}
+.pv-ok { color: var(--success); border-color: var(--success); }
+.pv-error { color: var(--warning); border-color: var(--warning); }

@@ -6,7 +6,7 @@ export default [
 
   // Main process + Node.js files
   {
-    files: ["main.js", "preload.js", "launch.js", "utils.js", "updater.js", "webauthn.js", "permissions.js", "settings-transfer.js", "safe-file.js", "plugin-manager.js", "plugin-directory.js", "plugin-package.js", "scripts/**/*.js", "plugins/**/main.js", "plugins/ai-features/m365.js", "plugins/ai-features/http.js", "plugins/note-backup/legacy-import.js"],
+    files: ["main.js", "preload.js", "launch.js", "utils.js", "updater.js", "webauthn.js", "permissions.js", "settings-transfer.js", "safe-file.js", "plugin-manager.js", "plugin-directory.js", "plugin-package.js", "scripts/**/*.js", "plugins/**/main.js", "plugins/ai-features/m365.js", "plugins/ai-features/http.js", "plugins/note-backup/legacy-import.js", "plugins/password-vault/vault-*.js", "windows-hello.js", "native/windows-hello/index.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "commonjs",
@@ -67,6 +67,6 @@ export default [
 
   // Global ignores
   {
-    ignores: ["node_modules/**", "dist/**", "docs/**"],
+    ignores: ["node_modules/**", "dist/**", "docs/**", "plugins/password-vault/argon2.min.js"],
   },
 ];

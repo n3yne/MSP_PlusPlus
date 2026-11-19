@@ -58,6 +58,9 @@ const SITES = {
 // copy-and-paste fallback keeps things working meanwhile.
 const SELECTORS = {
   input: [
+    // Microsoft 365 Copilot Chat's input (Fluent AI "BebopLiteChatInput", seen 2026-11-19).
+    ".fai-BebopLiteChatInput [contenteditable=\"true\"]",
+    ".fai-BebopLiteChatInput textarea",
     "#m365-chat-editor-target-element",
     "textarea#userInput",
     "[data-testid=\"chat-input\"] [contenteditable=\"true\"]",
@@ -67,6 +70,9 @@ const SELECTORS = {
     "div[contenteditable=\"true\"]",
   ],
   send: [
+    // Confirmed on Microsoft 365 Copilot Chat 2026-11-19. The same button turns
+    // into Stop while a reply is being written.
+    "button.fai-SendButton[aria-label=\"Send\"]",
     "button[data-testid=\"submit-button\"]",
     "button[data-testid=\"send-button\"]",
     "button[aria-label=\"Send\"]",
@@ -74,6 +80,7 @@ const SELECTORS = {
     "button[type=\"submit\"]",
   ],
   reply: [
+    ".fai-CopilotMessage",
     "[data-testid=\"copilot-message-reply-div\"]",
     "[data-testid=\"markdown-reply\"]",
     "[data-content=\"ai-message\"]",

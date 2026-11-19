@@ -67,6 +67,31 @@ describe("checkManifests", () => {
   });
 });
 
+describe("checkManifests versions", () => {
+  const dirPlugin = (version, extra = {}) => ({
+    folder: "p",
+    manifest: Object.assign({ id: "p", name: "P", description: "d", category: "Tickets", distribution: "directory", version }, extra),
+    distribution: "directory",
+  });
+
+  test("accepts three-part versions and four-part ones that need app 0.8.7+", () => {
+    expect(checkManifests([dirPlugin("0.8.7")])).toEqual([]);
+    expect(checkManifests([dirPlugin("0.8.7.1", { minAppVersion: "0.8.7" })])).toEqual([]);
+    expect(checkManifests([dirPlugin("0.8.8.2", { minAppVersion: "0.8.8" })])).toEqual([]);
+  });
+
+  test("refuses a four-part version that older apps could see", () => {
+    expect(checkManifests([dirPlugin("0.8.7.1")]).join("\n")).toMatch(/four-part version \(0\.8\.7\.1\) needs "minAppVersion": "0\.8\.7"/);
+    expect(checkManifests([dirPlugin("0.8.6.1", { minAppVersion: "0.8.6" })]).join("\n")).toMatch(/four-part/);
+  });
+
+  test("refuses five parts, suffixes and a malformed minAppVersion", () => {
+    expect(checkManifests([dirPlugin("0.8.7.1.1", { minAppVersion: "0.8.7" })]).join("\n")).toMatch(/need a version like 1\.2\.3/);
+    expect(checkManifests([dirPlugin("0.8.7-beta")]).join("\n")).toMatch(/need a version like 1\.2\.3/);
+    expect(checkManifests([dirPlugin("0.8.7", { minAppVersion: "0.8.7.1" })]).join("\n")).toMatch(/minAppVersion must be an app version/);
+  });
+});
+
 describe("buildDirectory", () => {
   const root = makeRoot([
     ["core-thing", { id: "core-thing", name: "Core", version: "1.0.0", description: "Stays bundled", category: "Tickets" }],
@@ -121,6 +146,14 @@ describe("checkAgainstPublished", () => {
     const problems = checkAgainstPublished(published, { plugins: [entry("a", "1.0.0", "b")] });
     expect(problems).toHaveLength(1);
     expect(problems[0]).toMatch(/a 1\.0\.0 changed/);
+  });
+
+  test("fails when a version is lower than the published one", () => {
+    const published = { plugins: [entry("a", "0.8.7", "a")] };
+    const problems = checkAgainstPublished(published, { plugins: [entry("a", "0.8.6.1", "b")] });
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toMatch(/a 0\.8\.6\.1 is lower than the published 0\.8\.7/);
+    expect(checkAgainstPublished(published, { plugins: [entry("a", "0.8.7.1", "b")] })).toEqual([]);
   });
 
   test("parseArgs reads the out folder and --published", () => {

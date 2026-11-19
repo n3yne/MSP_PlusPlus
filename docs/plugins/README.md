@@ -78,6 +78,8 @@ MSP++ checks the directory 30 seconds after it starts, then once a day, or when 
 
 Each download is checked against the size and SHA-256 listed in the directory before it's unpacked.
 
+Plugin versions match the app release they belong to. A fix to a plugin between app releases gets a fourth number, so `0.8.7.1` is a fix to the plugin that came with MSP++ 0.8.7. Those need MSP++ 0.8.7 or later: older copies don't see them in Browse until the app is updated. See [Plugin version numbers](../plugins.md#plugin-version-numbers).
+
 ### Where plugins and their data live
 
 Plugin code goes in `installed-plugins\<id>\` and each plugin's data in `plugins\<id>\`, both in the [data folder](../data-files.md#the-data-folder). Some plugins keep their settings in `settings.json` instead. Each plugin page has a **Data** section, and [Files and folders](../data-files.md) lists everything.

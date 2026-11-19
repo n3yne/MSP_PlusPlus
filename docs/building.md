@@ -49,7 +49,7 @@ Two small C++ Node-API modules, used by plugins through the plugin API:
 
 - **Tests** (`.github/workflows/test.yml`) – Every pull request and push to `main` runs lint, the Jest tests and a package check on Windows. It also builds the native Windows modules and checks they load and answer, and that both are in the packaged app. The package check builds the unpacked app and confirms every file in `build.files` made it in; a test also fails if code loads a file that isn't listed there.
 - **Build** (`.github/workflows/build.yml`) – Pushing a `v*` tag lints, tests and builds both platforms and attaches them to a GitHub release. The release also gets `latest.yml` and the installer's `.blockmap`: installed copies read `latest.yml` to find updates, so a release without it won't reach them. An existing release description is kept, with build info added on top. Beta tags stay pre-releases.
-- **Plugin directory** (`.github/workflows/plugins.yml`) – When a change to `plugins/` reaches `main`, builds every plugin and uploads it to the `plugin-directory` release. A plugin whose code changed needs a new manifest version. See [Publishing a plugin to the directory](plugins.md#publishing-a-plugin-to-the-directory).
+- **Plugin directory** (`.github/workflows/plugins.yml`) – When a change to `plugins/` reaches `main`, builds every plugin and uploads it to the `plugin-directory` release. A plugin whose code changed needs a new manifest version, higher than the published one (plugin-only fixes use a fourth part, such as `0.8.7.1`). See [Publishing a plugin to the directory](plugins.md#publishing-a-plugin-to-the-directory).
 
 ## See also
 

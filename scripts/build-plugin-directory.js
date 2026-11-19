@@ -12,6 +12,12 @@
 // plugin keeps a version number that's already published but its package has
 // changed: users who have that version would never get the change, and one
 // version would mean two different sets of files. Bump the plugin's version.
+// It also fails when a plugin's version is lower than the published one (say
+// 0.8.6.1 after 0.8.7 went out): the app would never offer it as an update.
+//
+// Versions are major.minor.patch, or major.minor.patch.fix for a plugin-only
+// fix between app releases (0.8.7.1 belongs to app 0.8.7). Apps before 0.8.7
+// can't read four parts, so a four-part version needs minAppVersion 0.8.7+.
 //
 // Packages are byte-for-byte the same for the same files, so rebuilding an
 // unchanged plugin gives the same SHA-256.
@@ -22,9 +28,14 @@ const path = require("path");
 
 const PluginPackage = require("../plugin-package");
 const PluginCategories = require("../plugin-categories");
+const { compareVersions } = require("../plugin-directory");
 
 const ROOT = path.join(__dirname, "..");
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}$/;
+const PLUGIN_VERSION_PATTERN = /^\d+\.\d+\.\d+(?:\.\d+)?$/;
+const APP_VERSION_PATTERN = /^\d+\.\d+\.\d+$/;
+// First app version that understands four-part plugin versions.
+const FOUR_PART_MIN_APP = "0.8.7";
 
 // Every plugin folder's manifest, with its distribution ("bundled" when not set).
 function readPluginManifests(root = ROOT) {
@@ -64,7 +75,15 @@ function checkManifests(plugins) {
     }
     if (p.distribution === "directory") {
       if (m.id !== p.folder) problems.push(`${p.folder}: folder name must match the id "${m.id}" for directory plugins`);
-      if (!/^\d+\.\d+\.\d+$/.test(m.version || "")) problems.push(`${p.folder}: directory plugins need a version like 1.2.3`);
+      if (!PLUGIN_VERSION_PATTERN.test(m.version || "")) {
+        problems.push(`${p.folder}: directory plugins need a version like 1.2.3 (or 1.2.3.4 for a plugin-only fix)`);
+      } else if (m.version.split(".").length === 4 &&
+        !(APP_VERSION_PATTERN.test(m.minAppVersion || "") && compareVersions(m.minAppVersion, FOUR_PART_MIN_APP) >= 0)) {
+        problems.push(`${p.folder}: a four-part version (${m.version}) needs "minAppVersion": "${FOUR_PART_MIN_APP}" or newer, because older apps can't read it`);
+      }
+      if (m.minAppVersion !== undefined && !APP_VERSION_PATTERN.test(m.minAppVersion)) {
+        problems.push(`${p.folder}: minAppVersion must be an app version like 1.2.3`);
+      }
       if (!m.name || !m.description) problems.push(`${p.folder}: directory plugins need a name and description`);
       if (!m.site && !PluginCategories.normalizeCategory(m.category)) problems.push(`${p.folder}: directory plugins need a category`);
     }
@@ -111,7 +130,7 @@ function buildDirectory({ root = ROOT, outDir = path.join(ROOT, "dist-plugins") 
 }
 
 // Problems where a built package reuses a published version with different
-// contents: returns a list of messages. `published` is the parsed index.json on
+// contents, or goes below the published version: returns a list of messages. `published` is the parsed index.json on
 // the release (or null before the first publish).
 function checkAgainstPublished(published, built) {
   const problems = [];
@@ -123,6 +142,8 @@ function checkAgainstPublished(published, built) {
     const old = before.get(e.id);
     if (old && old.version === e.version && old.sha256 !== e.sha256) {
       problems.push(`${e.id} ${e.version} changed but is already published as ${e.version}: bump its version in plugins/${e.id}/manifest.json`);
+    } else if (old && typeof old.version === "string" && compareVersions(e.version, old.version) < 0) {
+      problems.push(`${e.id} ${e.version} is lower than the published ${old.version}, so nobody would get it as an update: give it a version above ${old.version} in plugins/${e.id}/manifest.json`);
     }
   }
   return problems;
@@ -148,8 +169,8 @@ if (require.main === module) {
     for (const e of index.plugins) console.log(`  ${e.url}  ${e.size} bytes  sha256 ${e.sha256}`);
     if (args.published && fs.existsSync(args.published)) {
       const problems = checkAgainstPublished(JSON.parse(fs.readFileSync(args.published, "utf8")), index);
-      if (problems.length) throw new Error("Changed plugins need a new version:\n  " + problems.join("\n  "));
-      console.log("Checked against the published index: no version reused with different contents.");
+      if (problems.length) throw new Error("Plugin versions need fixing:\n  " + problems.join("\n  "));
+      console.log("Checked against the published index: no version reused with different contents or lowered.");
     }
   } catch (err) {
     console.error(err.message || err);
@@ -157,4 +178,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { readPluginManifests, checkManifests, buildDirectory, checkAgainstPublished, parseArgs };
+module.exports = { FOUR_PART_MIN_APP, readPluginManifests, checkManifests, buildDirectory, checkAgainstPublished, parseArgs };

@@ -81,7 +81,7 @@ Every plugin must have a `manifest.json` at its root:
 |---|---|---|
 | `id` | Yes | Unique identifier. Must match `/^[a-z0-9][a-z0-9_-]{0,62}$/`. Used as an IPC namespace and data directory name. |
 | `name` | No | Human-readable display name. |
-| `version` | No | Plugin version string (semver recommended). |
+| `version` | No | Plugin version: `major.minor.patch`, or `major.minor.patch.fix` for a plugin-only fix (app 0.8.7+). See [Plugin version numbers](#plugin-version-numbers). |
 | `description` | No | One-line summary. |
 | `category` | No | The group the plugin is listed under in Settings → Plugins and in the Settings nav. The built-in categories, in display order, are `Sites`, `Tickets`, `Notes & Replies`, `Time & Reminders`, `AI`, `Tabs & Toolbars` and `Security` (matched case-insensitively). Any other name (up to 40 characters) becomes its own group after those. Without one, a site plugin goes under `Sites` and anything else under `Other`. See `plugin-categories.js`. |
 | `author` | No | Plugin author name. |
@@ -879,6 +879,21 @@ A directory plugin must also be left out of the app build: add `"!plugins/<id>/*
 Publishing is automatic. When a change to `plugins/` reaches `main`, the **Plugin directory** workflow (`.github/workflows/plugins.yml`) runs the tests, builds every directory plugin with `node scripts/build-plugin-directory.js`, and uploads the packages and `index.json` to the `plugin-directory` release, creating it the first time. It can also be run by hand from the Actions tab. Run the script locally to see what it would publish; it writes to `dist-plugins/`.
 
 **Versions:** a directory plugin keeps its own version. Bump it only when the plugin changes, because every new version shows up as an update for everyone who has it installed. Set `minAppVersion` when it needs something new in the app.
+
+#### Plugin version numbers
+
+Plugin versions follow the app release they belong to, so a plugin's number never drifts ahead of the app:
+
+- **Changed together with an app release:** give the plugin the app's version, such as `0.8.7`.
+- **Plugin-only fix between app releases:** add a fourth part to the app version it belongs to: `0.8.7.1`, then `0.8.7.2`, and so on. The next app release starts over at three parts (`0.8.8`).
+
+Rules the app and the publish workflow apply:
+
+- Versions compare part by part, and a missing fourth part counts as 0: `0.8.7` < `0.8.7.1` < `0.8.7.2` < `0.8.8`. A `-beta` style suffix is ignored when comparing.
+- A four-part version needs `"minAppVersion": "0.8.7"` or newer. Apps before 0.8.7 only read three parts and would leave the plugin out of Browse altogether, so the build refuses a four-part version without it.
+- A version can't go below the one already published. For example, `0.8.6.1` after `0.8.7` went out would never reach anyone, so the build refuses it.
+- A published version can't be reused for changed files. Bump the fourth part instead.
+- `minAppVersion` itself is always an app version with three parts.
 
 ### Plugin packages (`.mspplugin`)
 

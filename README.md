@@ -4,7 +4,7 @@
 
 A desktop browser for MSP and ticketing web apps (Freshservice and ConnectWise Manage today). It wraps the sites you already use in tabs and adds a side panel, a note editor that never loses your work, live note sync, AI help, ticket tools and quality-of-life browser features on top.
 
-**Current version:** 0.8.4
+**Current version:** 0.8.5
 
 > MSP++ was called **Freshservice++** before 0.6.0. Your settings, notes and sign-ins carry over: the app keeps using the existing Freshservice++ data folder.
 
@@ -19,6 +19,7 @@ A desktop browser for MSP and ticketing web apps (Freshservice and ConnectWise M
 - **Ticket tools** – Search tickets, change status and assignee in one click, count down to SLA deadlines, and get a desktop alert when a ticket gets a reply. [Ticket plugins](docs/plugins/README.md#tickets)
 - **Time and reminders** – A timer per ticket that logs time entries, and follow-up reminders. [Time Tracker](docs/plugins/time-tracker.md) · [Follow-up Reminders](docs/plugins/follow-ups.md)
 - **AI** – Rewrite notes, summarise tickets, and ask questions answered from your knowledge base. [AI Features](docs/plugins/ai-features.md) · [Solutions Chat](docs/plugins/solutions-chat.md)
+- **Passwords at hand** – An encrypted password vault in the side panel, with Windows Hello. [Password Vault](docs/plugins/password-vault.md)
 - **Your numbers in view** – A metrics bar with live dashboard figures or Freshservice ticket counts, and weekly targets. [Metrics Bar](docs/plugins/metrics-bar.md)
 - **Only what you need** – Every feature is a plugin you install from the built-in plugin directory. [All plugins](docs/plugins/README.md)
 

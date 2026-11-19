@@ -46,6 +46,10 @@ jobs:
       # With the "publish" block in package.json, electron-builder also writes
       # latest.yml and the installer's .blockmap. The installed app reads latest.yml
       # from the release to find updates, so both must be attached to the release.
+      # Windows Hello addon (native/windows-hello), used by plugins through api.windowsHello.
+      - name: Build the Windows Hello addon
+        run: node scripts/build-native.js
+
       - name: Build portable EXE and installer
         run: npx electron-builder --win --publish never
         env:

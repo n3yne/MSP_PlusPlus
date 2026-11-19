@@ -38,4 +38,10 @@
 | `Ctrl+Shift+S` | Save snapshot |
 | `Ctrl+Shift+V` | Paste as plain text |
 
+## Password Vault
+
+| Shortcut | Action |
+|---|---|
+| `Ctrl+Shift+L` | Lock the [Password Vault](plugins/password-vault.md) |
+
 Tab shortcuts work even while you're typing in a page. Plugins list their own keys on their pages, such as the list keys in [Tree Style Tabs](plugins/tree-tabs.md#using-it).

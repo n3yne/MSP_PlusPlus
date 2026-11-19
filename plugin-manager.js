@@ -11,6 +11,7 @@ const SiteColors = require("./site-colors");
 const PluginDirectory = require("./plugin-directory");
 const PluginCategories = require("./plugin-categories");
 const safeFile = require("./safe-file");
+const WindowsHello = require("./windows-hello");
 
 const pluginBus = new EventEmitter();
 pluginBus.setMaxListeners(100);
@@ -385,6 +386,10 @@ function buildPluginApi(pluginId, ipcMain) {
         return electron.safeStorage.encryptString(plaintext).toString("base64");
       } catch { return null; }
     },
+
+    // Windows Hello (app 0.8.5+): sign a challenge with this plugin's own
+    // Windows Hello key after face, fingerprint or PIN. See windows-hello.js.
+    windowsHello: WindowsHello.getShared().forPlugin(pluginId),
 
     decryptCredential(encrypted) {
       if (typeof encrypted !== "string" || !encrypted) return null;

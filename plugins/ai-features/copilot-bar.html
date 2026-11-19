@@ -28,6 +28,7 @@
   <span class="text" id="text">Copilot for MSP++</span>
   <a class="btn primary" id="use" href="https://msp-copilot.invalid/use" hidden>Use this reply</a>
   <a class="btn" id="copy" href="https://msp-copilot.invalid/copy" title="Copy the request to the clipboard again" hidden>Copy request</a>
+  <a class="btn" id="details" href="https://msp-copilot.invalid/details" title="Copy a summary of the page's layout (no messages) for a bug report" hidden>Page details</a>
   <a class="btn" id="cancel" href="https://msp-copilot.invalid/cancel" title="Stop waiting and hide this window" hidden>Cancel</a>
   <a class="btn" id="hide" href="https://msp-copilot.invalid/hide" title="Hide this window">Hide</a>
 </div>
@@ -40,6 +41,7 @@
     document.getElementById("text").textContent = state && state.text || "";
     document.getElementById("use").hidden = !waiting;
     document.getElementById("copy").hidden = !waiting;
+    document.getElementById("details").hidden = !waiting;
     document.getElementById("cancel").hidden = mode === "idle";
     document.getElementById("hide").hidden = mode !== "idle";
   };

@@ -38,6 +38,11 @@ Things to know before turning it on:
 
 - Microsoft's terms for its AI services don't allow automated access or data extraction. With the switch off, you send every request yourself.
 - It depends on how Copilot's page is built today. A Microsoft redesign can stop it working until MSP++ is updated (requests then fall back to the window).
+- If it can't find Copilot's Send button it presses Enter instead, and if it can't recognise the reply it uses the message next to Copilot's own Copy button.
+
+**When hands-off doesn't work**
+
+When a request falls back to the window, the bar has a **Page details** button. It copies a summary of how the Copilot page is laid out (the message box, buttons and their labels, but no messages or ticket text). Send it with your bug report so the page matching can be fixed. MSP++ also writes the same summary to its log when hands-off fails.
 
 **Limits**
 

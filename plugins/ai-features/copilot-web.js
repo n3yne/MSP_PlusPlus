@@ -114,8 +114,11 @@ function isHttps(url) {
 //   "focus": focuses the message box and selects its contents, so typed text replaces them
 //   "send":  clicks the Send button
 //   "selection": the text the user has selected
-/* global document, window */
-function pageAction(action, sel) {
+//   "insert":  types `arg` into the message box from inside the page
+//   "enter":   presses Enter in the message box (sites that send on Enter)
+//   "diagnose": a summary of the page's structure (no message text) for bug reports
+/* global document, window, location, KeyboardEvent */
+function pageAction(action, sel, arg) {
   function shown(el) {
     return !!el && el.getClientRects().length > 0;
   }
@@ -137,23 +140,117 @@ function pageAction(action, sel) {
     if (!el) return "";
     return String(el.value !== undefined && (el.tagName === "TEXTAREA" || el.tagName === "INPUT") ? el.value : el.innerText || "");
   }
+  function copyButtons() {
+    return buttons().filter(function (b) {
+      const label = labelOf(b);
+      return /\bcopy\b/.test(label) && !/\blink\b|\bcode\b/.test(label);
+    });
+  }
+  // The message a Copy button belongs to: its highest ancestor that holds no
+  // other Copy button and not the message box.
+  function blockOf(btn, input) {
+    let block = null;
+    for (let n = btn.parentElement; n && n !== document.body; n = n.parentElement) {
+      if (input && n.contains(input)) break;
+      const copies = Array.from(n.querySelectorAll("button")).filter(function (b) {
+        return shown(b) && /\bcopy\b/.test(labelOf(b)) && !/\blink\b|\bcode\b/.test(labelOf(b));
+      });
+      if (copies.length > 1) break;
+      block = n;
+    }
+    return block;
+  }
   // The replies found by the first reply selector that matches anything, so
-  // two selectors never count the same message twice.
-  function replies() {
+  // two selectors never count the same message twice. When none matches (the
+  // site was redesigned), each message's Copy button stands in for it.
+  function replies(input) {
     for (const s of sel.reply) {
       let list;
       try { list = Array.from(document.querySelectorAll(s)).filter(shown); } catch { continue; }
       if (list.length) return list;
     }
-    return [];
+    const blocks = [];
+    for (const b of copyButtons()) {
+      const block = blockOf(b, input);
+      if (block && blocks.indexOf(block) < 0) blocks.push(block);
+    }
+    return blocks;
+  }
+  function describe(el) {
+    const parts = [el.tagName.toLowerCase()];
+    ["id", "role", "aria-label", "title", "data-testid", "data-test-id", "contenteditable", "type", "placeholder"].forEach(function (a) {
+      const v = el.getAttribute(a);
+      if (v) parts.push(a + "=" + JSON.stringify(String(v).slice(0, 60)));
+    });
+    const cls = String(el.getAttribute("class") || "").trim();
+    if (cls) parts.push("class=" + JSON.stringify(cls.slice(0, 80)));
+    if (el.disabled) parts.push("disabled");
+    if (!shown(el)) parts.push("hidden");
+    return parts.join(" ");
   }
 
   if (action === "probe") {
     const input = firstShown(sel.input);
-    const list = replies();
+    const list = replies(input);
     const last = list.length ? String(list[list.length - 1].innerText || "").trim() : "";
     const busy = buttons().some(function (b) { return /\bstop\b/.test(labelOf(b)); });
     return { hasInput: !!input, inputLength: inputText(input).trim().length, replyCount: list.length, lastReply: last, busy };
+  }
+
+  if (action === "insert") {
+    const input = firstShown(sel.input);
+    if (!input) return false;
+    input.focus();
+    const isField = input.tagName === "TEXTAREA" || input.tagName === "INPUT";
+    if (isField) input.setSelectionRange(0, String(input.value).length); else document.execCommand("selectAll");
+    if (document.execCommand("insertText", false, String(arg))) return true;
+    if (!isField) return false;
+    // React keeps its own copy of a field's value: set it the way typing does.
+    const proto = Object.getPrototypeOf(input);
+    const desc = Object.getOwnPropertyDescriptor(proto, "value");
+    if (desc && desc.set) desc.set.call(input, String(arg)); else input.value = String(arg);
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    return true;
+  }
+
+  if (action === "enter") {
+    const input = firstShown(sel.input);
+    if (!input) return false;
+    input.focus();
+    ["keydown", "keypress", "keyup"].forEach(function (type) {
+      input.dispatchEvent(new KeyboardEvent(type, { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+    });
+    return true;
+  }
+
+  if (action === "diagnose") {
+    const out = { page: location.host + location.pathname, frames: [], input: {}, reply: {}, send: {}, editors: [], buttons: [], testIds: [] };
+    document.querySelectorAll("iframe").forEach(function (f) {
+      let host;
+      try { host = new URL(f.getAttribute("src") || "", location.href).host; } catch { host = "?"; }
+      out.frames.push(host + (shown(f) ? "" : " (hidden)"));
+    });
+    ["input", "send", "reply"].forEach(function (group) {
+      sel[group].forEach(function (s) {
+        let list = [];
+        try { list = Array.from(document.querySelectorAll(s)); } catch { /* bad selector */ }
+        if (list.length) out[group][s] = list.length + " (" + list.filter(shown).length + " shown)";
+      });
+    });
+    document.querySelectorAll("textarea, input[type=text], [contenteditable=true], [role=textbox]").forEach(function (e) {
+      if (out.editors.length < 15) out.editors.push(describe(e));
+    });
+    buttons().forEach(function (b) { if (out.buttons.length < 60) out.buttons.push(describe(b)); });
+    const ids = {};
+    document.querySelectorAll("[data-testid], [data-test-id]").forEach(function (e) {
+      const id = e.getAttribute("data-testid") || e.getAttribute("data-test-id");
+      ids[id] = (ids[id] || 0) + 1;
+    });
+    out.testIds = Object.keys(ids).slice(0, 150).map(function (k) { return k + " x" + ids[k]; });
+    const p = replies(firstShown(sel.input));
+    out.repliesFound = p.length;
+    out.copyButtons = copyButtons().length;
+    return out;
   }
 
   if (action === "focus") {
@@ -189,8 +286,17 @@ function pageAction(action, sel) {
   return null;
 }
 
-function pageScript(action) {
-  return "(" + pageAction.toString() + ")(" + JSON.stringify(action) + ", " + JSON.stringify(SELECTORS) + ")";
+function pageScript(action, arg) {
+  return "(" + pageAction.toString() + ")(" + JSON.stringify(action) + ", " + JSON.stringify(SELECTORS) +
+    ", " + JSON.stringify(arg === undefined ? null : arg) + ")";
+}
+
+// True when `text` is just the prompt echoed back (the user's own message).
+function isPromptEcho(text, prompt) {
+  const t = String(text || "").trim();
+  const p = String(prompt || "").trim();
+  if (!t || !p) return false;
+  return t === p || (p.length > 40 && t.startsWith(p.slice(0, 40)));
 }
 
 // True once a new reply has appeared since `base` and finished: text present,
@@ -208,7 +314,7 @@ function replyFinished(base, probe, stableSince, now) {
 // request started (the user clicked the site's Copy button). The prompt itself
 // is never taken as a reply.
 function pickReply({ selection, probe, base, clipboard, clipboardAtStart, prompt }) {
-  const notPrompt = (t) => t && t.trim() && t.trim() !== String(prompt || "").trim();
+  const notPrompt = (t) => t && t.trim() && !isPromptEcho(t, prompt);
   if (notPrompt(selection)) return selection.trim();
   if (probe && probe.lastReply && (probe.replyCount > base.replyCount || probe.lastReply !== base.lastReply) && notPrompt(probe.lastReply)) {
     return probe.lastReply.trim();
@@ -336,10 +442,10 @@ function createCopilotWeb(api, deps) {
     win.focus();
   }
 
-  async function page(action) {
+  async function page(action, arg) {
     if (!alive()) return null;
     try {
-      return await view.webContents.executeJavaScript(pageScript(action));
+      return await view.webContents.executeJavaScript(pageScript(action, arg));
     } catch {
       return null;
     }
@@ -368,12 +474,46 @@ function createCopilotWeb(api, deps) {
   }
 
   // Types the prompt into the message box. Returns true if the box now holds it.
+  // Typing through Electron needs the window to have focus, which a hidden
+  // hands-off window doesn't, so it falls back to typing from inside the page.
   async function typePrompt(prompt) {
     if (!(await page("focus"))) return false;
     view.webContents.insertText(prompt);
     await sleep(200);
-    const p = await page("probe");
+    let p = await page("probe");
+    if (p && p.inputLength > 0) return true;
+    await page("insert", prompt);
+    await sleep(300);
+    p = await page("probe");
     return !!(p && p.inputLength > 0);
+  }
+
+  // Waits a few seconds for signs a message went: the box emptied, a Stop
+  // button, or a new message on the page.
+  async function wentThrough(before) {
+    for (let i = 0; i < 6; i++) {
+      await sleep(500);
+      const p = await page("probe");
+      if (!p) continue;
+      if (p.busy || p.inputLength === 0 || p.replyCount !== before.replyCount || p.lastReply !== before.lastReply) return true;
+    }
+    return false;
+  }
+
+  // Clicks Send, or presses Enter if that didn't work. Returns true once sent.
+  async function sendPrompt() {
+    const before = (await page("probe")) || { replyCount: 0, lastReply: "" };
+    if ((await page("send")) && (await wentThrough(before))) return true;
+    if ((await page("enter")) && (await wentThrough(before))) return true;
+    return false;
+  }
+
+  // Logs what's on the page (structure only, no message text) when hands-off
+  // fails, and returns it for "Copy page details".
+  async function diagnose(stage) {
+    const d = await page("diagnose");
+    if (d) api.log("Copilot website: " + stage + ". Page details: " + JSON.stringify(d));
+    return d;
   }
 
   function copyPrompt(prompt) {
@@ -394,6 +534,7 @@ function createCopilotWeb(api, deps) {
       const p = await page("probe");
       if (!p) continue;
       if (p.lastReply !== lastText) { lastText = p.lastReply; stableSince = now(); }
+      if (isPromptEcho(p.lastReply, req.prompt)) continue;
       if (replyFinished(req.base, p, stableSince, now())) return p.lastReply.trim();
     }
     return "";
@@ -422,6 +563,17 @@ function createCopilotWeb(api, deps) {
       return;
     }
     if (!req) return;
+    if (action === "details") {
+      const d = await diagnose("page details requested");
+      if (d) {
+        try { electron.clipboard.writeText(JSON.stringify(d, null, 1)); } catch { /* clipboard unavailable */ }
+      }
+      setBar({
+        mode: req.fallback ? "fallback" : "waiting",
+        text: d ? "Page details copied (layout only, no messages). Paste them to whoever is fixing MSP++." : "Couldn't read the page.",
+      });
+      return;
+    }
     if (action === "copy") {
       copyPrompt(req.prompt);
       setBar({ mode: req.fallback ? "fallback" : "waiting", text: "Request copied. Paste it into Copilot (Ctrl+V) if it isn't there already." });
@@ -488,7 +640,10 @@ function createCopilotWeb(api, deps) {
       const typed = ready && (await typePrompt(prompt));
       if (pending !== req) return;
 
-      if (autoSend && typed && (await page("send"))) {
+      if (autoSend && !typed) await diagnose(ready ? "couldn't type the request" : "message box not found");
+      const sent = autoSend && typed && (await sendPrompt());
+      if (autoSend && typed && !sent) await diagnose("couldn't send");
+      if (sent) {
         setBar({ mode: "working", text: "Sent automatically. Waiting for the reply…" });
         const text = await waitForReply(req, AUTO_REPLY_TIMEOUT_MS);
         if (pending !== req) return;
@@ -498,6 +653,7 @@ function createCopilotWeb(api, deps) {
           return;
         }
         // Couldn't read the reply: hand over to the user instead of failing.
+        await diagnose("couldn't read the reply");
         oneClickBar(req, false);
         setBar({ mode: "waiting", text: "Couldn't read the reply automatically. When Copilot has finished, click Use this reply." });
         show();
@@ -588,6 +744,7 @@ module.exports = {
   pageScript,
   replyFinished,
   pickReply,
+  isPromptEcho,
   SITES,
   SELECTORS,
   PARTITION,

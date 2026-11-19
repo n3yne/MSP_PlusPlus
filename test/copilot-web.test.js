@@ -415,6 +415,63 @@ describe("copilot-web hands-off requests", () => {
   });
 });
 
+describe("copilot-web hands-off on a changed page", () => {
+  test("types from inside the page when Electron's typing doesn't land (hidden window)", async () => {
+    const { page, fake, client } = setup();
+    const result = client.chat("Prompt", { aiWebAutoSend: true });
+    // Electron's insertText reaches nothing while the window is hidden.
+    await until(() => fake.state.windows[0] && fake.state.windows[0].child);
+    fake.state.windows[0].child.webContents.insertText = () => {};
+    page.sendButton.click = () => { page.addReply("Answer"); };
+    await expect(result).resolves.toBe("Answer");
+    expect(page.input.value).toBe("Prompt");
+  });
+
+  test("presses Enter when the Send button does nothing", async () => {
+    const { page, client } = setup();
+    page.sendButton.click = () => {};
+    page.input.addEventListener("keydown", (e) => { if (e.key === "Enter") page.addReply("Sent with Enter"); });
+    await expect(client.chat("Prompt", { aiWebAutoSend: true })).resolves.toBe("Sent with Enter");
+  });
+
+  test("finds replies by their Copy buttons when no reply selector matches", async () => {
+    const { page, client } = setup();
+    const message = (who, text) => {
+      const box = el("div.msg", { children: [el("p", { text }), el("button", { attrs: { "aria-label": "Copy" } })] });
+      page.thread.appendChild(box);
+    };
+    message("bot", "Hi there");
+    page.sendButton.click = () => {
+      message("user", "Prompt");
+      message("bot", "Reply from a redesigned page");
+    };
+    await expect(client.chat("Prompt", { aiWebAutoSend: true })).resolves.toBe("Reply from a redesigned page");
+  });
+
+  test("never takes the user's own message for the reply", () => {
+    expect(web.isPromptEcho("Prompt", " Prompt ")).toBe(true);
+    expect(web.isPromptEcho("A".repeat(50) + " shown shortened", "A".repeat(80))).toBe(true);
+    expect(web.isPromptEcho("Answer", "Prompt")).toBe(false);
+    expect(web.pickReply({ selection: "", probe: { replyCount: 1, lastReply: "Prompt" }, base: { replyCount: 0, lastReply: "" }, clipboard: "", clipboardAtStart: "", prompt: "Prompt" })).toBe("");
+  });
+
+  test("logs the page's layout, without message text, when it can't send", async () => {
+    const { page, fake, client, api } = setup();
+    page.sendButton.disabled = true;
+    page.addReply("Secret ticket text");
+    const result = client.chat("Prompt", { aiWebAutoSend: true });
+    await until(() => fake.bar() && fake.bar().mode === "waiting");
+    const line = api.log.mock.calls.map((c) => c.join(" ")).find((l) => /couldn't send/.test(l));
+    expect(line).toMatch(/aria-label=\\"Send\\"/);
+    expect(line).not.toMatch(/Secret ticket text/);
+    await client._onBarAction("details");
+    expect(JSON.parse(fake.state.clipboard).page).toBe("m365.cloud.microsoft/chat");
+    expect(fake.bar().text).toMatch(/Page details copied/);
+    await client._onBarAction("cancel");
+    await expect(result).rejects.toThrow(/Cancelled/);
+  });
+});
+
 describe("copilot-web Windows device sign-on", () => {
   function withSso(available) {
     const page = copilotPage();

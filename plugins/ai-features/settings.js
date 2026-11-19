@@ -18,7 +18,8 @@
       '      <option value="openai">OpenAI</option>' +
       '      <option value="anthropic">Anthropic</option>' +
       '      <option value="azure">Azure OpenAI</option>' +
-      '      <option value="m365copilot">Microsoft 365 Copilot</option>' +
+      '      <option value="m365copilot">Microsoft 365 Copilot (API)</option>' +
+      '      <option value="copilotweb">Copilot website (no setup)</option>' +
       "    </select>" +
       "  </div>" +
       "</div>" +
@@ -69,6 +70,39 @@
       "  </div>" +
       "</div>" +
 
+      // Copilot website: a chat site signed in inside MSP++
+      '<div class="settings-field settings-field-column" data-ai-providers="copilotweb">' +
+      '  <label class="settings-field-label" for="ai-plugin-web-site">Chat site</label>' +
+      '  <select id="ai-plugin-web-site" class="settings-select-input">' +
+      '    <option value="copilot-work">Microsoft Copilot (work account)</option>' +
+      '    <option value="copilot-consumer">Microsoft Copilot (copilot.microsoft.com)</option>' +
+      '    <option value="custom">Other chat site</option>' +
+      "  </select>" +
+      "</div>" +
+      '<div class="settings-field settings-field-column" data-ai-providers="copilotweb" id="ai-plugin-web-url-row">' +
+      '  <label class="settings-field-label" for="ai-plugin-web-url">Chat site address</label>' +
+      '  <input type="url" id="ai-plugin-web-url" class="settings-text-input"' +
+      '    placeholder="https://chat.example.com/" maxlength="500" spellcheck="false" autocomplete="off" />' +
+      "</div>" +
+      '<div class="settings-field" data-ai-providers="copilotweb">' +
+      '  <div class="settings-field-row">' +
+      '    <button type="button" id="ai-plugin-web-open" class="btn btn-small btn-primary">Open and sign in</button>' +
+      '    <button type="button" id="ai-plugin-web-test" class="btn btn-small btn-secondary">Test</button>' +
+      '    <button type="button" id="ai-plugin-web-signout" class="btn btn-small btn-secondary">Sign out</button>' +
+      "  </div>" +
+      '  <span id="ai-plugin-web-status" class="settings-description"></span>' +
+      "</div>" +
+      '<div class="settings-field settings-field-column" data-ai-providers="copilotweb">' +
+      '  <label class="settings-toggle">' +
+      '    <input type="checkbox" id="ai-plugin-web-auto" />' +
+      '    <span class="settings-toggle-slider"></span>' +
+      '    <span class="settings-toggle-label">Send Automatically (experimental)</span>' +
+      "  </label>" +
+      '  <p class="settings-description">MSP++ presses Send itself in a hidden window and reads the reply, so you never see Copilot. ' +
+      "Microsoft&#39;s terms don&#39;t allow automated use of its AI services, and a change to the site can stop this working until MSP++ is updated. " +
+      "If it can&#39;t send or read the reply, the Copilot window opens so you can finish by hand.</p>" +
+      "</div>" +
+
       '<p class="settings-description settings-description-field" id="ai-plugin-help"></p>';
 
     panel.appendChild(section);
@@ -81,6 +115,9 @@
         "and the name of a chat model deployment.",
       m365copilot: "Requires a Microsoft 365 Copilot license and an Entra app registration with admin consent for the " +
         "Copilot Chat API permissions. Web search is turned off; Copilot may still draw on your Microsoft 365 data.",
+      copilotweb: "Uses the Copilot website signed in inside MSP++: no app registration or API key, and free Copilot Chat " +
+        "comes with a Microsoft work account. Each AI request opens a new chat in a Copilot window with the request typed in; " +
+        "press Send, then click Use this reply. Requests go to Microsoft like anything you type into Copilot and show in your Copilot history.",
     };
 
     const elProvider   = panel.querySelector("#ai-plugin-provider");
@@ -93,6 +130,14 @@
     const elSignIn     = panel.querySelector("#ai-plugin-m365-signin");
     const elM365Status = panel.querySelector("#ai-plugin-m365-status");
     const elHelp       = panel.querySelector("#ai-plugin-help");
+    const elWebSite    = panel.querySelector("#ai-plugin-web-site");
+    const elWebUrl     = panel.querySelector("#ai-plugin-web-url");
+    const elWebUrlRow  = panel.querySelector("#ai-plugin-web-url-row");
+    const elWebOpen    = panel.querySelector("#ai-plugin-web-open");
+    const elWebTest    = panel.querySelector("#ai-plugin-web-test");
+    const elWebSignOut = panel.querySelector("#ai-plugin-web-signout");
+    const elWebStatus  = panel.querySelector("#ai-plugin-web-status");
+    const elWebAuto    = panel.querySelector("#ai-plugin-web-auto");
 
     // Shows only the fields that apply to the selected provider.
     function showProviderFields(provider) {
@@ -101,6 +146,11 @@
         el.style.display = providers.includes(provider) ? "" : "none";
       });
       elHelp.textContent = HELP[provider] || "";
+      if (provider === "copilotweb") showWebUrlRow();
+    }
+
+    function showWebUrlRow() {
+      elWebUrlRow.style.display = elProvider.value === "copilotweb" && elWebSite.value === "custom" ? "" : "none";
     }
 
     let m365SignedIn = false;
@@ -224,6 +274,10 @@
       if (document.activeElement !== elDeployment) elDeployment.value = s.aiAzureDeployment || "";
       if (document.activeElement !== elTenant)     elTenant.value     = s.aiM365TenantId || "";
       if (document.activeElement !== elClient)     elClient.value     = s.aiM365ClientId || "";
+      if (document.activeElement !== elWebUrl)     elWebUrl.value     = s.aiWebUrl || "";
+      elWebSite.value = s.aiWebSite || "copilot-work";
+      elWebAuto.checked = s.aiWebAutoSend === true;
+      showWebUrlRow();
     }
 
     applyForm(settingsAPI.getSettings());
@@ -274,6 +328,62 @@
     bindTextSetting(elClient, "aiM365ClientId", function (v) {
       return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(v);
     }, "Enter the Application (client) ID GUID from your app registration");
+
+    bindTextSetting(elWebUrl, "aiWebUrl", function (v) {
+      try { return new URL(v).protocol === "https:"; } catch { return false; }
+    }, "Enter an https:// address, e.g. https://chat.example.com/");
+
+    elWebSite.addEventListener("change", function () {
+      showWebUrlRow();
+      settingsAPI.saveSettings({ aiWebSite: elWebSite.value });
+    });
+
+    elWebAuto.addEventListener("change", function () {
+      settingsAPI.saveSettings({ aiWebAutoSend: elWebAuto.checked });
+    });
+
+    elWebOpen.addEventListener("click", async function () {
+      let result;
+      try {
+        result = await window.backupAPI.pluginInvoke("plugin:ai-features:copilotweb-open", {});
+      } catch {
+        result = { error: "Couldn't open the chat site." };
+      }
+      elWebStatus.textContent = result && result.error
+        ? result.error
+        : "Sign in in the Copilot window if asked. MSP++ remembers the sign-in.";
+    });
+
+    elWebSignOut.addEventListener("click", async function () {
+      elWebSignOut.disabled = true;
+      try {
+        await window.backupAPI.pluginInvoke("plugin:ai-features:copilotweb-sign-out", {});
+        elWebStatus.textContent = "Signed out of the chat site.";
+      } catch {
+        elWebStatus.textContent = "Couldn't sign out.";
+      } finally {
+        elWebSignOut.disabled = false;
+      }
+    });
+
+    elWebTest.addEventListener("click", async function () {
+      elWebTest.disabled = true;
+      elWebStatus.textContent = elWebAuto.checked
+        ? "Sending a test request…"
+        : "A test request is in the Copilot window: press Send, then click Use this reply.";
+      try {
+        const result = await window.backupAPI.pluginInvoke("plugin:ai-features:complete", {
+          prompt: "This is a connection test from MSP++. Reply with only the word: OK",
+        });
+        elWebStatus.textContent = result && result.error
+          ? result.error
+          : "Working. Reply: " + String(result && result.result || "").trim().substring(0, 80);
+      } catch {
+        elWebStatus.textContent = "The test request failed.";
+      } finally {
+        elWebTest.disabled = false;
+      }
+    });
 
     elModel.addEventListener("change", function () {
       settingsAPI.saveSettings({ aiModelName: elModel.value });

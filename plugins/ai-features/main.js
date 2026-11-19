@@ -2,8 +2,9 @@
 
 const { createM365Client, TENANT_PATTERN, CLIENT_ID_PATTERN } = require("./m365");
 const { fetchWithTimeout } = require("./http");
+const { createCopilotWeb, siteFor, normalizeSiteUrl, SITES } = require("./copilot-web");
 
-const PROVIDERS = ["hatz", "openai", "anthropic", "azure", "m365copilot"];
+const PROVIDERS = ["hatz", "openai", "anthropic", "azure", "m365copilot", "copilotweb"];
 
 const MAX_NOTES_CHARS        = 8000;
 const MAX_CONTEXT_CHARS      = 4000;
@@ -21,6 +22,9 @@ module.exports = {
     aiAzureDeployment: "",
     aiM365TenantId: "",
     aiM365ClientId: "",
+    aiWebSite: "copilot-work",
+    aiWebUrl: "",
+    aiWebAutoSend: false,
   },
 
   validateSettings: function (s) {
@@ -38,12 +42,19 @@ module.exports = {
     }
     if (s.aiM365TenantId !== undefined && (typeof s.aiM365TenantId !== "string" || (s.aiM365TenantId && !TENANT_PATTERN.test(s.aiM365TenantId)))) return false;
     if (s.aiM365ClientId !== undefined && (typeof s.aiM365ClientId !== "string" || (s.aiM365ClientId && !CLIENT_ID_PATTERN.test(s.aiM365ClientId)))) return false;
+    if (s.aiWebSite !== undefined && !Object.prototype.hasOwnProperty.call(SITES, s.aiWebSite)) return false;
+    if (s.aiWebUrl !== undefined) {
+      if (typeof s.aiWebUrl !== "string" || s.aiWebUrl.length > 500) return false;
+      if (s.aiWebUrl && normalizeSiteUrl(s.aiWebUrl) === null) return false;
+    }
+    if (s.aiWebAutoSend !== undefined && typeof s.aiWebAutoSend !== "boolean") return false;
     return true;
   },
 
   init: function (api) {
 
     const m365 = createM365Client(api);
+    const copilotWeb = createCopilotWeb(api);
 
     // Encrypt any plaintext aiApiKey before it reaches disk; never write plaintext credentials.
     api.registerSettingsTransformer(function (settings) {
@@ -96,6 +107,10 @@ module.exports = {
       if (aiProvider === "m365copilot") {
         const s = api.getSettings();
         return m365.chat(prompt, s.aiM365TenantId, s.aiM365ClientId);
+      }
+
+      if (aiProvider === "copilotweb") {
+        return copilotWeb.chat(prompt, api.getSettings());
       }
 
       if (aiProvider === "azure") {
@@ -225,6 +240,10 @@ module.exports = {
         }
         return null;
       }
+      if (provider === "copilotweb") {
+        if (!siteFor(settings).url) return "Enter the chat site's address in Settings → AI Features.";
+        return null;
+      }
       if (!aiApiKey && provider === "azure" && settings.aiApiKeyProvider === "azure" && keyEndpoint(settings)) {
         return "The saved API key was entered for " + keyEndpoint(settings) + ". Enter the API key again in Settings → AI Features to use it with this endpoint.";
       }
@@ -251,7 +270,11 @@ module.exports = {
       const notReady = aiSettings ? configError(provider, current, aiApiKey) : "No AI provider configured.";
       if (notReady) return { error: notReady };
       const safeText = (text || "").substring(0, MAX_NOTES_CHARS);
-      const safeContext = (ticketContext || "").substring(0, MAX_CONTEXT_CHARS);
+      let safeContext = (ticketContext || "").substring(0, MAX_CONTEXT_CHARS);
+      // Chat websites take shorter prompts: drop ticket context before the user's text.
+      const limit = promptLimit(provider, current);
+      const fixedLength = safeText.length + MAX_INSTRUCTIONS_CHARS + 2000;
+      if (fixedLength + safeContext.length > limit) safeContext = safeContext.substring(0, Math.max(0, limit - fixedLength));
       const safeInstructions = (customInstructions || "").substring(0, MAX_INSTRUCTIONS_CHARS);
       const contextSection =
         safeContext.trim().length > 20
@@ -286,7 +309,7 @@ module.exports = {
       const aiApiKey = keyForProvider(current, provider);
       const notReady = aiSettings ? configError(provider, current, aiApiKey) : "No AI provider configured.";
       if (notReady) return { error: notReady };
-      const safeText = (text || "").substring(0, MAX_NOTES_CHARS + MAX_CONTEXT_CHARS);
+      const safeText = (text || "").substring(0, Math.min(MAX_NOTES_CHARS + MAX_CONTEXT_CHARS, promptLimit(provider, current) - 500));
       const prompt =
         "Summarize the following service desk ticket conversation and notes into a concise bullet-point summary. " +
         "Capture the key issue, actions taken, and current status. " +
@@ -316,6 +339,32 @@ module.exports = {
       } catch (err) {
         return { error: err.message || String(err) };
       }
+    });
+
+    // The most characters a prompt for this provider can have.
+    function promptLimit(provider, settings) {
+      return provider === "copilotweb" ? siteFor(settings).maxPromptChars : MAX_COMPLETE_CHARS;
+    }
+
+    // Lets other plugins adapt to the provider: a chat website gets one request
+    // per question (each one may need the user to press Send) and a shorter prompt.
+    api.handle("info", async function () {
+      const current = api.getSettings();
+      const provider = current.aiProvider;
+      const website = provider === "copilotweb";
+      return { provider, singleRequest: website, maxPromptChars: promptLimit(provider, current) };
+    });
+
+    api.handle("copilotweb-open", async function () {
+      try {
+        return copilotWeb.open(api.getSettings());
+      } catch (err) {
+        return { error: err.message || String(err) };
+      }
+    });
+
+    api.handle("copilotweb-sign-out", async function () {
+      return copilotWeb.signOut();
     });
 
     api.handle("m365-status", async function () {

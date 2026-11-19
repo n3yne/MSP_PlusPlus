@@ -28,7 +28,7 @@ None of its own. It uses the AI Features and Freshservice settings.
 ## Limits and known issues
 
 - Freshservice only. The API key needs permission to view Solutions articles.
-- Each question makes two AI requests (one to choose search terms, one to answer).
+- Each question makes two AI requests (one to choose search terms, one to answer). With the [Copilot website](ai-providers.md#copilot-website) it makes one: Solutions Chat picks the search words from your question (and the ticket's first line) itself, so you press Send once per question. Articles are shortened to fit Copilot's prompt limit.
 - Answers are only as good as your articles: it can't answer from tickets or anywhere else.
 - **Add to note** needs [Note Backup](note-backup.md).
 

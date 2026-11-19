@@ -110,6 +110,18 @@
     return kept.join(" ");
   }
 
+  // Search queries made without the AI, for providers where each AI request
+  // costs the user a click (chat websites): the question's keywords, and the
+  // ticket's first line when the question is about the ticket.
+  function localQueries(question, ticketText) {
+    const out = [];
+    const fromQuestion = fallbackQuery(question);
+    if (fromQuestion) out.push(fromQuestion);
+    const fromTicket = fallbackQuery(String(ticketText || "").trim().split("\n")[0]);
+    if (fromTicket && !out.includes(fromTicket)) out.push(fromTicket);
+    return out.slice(0, MAX_QUERIES);
+  }
+
   // Interleaves several result lists (best match of each query first) and drops duplicates.
   function mergeResults(lists, max) {
     const out = [];
@@ -131,7 +143,31 @@
     return String(s || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   }
 
-  function buildAnswerPrompt(question, history, ticketText, articles, source) {
+  // Shortens the articles' text, longest first, so the prompt fits maxChars.
+  // Used for chat-website providers, which take much shorter prompts than APIs.
+  function fitArticles(articles, overflow) {
+    if (!(overflow > 0)) return articles;
+    const out = articles.map((a) => Object.assign({}, a, { text: String(a.text || "") }));
+    let remaining = overflow;
+    while (remaining > 0) {
+      const longest = out.reduce((best, a) => (a.text.length > best.text.length ? a : best), out[0]);
+      if (!longest || longest.text.length <= 300) break;
+      const cut = Math.min(remaining, longest.text.length - 300, Math.max(200, Math.ceil(remaining / out.length)));
+      longest.text = longest.text.substring(0, longest.text.length - cut);
+      longest.truncated = true;
+      remaining -= cut;
+    }
+    return out;
+  }
+
+  function buildAnswerPrompt(question, history, ticketText, articles, source, maxChars) {
+    if (maxChars > 0) {
+      const full = buildAnswerPrompt(question, history, ticketText, articles, source);
+      if (full.length <= maxChars) return full;
+      // Leave room for the "[article continues]" markers added to cut articles.
+      return buildAnswerPrompt(question, history, ticketText,
+        fitArticles(articles, full.length - maxChars + articles.length * 25), source);
+    }
     const past = formatHistory(history);
     const docs = articles.map((a, i) =>
       `<article number="${i + 1}" title="${escapeAttr(a.title)}" status="${a.status === "draft" ? "draft" : "published"}">\n` +
@@ -192,6 +228,7 @@
 
   const lib = {
     buildQueryPrompt, kbLabel, parseQueries, fallbackQuery, mergeResults, buildAnswerPrompt, answerToHtml, formatHistory,
+    fitArticles, localQueries,
   };
 
   if (typeof module !== "undefined" && module.exports) {
@@ -363,11 +400,22 @@
       }
       const source = { site: kbSite.name, kb: kbSite.knowledge.name };
 
-      setStatus(reply, "Choosing what to search for…");
-      const planned = await call("ai-features", "complete", { prompt: buildQueryPrompt(question, pastTurns, ticketText, source) }, "AI Features");
+      // A chat-website provider gets one request per question: search words are
+      // picked here instead of by the AI. Older AI Features versions have no "info".
+      const info = await call("ai-features", "info", {}, "AI Features");
       if (stale()) return;
-      if (planned.error) throw new Error(planned.error);
-      let queries = parseQueries(planned.result);
+      const singleRequest = !info.error && info.singleRequest === true;
+      const maxPromptChars = !info.error && info.maxPromptChars > 0 ? info.maxPromptChars : 0;
+      let queries;
+      if (singleRequest) {
+        queries = localQueries(question, ticketText);
+      } else {
+        setStatus(reply, "Choosing what to search for…");
+        const planned = await call("ai-features", "complete", { prompt: buildQueryPrompt(question, pastTurns, ticketText, source) }, "AI Features");
+        if (stale()) return;
+        if (planned.error) throw new Error(planned.error);
+        queries = parseQueries(planned.result);
+      }
       if (!queries.length) {
         const fallback = fallbackQuery(question) || fallbackQuery(ticketText.split("\n")[0]);
         if (fallback) queries = [fallback];
@@ -397,9 +445,11 @@
       }));
       if (stale()) return;
 
-      setStatus(reply, "Writing an answer…");
+      setStatus(reply, singleRequest && info.provider === "copilotweb"
+        ? "Waiting for Copilot… (press Send in the Copilot window if it's waiting for you)"
+        : "Writing an answer…");
       const answered = await call("ai-features", "complete",
-        { prompt: buildAnswerPrompt(question, pastTurns, ticketText, articles, source) }, "AI Features");
+        { prompt: buildAnswerPrompt(question, pastTurns, ticketText, articles, source, maxPromptChars) }, "AI Features");
       if (stale()) return;
       if (answered.error) throw new Error(answered.error);
 

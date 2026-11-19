@@ -91,6 +91,7 @@ Electron (Chromium) keeps the browsing data for the tabs here. This is where you
 - `Cache\`, `Code Cache\`, `GPUCache\` – caches, safe to delete while the app is closed
 - `Preferences`, `Crashpad\`, the single-instance lock files and other Chromium housekeeping files
 - `Partitions\fspp-m365-auth\` – a separate profile used only by the Microsoft 365 sign-in window
+- `Partitions\msp-copilot-web\` – a separate profile used only by the Copilot website window (AI Features, Copilot website provider). Cleared by **Sign out**.
 
 ## Install and update locations (Windows)
 

@@ -152,6 +152,15 @@
   const TICKET_CHANGED_HTML =
     '<p class="ai-error">The open ticket changed while waiting for the AI. Run it again on this ticket.</p>';
 
+  // The "working" message. With the Copilot website provider in one-click mode
+  // the user has to press Send in the Copilot window, so say so.
+  function loadingHtml(text) {
+    const s = api.getSettings();
+    const handsOn = s.aiProvider === "copilotweb" && s.aiWebAutoSend !== true;
+    return '<div class="ai-loading">' + text + "</div>" +
+      (handsOn ? '<p class="ai-hint">Press Send in the Copilot window, then click Use this reply there.</p>' : "");
+  }
+
   function showAiOverlay(title, bodyHtml, applyCallback, applyLabel) {
     aiDialogTitle.textContent = title;
     aiDialogBody.innerHTML = bodyHtml;
@@ -254,7 +263,7 @@
       return;
     }
 
-    showAiOverlay("✨ AI Suggestion", '<div class="ai-loading">Thinking…</div>', null);
+    showAiOverlay("✨ AI Suggestion", loadingHtml("Thinking…"), null);
     const req = startRequest();
 
     let ticketContext = "";
@@ -308,7 +317,7 @@
 
     btnAiRefine.disabled = true;
     btnAiApply.style.display = "none";
-    aiDialogBody.innerHTML = '<div class="ai-loading">Refining…</div>';
+    aiDialogBody.innerHTML = loadingHtml("Refining…");
 
     let response;
     try {
@@ -370,7 +379,7 @@
       return;
     }
 
-    aiDialogBody.innerHTML = '<div class="ai-loading">Summarizing…</div>';
+    aiDialogBody.innerHTML = loadingHtml("Summarizing…");
 
     const settings = api.getSettings();
     let response;

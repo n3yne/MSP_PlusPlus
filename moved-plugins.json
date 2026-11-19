@@ -102,7 +102,8 @@
         "aiM365ClientId": "",
         "aiWebSite": "copilot-work",
         "aiWebUrl": "",
-        "aiWebAutoSend": false
+        "aiWebAutoSend": false,
+        "aiWebDeviceSso": true
       },
       "credentials": [
         "aiApiKey"

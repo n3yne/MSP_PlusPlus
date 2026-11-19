@@ -39,6 +39,7 @@ Where the ticket text comes from:
 | Directory (Tenant) ID, Application (Client) ID, Sign in | Microsoft 365 Copilot (API) only. See [AI provider setup](ai-providers.md#microsoft-365-copilot). | empty |
 | Chat site | Copilot website only: which site to use. | Microsoft Copilot (work account) |
 | Chat site address | Copilot website with **Other chat site** only. | empty |
+| Use Windows Device Sign-On | Copilot website on Windows only (MSP++ 0.8.6+): prove this company PC to Microsoft sign-in, like Edge, for Conditional Access. See [AI provider setup](ai-providers.md#copilot-website). | on |
 | Send Automatically (experimental) | Copilot website only: send and read replies in a hidden window. See [AI provider setup](ai-providers.md#copilot-website). | off |
 
 ## Data

@@ -10,6 +10,7 @@ Problems with one plugin are also covered on that plugin's page, under **Limits 
 - **ConnectWise Manage doesn't load** – The same Chrome user agent goes to `*.myconnectwise.net` and to the [Custom URL](plugins/connectwise-manage.md#settings) host. Check that the ConnectWise Manage plugin is installed and enabled in Settings → Plugins.
 - **Signed out every time** – Sign-ins are kept in the browser profile in the [data folder](data-files.md#browser-profile-data). Cleanup tools that clear `Cookies` sign you out.
 - **Passkey sign-in doesn't offer Touch ID on macOS** – Touch ID passkeys need a signed build, which the macOS build doesn't have yet. USB security keys still work. On Windows, passkeys go through Windows Hello: check it's set up under Windows Settings → Accounts → Sign-in options.
+- **Copilot sign-in fails with error 53000 ("device is required to be managed")** – Your company only allows sign-in from a managed PC. On Windows with MSP++ 0.8.6 or later, check **Use Windows Device Sign-On** is on in [AI Features settings](plugins/ai-features.md#settings), then **Sign out** and **Open and sign in** again. It only works on a PC registered with your company's Microsoft Entra ID. See [Windows device sign-on](plugins/ai-providers.md#copilot-website).
 - **A site says the microphone, camera or location is blocked** – You chose **Block** for that site earlier. Click **Forget Saved Answers** under [Settings → General → Site Permissions](settings.md#site-permissions) and reload the page.
 
 ## Notes and sync

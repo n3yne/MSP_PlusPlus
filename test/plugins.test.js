@@ -331,6 +331,8 @@ describe("ai-features Copilot website settings", () => {
     expect(validateAi({ aiWebUrl: "http://chat.example.com/" })).toBe(false);
     expect(validateAi({ aiWebUrl: "x".repeat(501) })).toBe(false);
     expect(validateAi({ aiWebAutoSend: "yes" })).toBe(false);
+    expect(validateAi({ aiWebDeviceSso: "on" })).toBe(false);
+    expect(validateAi({ aiWebDeviceSso: false })).toBe(true);
   });
 });
 

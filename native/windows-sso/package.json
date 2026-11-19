@@ -1,0 +1,9 @@
+{
+  "name": "msp-windows-sso",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MSP++ Windows device sign-on: a small Node-API addon over Windows' IProofOfPossessionCookieInfoManager",
+  "main": "index.js",
+  "gypfile": true,
+  "license": "MIT"
+}

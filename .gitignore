@@ -27,3 +27,4 @@ icon-raw.png
 .claude/settings.local.json
 dist-plugins/
 native/windows-hello/build/
+native/windows-sso/build/

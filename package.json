@@ -1,6 +1,6 @@
 {
   "name": "msp-pp",
-  "version": "0.8.5",
+  "version": "0.8.6",
   "description": "MSP++: a wrapper for MSP and ticketing sites with a plugin side panel and ticket note backup",
   "main": "main.js",
   "scripts": {
@@ -37,7 +37,8 @@
     "appId": "com.n3yne.freshservicepp",
     "productName": "MSP++",
     "asarUnpack": [
-      "native/windows-hello/build/Release/*.node"
+      "native/windows-hello/build/Release/*.node",
+      "native/windows-sso/build/Release/*.node"
     ],
     "files": [
       "main.js",
@@ -65,6 +66,10 @@
       "native/windows-hello/index.js",
       "native/windows-hello/package.json",
       "native/windows-hello/build/Release/*.node",
+      "windows-sso.js",
+      "native/windows-sso/index.js",
+      "native/windows-sso/package.json",
+      "native/windows-sso/build/Release/*.node",
       "plugin-manager.js",
       "plugin-directory.js",
       "plugin-package.js",

@@ -92,6 +92,17 @@
       "  </div>" +
       '  <span id="ai-plugin-web-status" class="settings-description"></span>' +
       "</div>" +
+      // Windows device sign-on: only on an MSP++ that has it (0.8.6+ on Windows)
+      '<div class="settings-field settings-field-column" data-ai-providers="copilotweb" id="ai-plugin-web-sso-row">' +
+      '  <label class="settings-toggle">' +
+      '    <input type="checkbox" id="ai-plugin-web-sso" />' +
+      '    <span class="settings-toggle-slider"></span>' +
+      '    <span class="settings-toggle-label">Use Windows Device Sign-On</span>' +
+      "  </label>" +
+      '  <p class="settings-description">Signs in to Microsoft the way Edge does: Windows vouches that this PC is registered with ' +
+      "your organisation, so sign-in rules that require a compliant device let you in. The proof only goes to Microsoft&#39;s sign-in page.</p>" +
+      '  <p class="settings-description" id="ai-plugin-web-sso-state"></p>' +
+      "</div>" +
       '<div class="settings-field settings-field-column" data-ai-providers="copilotweb">' +
       '  <label class="settings-toggle">' +
       '    <input type="checkbox" id="ai-plugin-web-auto" />' +
@@ -138,6 +149,10 @@
     const elWebSignOut = panel.querySelector("#ai-plugin-web-signout");
     const elWebStatus  = panel.querySelector("#ai-plugin-web-status");
     const elWebAuto    = panel.querySelector("#ai-plugin-web-auto");
+    const elWebSso     = panel.querySelector("#ai-plugin-web-sso");
+    const elWebSsoRow  = panel.querySelector("#ai-plugin-web-sso-row");
+    const elWebSsoState = panel.querySelector("#ai-plugin-web-sso-state");
+    let ssoSupported = false;
 
     // Shows only the fields that apply to the selected provider.
     function showProviderFields(provider) {
@@ -147,6 +162,7 @@
       });
       elHelp.textContent = HELP[provider] || "";
       if (provider === "copilotweb") showWebUrlRow();
+      showSsoRow();
     }
 
     function showWebUrlRow() {
@@ -277,6 +293,7 @@
       if (document.activeElement !== elWebUrl)     elWebUrl.value     = s.aiWebUrl || "";
       elWebSite.value = s.aiWebSite || "copilot-work";
       elWebAuto.checked = s.aiWebAutoSend === true;
+      elWebSso.checked = s.aiWebDeviceSso !== false;
       showWebUrlRow();
     }
 
@@ -284,6 +301,7 @@
     const initial = settingsAPI.getSettings();
     if (providerUsesModelList(initial.aiProvider || "hatz") && hasKeyFor(initial, initial.aiProvider || "hatz")) populateModelDropdown();
     refreshM365Status();
+    refreshSsoStatus();
 
     settingsAPI.onSettingsChanged(function (s) {
       applyForm(s);
@@ -336,6 +354,31 @@
     elWebSite.addEventListener("change", function () {
       showWebUrlRow();
       settingsAPI.saveSettings({ aiWebSite: elWebSite.value });
+    });
+
+    // Hides the device sign-on toggle on an MSP++ without it and says whether
+    // this PC has a proof to send.
+    async function refreshSsoStatus() {
+      let st;
+      try {
+        st = await window.backupAPI.pluginInvoke("plugin:ai-features:copilotweb-sso-status", {});
+      } catch {
+        st = null;
+      }
+      ssoSupported = !!(st && st.supported);
+      showSsoRow();
+      if (!ssoSupported) return;
+      elWebSsoState.textContent = st.available
+        ? "This PC is registered with your organisation: device sign-on is available."
+        : "No device sign-on on this PC. It needs a PC registered with your organisation (Entra ID) and Windows signed in with your work account.";
+    }
+
+    function showSsoRow() {
+      elWebSsoRow.style.display = elProvider.value === "copilotweb" && ssoSupported ? "" : "none";
+    }
+
+    elWebSso.addEventListener("change", function () {
+      settingsAPI.saveSettings({ aiWebDeviceSso: elWebSso.checked });
     });
 
     elWebAuto.addEventListener("change", function () {

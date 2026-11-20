@@ -37,6 +37,7 @@ Start with the page that matches what you want to do.
 | [Plugin development guide](plugins.md) | Writing your own plugin: the manifest and the full API |
 | [Site plugins](sites.md) | Adding support for another ticketing site |
 | [Example plugin](example-plugin/) | A small annotated plugin to copy |
+| [To-do list](../TODO.md) | Planned features and fixes, things to test, and ideas under consideration |
 
 ## How these pages fit together
 

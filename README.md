@@ -38,7 +38,7 @@ Full steps: [Getting started](docs/getting-started.md).
 | **Using MSP++** | [Getting started](docs/getting-started.md) · [The browser](docs/browser.md) · [The side panel](docs/side-panel.md) · [Settings](docs/settings.md) · [Updates and notifications](docs/updates-and-notifications.md) · [Keyboard shortcuts](docs/keyboard-shortcuts.md) · [Troubleshooting](docs/troubleshooting.md) |
 | **Plugins** | [All plugins](docs/plugins/README.md), with a page for each |
 | **Reference** | [Files and folders](docs/data-files.md) · [Building from source](docs/building.md) |
-| **Developers** | [Plugin development guide](docs/plugins.md) · [Site plugins](docs/sites.md) · [Example plugin](docs/example-plugin/) |
+| **Developers** | [Plugin development guide](docs/plugins.md) · [Site plugins](docs/sites.md) · [Example plugin](docs/example-plugin/) · [To-do list](TODO.md) |
 
 ## Build from source
 

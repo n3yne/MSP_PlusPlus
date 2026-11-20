@@ -64,6 +64,10 @@
     "hello-failed": "Windows Hello didn't work. Use your master password.",
     "hello-mismatch": "Windows Hello's key has changed, so it can't open this vault. Use your master password, then turn Windows Hello off and on again.",
     "wait": "Too many wrong tries. Wait a moment and try again.",
+    "fill-no-tab": "Open the sign-in page in a tab first.",
+    "fill-not-https": "Auto-fill only works on https:// pages.",
+    "fill-wrong-site": "That page isn't this entry's website (or it changed), so nothing was filled.",
+    "fill-no-fields": "Couldn't find a sign-in box on this page.",
   };
 
   function messageFor(res) {
@@ -72,6 +76,14 @@
       return "Too many wrong tries. Try again in " + Math.ceil(res.retryInMs / 1000) + " seconds.";
     }
     return MESSAGES[res.error] || "Something went wrong. Try again.";
+  }
+
+  function isHttps(url) {
+    try {
+      return new URL(url).protocol === "https:";
+    } catch {
+      return false;
+    }
   }
 
   function hostOf(url) {
@@ -158,6 +170,9 @@
   let pollTimer = null;
   let generatorOpen = false;
   let pendingSettings = null; // settings choices kept while the master password is asked for
+  let pageMatches = [];   // logins saved for the active tab's page
+  let pageUrl = "";       // the active tab's address when pageMatches was asked for
+  let matchBox = null;    // the "This page" box in the list view
   const genOpts = { mode: "chars", length: 20, lower: true, upper: true, digits: true, symbols: true, words: 5 };
 
   function h(tag, attrs, children) {
@@ -234,7 +249,92 @@
     if (res.ok) entries = res.entries || [];
     else if (res.error === "locked") return refresh();
     render();
+    loadMatches();
   }
+
+  // ---------- Auto-fill ----------
+
+  function activeTab() {
+    return api.browser && typeof api.browser.getActiveTab === "function" ? api.browser.getActiveTab() : null;
+  }
+  function webContentsIdOf(t) {
+    try {
+      return t && t.webview && typeof t.webview.getWebContentsId === "function" ? t.webview.getWebContentsId() : null;
+    } catch {
+      return null; // the page hasn't attached yet
+    }
+  }
+  // Tells main.js which page Ctrl+Shift+F should fill.
+  function sendActiveTab() {
+    if (typeof api.send === "function") api.send(PLUGIN_ID, "active-tab", { webContentsId: webContentsIdOf(activeTab()) });
+  }
+
+  async function loadMatches() {
+    const t = activeTab();
+    const url = t && t.url ? t.url : "";
+    if (!status || status.state !== "unlocked" || !isHttps(url)) {
+      pageUrl = url;
+      pageMatches = [];
+      renderMatches();
+      return;
+    }
+    const res = await call("matching", { url: url });
+    pageUrl = url;
+    pageMatches = res.ok ? res.matches || [] : [];
+    renderMatches();
+  }
+
+  function renderMatches() {
+    if (!matchBox) return;
+    matchBox.textContent = "";
+    const host = isHttps(pageUrl) ? hostOf(pageUrl) : "";
+    matchBox.hidden = !host;
+    if (!host) return;
+    matchBox.appendChild(h("div", { className: "pv-matches-title" }, ["This page · " + host]));
+    if (!pageMatches.length) {
+      matchBox.appendChild(h("div", { className: "pv-matches-none" }, [
+        h("span", { className: "pv-muted" }, ["No saved login for this site."]),
+        button("+ Add", function () { openEditor(null, { name: host, url: "https://" + host }); }, "pv-link", "Add a login for " + host),
+      ]));
+      return;
+    }
+    pageMatches.forEach(function (m, i) {
+      matchBox.appendChild(h("div", { className: "pv-match" }, [
+        h("div", { className: "pv-row-main" }, [
+          h("div", { className: "pv-row-name" }, [m.name]),
+          m.username ? h("div", { className: "pv-muted pv-row-sub" }, [m.username]) : null,
+        ]),
+        button("Fill", function () { fill(m.id); }, "pv-primary-small",
+          "Fill this login into the page" + (i === 0 ? " (Ctrl+Shift+F)" : "")),
+      ]));
+    });
+  }
+
+  async function fill(id) {
+    const t = activeTab();
+    const res = await call("fill", { id: id, webContentsId: webContentsIdOf(t) });
+    if (!res.ok) {
+      if (res.error === "locked") await refresh();
+      return flash(messageFor(res), "error");
+    }
+    flash(res.filled === "username"
+      ? "Username filled. Press Ctrl+Shift+F on the next page for the password."
+      : res.filled === "password" ? "Password filled." : "Filled.", "ok");
+    // Back to the page, so Enter signs in.
+    try { if (t && t.webview) t.webview.focus(); } catch { /* the tab closed */ }
+    loadMatches();
+  }
+
+  if (api.events && typeof api.events.on === "function") {
+    api.events.on("tab:activated", function () { sendActiveTab(); loadMatches(); });
+    api.events.on("tab:updated", function (t) {
+      if (!t || !t.active) return;
+      sendActiveTab();
+      if (t.url !== pageUrl) loadMatches();
+    });
+    api.events.on("tab:closed", function () { setTimeout(function () { sendActiveTab(); loadMatches(); }, 0); });
+  }
+  sendActiveTab();
 
   // Runs an action that returns a status; shows its error, if any.
   async function act(action, data, onDone) {
@@ -365,6 +465,9 @@
     wrap.appendChild(tools);
     const fl = flashEl();
     if (fl) wrap.appendChild(fl);
+    matchBox = h("div", { className: "pv-matches" });
+    wrap.appendChild(matchBox);
+    renderMatches();
     const list = h("div", { className: "pv-list", role: "list" });
     wrap.appendChild(list);
 
@@ -421,11 +524,11 @@
     else if (!res.ok) flash(messageFor(res), "error");
   }
 
-  async function openEditor(id) {
+  async function openEditor(id, prefill) {
     generatorOpen = false;
     flashMsg = null;
     if (!id) {
-      editing = { id: null, name: "", username: "", password: "", url: "", notes: "", folder: folder || "" };
+      editing = Object.assign({ id: null, name: "", username: "", password: "", url: "", match: "host", notes: "", folder: folder || "" }, prefill || {});
       view = "edit";
       render();
       return;
@@ -450,6 +553,10 @@
     const user = h("input", { className: "pv-input", value: e.username, maxlength: "500", autocomplete: "off", spellcheck: "false" });
     const pw = h("input", { type: "password", className: "pv-input pv-mono", value: e.password, maxlength: "1000", autocomplete: "off", spellcheck: "false" });
     const url = h("input", { className: "pv-input", value: e.url, maxlength: "2048", placeholder: "https://", spellcheck: "false" });
+    const sub = h("input", { type: "checkbox", checked: e.match === "domain" });
+    const subLabel = h("label", { className: "pv-check", title: "Off: only this exact site. On: also any address that ends in this site's name, e.g. eu.example.com for example.com." }, [
+      sub, " Also auto-fill on its subdomains",
+    ]);
     const fold = h("input", { className: "pv-input", value: e.folder, maxlength: "100", list: "pv-folders", placeholder: "Optional" });
     const datalist = h("datalist", { id: "pv-folders" }, folderList(entries).map(function (f) { return h("option", { value: f }); }));
     const notes = h("textarea", { className: "pv-input pv-notes", maxlength: "10000", rows: "4" });
@@ -457,9 +564,13 @@
 
     function keep() {
       // So a re-render (generator, flash) doesn't lose what's typed.
-      Object.assign(editing, { name: name.value, username: user.value, password: pw.value, url: url.value, folder: fold.value, notes: notes.value });
+      Object.assign(editing, {
+        name: name.value, username: user.value, password: pw.value, url: url.value,
+        match: sub.checked ? "domain" : "host", folder: fold.value, notes: notes.value,
+      });
     }
     [name, user, pw, url, fold, notes].forEach(function (el) { el.addEventListener("input", keep); });
+    sub.addEventListener("change", keep);
 
     const show = button("Show", function () {
       pw.type = pw.type === "password" ? "text" : "password";
@@ -502,6 +613,7 @@
         keep();
       }) : null,
       field("Website", url),
+      subLabel,
       field("Folder", fold), datalist,
       field("Notes", notes),
       h("div", { className: "pv-actions" }, [
@@ -695,6 +807,7 @@
   }
 
   function render() {
+    matchBox = null; // renderList makes a new one
     // Keep focus in an input that is re-rendered only when nothing is typed there.
     panel.textContent = "";
     if (!status) {

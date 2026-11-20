@@ -42,6 +42,7 @@
 
 | Shortcut | Action |
 |---|---|
+| `Ctrl+Shift+F` | Fill the current page's sign-in from the [Password Vault](plugins/password-vault.md#auto-fill); again within 10 seconds for the next login for that site |
 | `Ctrl+Shift+L` | Lock the [Password Vault](plugins/password-vault.md) |
 
 Tab shortcuts work even while you're typing in a page. Plugins list their own keys on their pages, such as the list keys in [Tree Style Tabs](plugins/tree-tabs.md#using-it).

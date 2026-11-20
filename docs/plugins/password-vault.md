@@ -4,16 +4,37 @@
 
 **Category:** Security · **Side panel tab:** 🔑 Vault · **Needs:** nothing
 
-Keep passwords in an encrypted vault on this PC, opened with a master password. You need the master password every time MSP++ starts, and again after a time you choose. Windows Hello can answer those later prompts.
+Keep passwords in an encrypted vault on this PC, opened with a master password. You need the master password every time MSP++ starts, and again after a time you choose. Windows Hello can answer those later prompts. It can also fill in sign-in pages for you when you ask.
 
 ## Using it
 
 - **Set up** – Open the 🔑 Vault tab and choose a master password of at least 12 characters, typed twice. There is **no way to recover the vault** if you forget it, so pick something you'll remember (a few unrelated words work well).
 - **Unlock** – Type the master password. After 3 wrong tries in a row, each further try waits longer (2, 4, 8, 16, then 30 seconds).
-- **Add an entry** – **+ New**: name, username, password, website, folder and notes. **Generate** makes a password: 8 to 64 characters with the character types you pick, or a passphrase of 3 to 10 words.
+- **Add an entry** – **+ New**: name, username, password, website, folder and notes. The website is what auto-fill matches (see below). **Generate** makes a password: 8 to 64 characters with the character types you pick, or a passphrase of 3 to 10 words.
 - **Find one** – Type in the search box (searches name, username, website and folder), or pick a folder.
 - **Use one** – On each row, 👤 copies the username, 🔑 copies the password, and ↗ opens the website in a new tab. A copied password is cleared from the clipboard after 30 seconds, unless you've copied something else since. Click a row to edit or delete the entry.
+- **Fill a sign-in page** – See [Auto-fill](#auto-fill).
 - **Lock now** – The 🔒 button in the tab, or `Ctrl+Shift+L` from anywhere in MSP++. Locking also clears a copied password from the clipboard.
+
+### Auto-fill
+
+Auto-fill only happens when you ask for it, never just because a page loaded.
+
+- **From the Vault tab** – With a sign-in page open in the current tab, the top of the Vault tab shows **This page** with the logins saved for that site. Press **Fill** next to one. If there's none, **+ Add** starts a new entry for the site.
+- **From the keyboard** – `Ctrl+Shift+F` fills the current tab with the login for its site. If the site has more than one, it uses the one you filled last; press `Ctrl+Shift+F` again within 10 seconds for the next one. When it can't fill (the vault is locked, or there's no login for the site), a Windows notification says why.
+- **Two-step sign-ins** – On pages that ask for your email first and the password on the next page (like Microsoft's), press **Fill** or `Ctrl+Shift+F` once on each page.
+- It fills the boxes but doesn't press **Sign in**; you do that (after a fill, `Enter` usually works).
+
+**Which sites a login fills:**
+
+| Entry's website | Fills on |
+|---|---|
+| `https://service.rakedigital.com` | `service.rakedigital.com` only (`www.` is ignored) |
+| `https://rakedigital.com` with **Also auto-fill on its subdomains** ticked | `rakedigital.com` and any address ending in `.rakedigital.com` |
+
+Tick **Also auto-fill on its subdomains** in the entry only when you trust every site under that name. It's off by default, so a login for one client's `x.freshservice.com` is never offered on another client's tenant.
+
+**Safety checks:** it only fills `https://` pages, only when the page in the tab right now matches the entry's website (it checks again at the moment it fills, in case the page changed), and only in the page itself, not in frames inside it. The password goes from the vault straight into the page and never passes through the side panel. Once filled, the page can read what's in the box, just as it can when you type it, so only fill sites you trust.
 
 ### When it asks for the password again
 
@@ -27,6 +48,8 @@ Keep passwords in an encrypted vault on this PC, opened with a master password. 
 | MSP++ closes | Locked, and the key is wiped from memory |
 
 While it's asking again, the vault's key and entries are wiped from memory, not just hidden.
+
+With **Ask for the password again** set to **Immediately**, leaving the Vault tab asks again, so use **Fill** in the tab rather than `Ctrl+Shift+F`.
 
 ## Settings
 
@@ -78,7 +101,9 @@ Argon2id comes from [hash-wasm](https://github.com/Daninet/hash-wasm) (MIT, incl
 - **Malware on the PC** can read the vault while it's unlocked. No password manager can stop that; short re-prompt times and locking on sleep keep the window small.
 - **Other plugins** run with full access inside MSP++, so a harmful plugin could reach the vault. Only install plugins from the MSP++ plugin directory.
 - Decrypted text can stay in memory for a while after locking, until it's overwritten. JavaScript can't wipe it on demand.
-- It doesn't fill in sign-in forms on web pages, and there's no import from other password managers yet.
+- Auto-fill doesn't reach sign-in boxes inside frames, and some unusual sign-in pages may not be recognised. Copy the username and password with 👤 and 🔑 instead.
+- Auto-fill needs Password Vault 0.8.8.1 or later, which needs MSP++ 0.8.7 or later.
+- There's no import from other password managers yet.
 - There's no plain-text export.
 
 ## See also

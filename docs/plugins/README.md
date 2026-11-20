@@ -58,7 +58,7 @@ A site plugin teaches MSP++ about a ticketing site: how to find the ticket numbe
 
 | Plugin | What it does | Needs |
 |---|---|---|
-| [Password Vault](password-vault.md) | 🔑 Vault tab: your passwords, encrypted with a master password, with Windows Hello | – |
+| [Password Vault](password-vault.md) | 🔑 Vault tab: your passwords, encrypted with a master password, with Windows Hello and auto-fill | – |
 
 ## Installing and managing plugins
 

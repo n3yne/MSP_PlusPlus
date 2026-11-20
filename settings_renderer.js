@@ -74,6 +74,8 @@ document.addEventListener("DOMContentLoaded", function () {
     unreadTabBadges: true,
     siteTabColors: true,
     pluginAutoUpdate: false,
+    linkClickBackground: false,
+    popOutAlwaysOnTop: false,
   };
 
   // ==================== Element References ====================
@@ -82,6 +84,8 @@ document.addEventListener("DOMContentLoaded", function () {
   const settingDefaultUrl     = document.getElementById("setting-default-url");
   const settingRestoreTabs    = document.getElementById("setting-restore-tabs");
   const settingUnreadBadges   = document.getElementById("setting-unread-tab-badges");
+  const settingLinkBackground = document.getElementById("setting-link-click-background");
+  const settingPopOutOnTop    = document.getElementById("setting-pop-out-on-top");
   const settingSiteColors     = document.getElementById("setting-site-tab-colors");
   const siteColorList         = document.getElementById("site-tab-color-list");
   const settingTheme          = document.getElementById("setting-theme");
@@ -160,6 +164,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (settingPluginAutoUpd) settingPluginAutoUpd.checked = settings.pluginAutoUpdate === true;
     settingRestoreTabs.checked = settings.restoreTabs !== false;
     settingUnreadBadges.checked = settings.unreadTabBadges !== false;
+    settingLinkBackground.checked = settings.linkClickBackground === true;
+    settingPopOutOnTop.checked = settings.popOutAlwaysOnTop === true;
     settingSiteColors.checked = settings.siteTabColors !== false;
     renderSiteColorList();
     const collapsedKey = JSON.stringify(settings.pluginCategoriesCollapsed || null);
@@ -194,6 +200,16 @@ document.addEventListener("DOMContentLoaded", function () {
   settingUnreadBadges.addEventListener("change", function () {
     appSettings.unreadTabBadges = settingUnreadBadges.checked;
     saveSettings({ unreadTabBadges: appSettings.unreadTabBadges });
+  });
+
+  settingLinkBackground.addEventListener("change", function () {
+    appSettings.linkClickBackground = settingLinkBackground.checked;
+    saveSettings({ linkClickBackground: appSettings.linkClickBackground });
+  });
+
+  settingPopOutOnTop.addEventListener("change", function () {
+    appSettings.popOutAlwaysOnTop = settingPopOutOnTop.checked;
+    saveSettings({ popOutAlwaysOnTop: appSettings.popOutAlwaysOnTop });
   });
 
   settingSiteColors.addEventListener("change", function () {

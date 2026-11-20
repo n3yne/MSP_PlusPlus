@@ -1,7 +1,8 @@
 // Bookmarks Bar plugin — main window renderer
 // A row of bookmarked sites under the address bar.
 //   Left click: open in this tab (Ctrl+click: new tab, Shift+click: new window)
-//   Middle click: open in a new tab in the background
+//   Middle click: open in a new tab, in the background unless the
+//   bookmarksBarClickBackground setting is off (then it switches to the tab)
 //   Right click: Open site / in new tab / in new window / Edit / Delete
 //   Drag a bookmark along the bar to reorder it.
 // The tab menu gets "Save to Bookmarks Bar". The list is the bookmarksBarItems
@@ -188,6 +189,7 @@
 
   function open(b, where) {
     if (!b || !isWebUrl(b.url)) return;
+    if (where === "click") where = settings.bookmarksBarClickBackground === false ? "tab" : "background";
     if (where === "tab") api.browser.newTab(b.url, { activate: true });
     else if (where === "background") api.browser.newTab(b.url, { activate: false });
     else if (where === "window") api.browser.newWindow(b.url);
@@ -204,7 +206,7 @@
     if (e.target.closest(".bm-overflow")) { showOverflowMenu(); return; }
     const b = itemFromEvent(e);
     if (!b) return;
-    if (e.ctrlKey || e.metaKey) open(b, "background");
+    if (e.ctrlKey || e.metaKey) open(b, "click");
     else if (e.shiftKey) open(b, "window");
     else open(b, "current");
   });
@@ -216,7 +218,7 @@
   bar.addEventListener("auxclick", function (e) {
     if (e.button !== 1) return;
     const b = itemFromEvent(e);
-    if (b) { e.preventDefault(); open(b, "background"); }
+    if (b) { e.preventDefault(); open(b, "click"); }
   });
 
   bar.addEventListener("contextmenu", function (e) {

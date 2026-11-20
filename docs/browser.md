@@ -11,6 +11,7 @@ MSP++ is a tabbed browser built for ticketing sites. This page covers what the a
 - **Site colours** – A thin stripe along the top of each tab shows which site it's on (green for Freshservice, orange for ConnectWise Manage). Change or turn off the colours in [Settings](settings.md#tab-colours).
 - **Right-click a tab** to pin, duplicate (the copy opens next to the original), close others, reopen closed tabs, copy the URL, copy a clean ticket link, open in your default browser, or **Open in New Window**. Plugins add their own items here, such as **⏱ Start Timer for This Ticket** from [Time Tracker](plugins/time-tracker.md).
 - **New tab** – `Ctrl+T`, or double-click an empty part of the tab bar.
+- **Links in a new tab** – Middle-click or `Ctrl`+click a link on a page to open it in a new tab. MSP++ switches to the new tab; turn on **Settings → General → Middle-Click Opens Links in Background** to stay on the tab you're on instead.
 - **Reopen** – `Ctrl+Shift+T` puts the last closed tab back where it was.
 - **Refresh all** – **View → Refresh All Tabs** (`Ctrl+Alt+R`).
 - **Crashed tabs** – If a tab's page dies, the tab says so and offers to reload it instead of going blank.
@@ -41,6 +42,8 @@ A ticket number (`12345`, `CW-12345`) or an address opens straight away, as in t
 ## Open in New Window
 
 Right-click a tab and choose **Open in New Window** for a plain browser window: back, forward, reload and an address bar, with no tabs, side panel, metrics or bookmarks. It shares your sign-ins and closes when the main window closes. Links it opens go to tabs in the main window, and the ⇱ button moves its page to a tab. Right-clicking a link in a page also offers **Open Link in New Window**.
+
+To keep these windows in front of everything else (handy for a ticket you're copying from), turn on **Settings → General → Keep Pop-Out Windows on Top**. It's off by default, and changing it also applies to windows already open.
 
 ## Page zoom
 

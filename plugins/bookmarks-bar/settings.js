@@ -59,6 +59,15 @@
       "    or right-click for more. Drag bookmarks on the bar, or here, to change their order. To bookmark a page, right-click " +
       "    its tab and choose <strong>Save to Bookmarks Bar</strong>." +
       "  </p>" +
+      '  <label class="settings-toggle settings-toggle-spaced">' +
+      '    <input type="checkbox" id="plugin-bm-click-background" />' +
+      '    <span class="settings-toggle-slider"></span>' +
+      '    <span class="settings-toggle-label">Middle-click opens bookmarks in background</span>' +
+      "  </label>" +
+      '  <p class="settings-description">' +
+      "    Middle-click (or Ctrl+click) a bookmark to open it in a new tab but stay on the tab you're on. Turn it off to " +
+      "    switch to the new tab straight away. Links on pages follow <strong>General → Middle-Click Opens Links in Background</strong>." +
+      "  </p>" +
       "</div>" +
       '<div class="settings-section">' +
       '  <h3 class="settings-section-title">Bookmarks</h3>' +
@@ -73,6 +82,7 @@
       "</div>";
 
     const visibleInput = panel.querySelector("#plugin-bm-visible");
+    const clickBackgroundInput = panel.querySelector("#plugin-bm-click-background");
     const listEl = panel.querySelector("#plugin-bm-list");
     const emptyEl = panel.querySelector("#plugin-bm-empty");
     const newTitle = panel.querySelector("#plugin-bm-new-title");
@@ -299,9 +309,14 @@
       settingsAPI.saveSettings({ bookmarksBarVisible: visibleInput.checked });
     });
 
+    clickBackgroundInput.addEventListener("change", function () {
+      settingsAPI.saveSettings({ bookmarksBarClickBackground: clickBackgroundInput.checked });
+    });
+
     function populate(s) {
       if (!s) return;
       visibleInput.checked = s.bookmarksBarVisible !== false;
+      clickBackgroundInput.checked = s.bookmarksBarClickBackground !== false;
       if (Array.isArray(s.bookmarksBarItems)) {
         items = sanitize(s.bookmarksBarItems);
         // A row being edited or confirmed may have been removed elsewhere.

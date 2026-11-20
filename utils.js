@@ -40,6 +40,11 @@ const DEFAULT_SETTINGS = {
   // (applied at the next start). Off: show them in Settings > Plugins > Browse
   // and the notifications list. See plugin-directory.js.
   pluginAutoUpdate: false,
+  // Middle-click or Ctrl+click on a link in a page: true opens the new tab in the
+  // background and stays on the current tab (like Chrome). False switches to it.
+  linkClickBackground: false,
+  // Windows opened with "Open in New Window" stay above other windows.
+  popOutAlwaysOnTop: false,
 };
 
 function validateSettings(s) {
@@ -64,6 +69,8 @@ function validateSettings(s) {
   if (s.unreadTabBadges !== undefined && typeof s.unreadTabBadges !== "boolean") return false;
   if (s.siteTabColors !== undefined && typeof s.siteTabColors !== "boolean") return false;
   if (s.pluginAutoUpdate !== undefined && typeof s.pluginAutoUpdate !== "boolean") return false;
+  if (s.linkClickBackground !== undefined && typeof s.linkClickBackground !== "boolean") return false;
+  if (s.popOutAlwaysOnTop !== undefined && typeof s.popOutAlwaysOnTop !== "boolean") return false;
   if (!SiteColors.validOverrides(s.siteTabColorOverrides)) return false;
   if (s.dismissedReleaseVersion !== undefined && (typeof s.dismissedReleaseVersion !== "string" || s.dismissedReleaseVersion.length > 20)) return false;
   return true;

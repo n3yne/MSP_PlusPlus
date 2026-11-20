@@ -121,3 +121,17 @@
 }
 .pv-ok { color: var(--success); border-color: var(--success); }
 .pv-error { color: var(--warning); border-color: var(--warning); }
+
+/* "This page": logins for the active tab's site, with Fill buttons */
+.pv-matches {
+  margin: 0 12px 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-hover);
+}
+.pv-matches[hidden] { display: none; }
+.pv-matches-title { font-size: 11px; font-weight: 600; color: var(--text-muted); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv-match { display: flex; align-items: center; gap: 8px; padding: 3px 0; }
+.pv-matches-none { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.btn-small.pv-link { background: none; border-color: transparent; color: var(--primary); padding-left: 4px; padding-right: 4px; }

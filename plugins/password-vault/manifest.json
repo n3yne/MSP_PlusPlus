@@ -1,12 +1,12 @@
 {
   "id": "password-vault",
   "name": "Password Vault",
-  "version": "0.8.4",
+  "version": "0.8.8.1",
   "distribution": "directory",
-  "description": "A Vault tab in the side panel for your passwords, encrypted on this PC with a master password (Argon2id and AES-256). Asks for the master password every time MSP++ starts, then again after a time you choose; Windows Hello can answer in between. Copied passwords are cleared from the clipboard.",
+  "description": "A Vault tab in the side panel for your passwords, encrypted on this PC with a master password (Argon2id and AES-256). Asks for the master password every time MSP++ starts, then again after a time you choose; Windows Hello can answer in between. Fills sign-in pages when you ask (Fill or Ctrl+Shift+F), and copied passwords are cleared from the clipboard.",
   "category": "Security",
   "main": "main.js",
   "renderer": "renderer.js",
   "settings": "settings.js",
-  "minAppVersion": "0.8.4"
+  "minAppVersion": "0.8.7"
 }

@@ -64,6 +64,7 @@ function sanitizeEntry(e, nowIso) {
     username: str(e.username, LIMITS.username),
     password: str(e.password, LIMITS.password),
     url: str(e.url, LIMITS.url).trim(),
+    match: e.match === "domain" ? "domain" : "host", // for auto-fill: this site only, or its subdomains too
     notes: str(e.notes, LIMITS.notes),
     folder: str(e.folder, LIMITS.folder).trim(),
     created: isoOr(e.created, nowIso),
@@ -419,6 +420,7 @@ class VaultSession {
       name: e.name,
       username: e.username,
       url: e.url,
+      match: e.match,
       folder: e.folder,
       hasPassword: e.password.length > 0,
       updated: e.updated,

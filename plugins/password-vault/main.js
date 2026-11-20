@@ -10,12 +10,19 @@
 //   - re-prompt timer, Windows lock or sleep: re-prompt (Windows Hello or the
 //     master password), or locked when Windows Hello is off
 //   - Lock now, Ctrl+Shift+L, closing the app: locked
+//
+// Auto-fill (vault-fill.js) only happens when asked: a Fill button in the tab
+// or Ctrl+Shift+F. The password goes from here straight into the page.
 
 const path = require("path");
 const { VaultSession, VaultError } = require("./vault-session");
 const { generate, createClipboardGuard } = require("./vault-tools");
+const Fill = require("./vault-fill");
 
 const TICK_MS = 15000;
+// The isolated world the fill script runs in (not the page's own world, 0,
+// nor Electron's preload world, 999).
+const FILL_WORLD = 4242;
 
 // Errors the tab knows how to explain. Anything else is logged and shown as "failed".
 const KNOWN_ERRORS = new Set([
@@ -23,6 +30,7 @@ const KNOWN_ERRORS = new Set([
   "password-required", "bad-entry", "too-many", "not-found", "bad-field", "bad-file", "bad-version",
   "decrypt-failed", "hello-unavailable", "hello-cancelled", "hello-not-set-up", "hello-locked-out",
   "hello-busy", "hello-failed", "hello-mismatch",
+  "fill-no-tab", "fill-wrong-site", "fill-not-https", "fill-no-fields",
 ]);
 
 function errorResult(err, log) {
@@ -45,7 +53,7 @@ function safeUrl(u) {
 module.exports = {
   init(api) {
     const electron = require("electron");
-    const { app, clipboard, powerMonitor, dialog, BrowserWindow } = electron;
+    const { app, clipboard, powerMonitor, dialog, BrowserWindow, webContents, Notification } = electron;
     // Windows Hello comes from the app (api.windowsHello, app 0.8.5+), which
     // keeps a Windows Hello key just for this plugin. Older apps: no Hello.
     const hello = api.windowsHello && process.platform === "win32" ? api.windowsHello : null;
@@ -123,6 +131,106 @@ module.exports = {
     });
     handle("generate", async (d) => ({ password: generate(d.options) }));
 
+    // ---------- Auto-fill ----------
+
+    // The page in the active browser tab, as the tab last told us.
+    let activeTabId = null;
+    api.onMessage("active-tab", (d) => {
+      const id = d && Number(d.webContentsId);
+      activeTabId = Number.isInteger(id) && id > 0 ? id : null;
+    });
+    const lastUsed = new Map(); // entry id → when it was last filled (this run only)
+    let lastShortcut = null;    // { tabId, url, ids, index, at } for cycling with Ctrl+Shift+F
+
+    // A browser tab's page. Only <webview> tabs, never MSP++'s own windows.
+    function tabContents(id) {
+      const wc = Number.isInteger(id) && id > 0 ? webContents.fromId(id) : null;
+      if (!wc || wc.isDestroyed() || wc.getType() !== "webview") throw new VaultError("fill-no-tab");
+      return wc;
+    }
+
+    function matchesFor(pageUrl) {
+      return session.listEntries().filter((e) => Fill.siteMatches(e.url, pageUrl, e.match));
+    }
+
+    async function fillInto(wc, id) {
+      const entry = session.getEntry(id);
+      const pageUrl = wc.getURL();
+      const page = Fill.parseSite(pageUrl);
+      if (page && page.protocol !== "https:") throw new VaultError("fill-not-https");
+      if (!Fill.siteMatches(entry.url, pageUrl, entry.match)) throw new VaultError("fill-wrong-site");
+      const code = Fill.buildFillScript(Fill.originOf(pageUrl), entry.username, entry.password);
+      const res = await wc.executeJavaScriptInIsolatedWorld(FILL_WORLD, [{ code }], true);
+      if (!res || res.reason === "moved") throw new VaultError("fill-wrong-site");
+      if (res.filled === "none") throw new VaultError("fill-no-fields");
+      lastUsed.set(entry.id, Date.now());
+      return { filled: res.filled, name: entry.name };
+    }
+
+    // Logins saved for a page (the tab's address), for the tab's "This page" list.
+    handle("matching", async (d) => {
+      const pageUrl = typeof d.url === "string" ? d.url : "";
+      const list = Fill.orderMatches(matchesFor(pageUrl), lastUsed);
+      return { matches: list.map((e) => ({ id: e.id, name: e.name, username: e.username })) };
+    });
+    handle("fill", async (d) => {
+      const tabId = d.webContentsId === undefined ? activeTabId : Number(d.webContentsId);
+      return fillInto(tabContents(tabId), d.id);
+    });
+
+    function tell(body) {
+      try {
+        if (Notification && Notification.isSupported()) new Notification({ title: "Password Vault", body, silent: true }).show();
+      } catch {
+        api.log("Password Vault:", body);
+      }
+    }
+
+    const SHORTCUT_MESSAGES = {
+      "locked": "The vault is locked. Unlock it in the 🔑 Vault tab, then press Ctrl+Shift+F again.",
+      "no-vault": "There's no vault yet. Set one up in the 🔑 Vault tab.",
+      "fill-no-tab": "Open the sign-in page in a tab first.",
+      "fill-not-https": "Auto-fill only works on https:// pages.",
+      "fill-wrong-site": "The page changed before it could be filled. Try again.",
+      "fill-no-fields": "Couldn't find a sign-in box on this page.",
+    };
+
+    // Ctrl+Shift+F: fills the active tab with its best match; again within
+    // 10 seconds on the same page fills the next match.
+    async function fillActiveTab() {
+      await ready;
+      try {
+        const wc = tabContents(activeTabId);
+        const pageUrl = wc.getURL();
+        const page = Fill.parseSite(pageUrl);
+        if (page && page.protocol !== "https:") throw new VaultError("fill-not-https");
+        const matches = matchesFor(pageUrl);
+        if (!matches.length) {
+          tell("No saved login for " + (page ? page.host : "this page") + ". Add one in the 🔑 Vault tab with this site as its website.");
+          return;
+        }
+        const now = Date.now();
+        let pick;
+        const ids = matches.map((e) => e.id).sort().join(",");
+        if (lastShortcut && lastShortcut.tabId === activeTabId && lastShortcut.url === pageUrl &&
+            lastShortcut.ids === ids && now - lastShortcut.at < Fill.CYCLE_MS) {
+          lastShortcut.index = (lastShortcut.index + 1) % lastShortcut.order.length;
+          pick = lastShortcut.order[lastShortcut.index];
+          lastShortcut.at = now;
+        } else {
+          const order = Fill.orderMatches(matches, lastUsed).map((e) => e.id);
+          lastShortcut = { tabId: activeTabId, url: pageUrl, ids, order, index: 0, at: now };
+          pick = order[0];
+        }
+        const res = await fillInto(wc, pick);
+        if (matches.length > 1) tell("Filled " + res.name + ". Press Ctrl+Shift+F again for the next login for this site.");
+      } catch (err) {
+        const code = err && err.code;
+        if (SHORTCUT_MESSAGES[code]) tell(SHORTCUT_MESSAGES[code]);
+        else errorResult(err, api.log);
+      }
+    }
+
     handle("save-settings", async (d) => { await session.saveSettings(d.settings, d.password); return status(); });
     handle("enable-hello", async (d) => {
       if (!helloSupported) throw new VaultError("hello-unavailable");
@@ -177,6 +285,11 @@ module.exports = {
       api.log("Password Vault: can't watch for Windows lock/sleep:", e.message);
     }
 
+    api.addMenuItem({
+      label: "Fill Login from Password Vault",
+      accelerator: "CmdOrCtrl+Shift+F",
+      click: () => { fillActiveTab(); },
+    });
     api.addMenuItem({
       label: "Lock Password Vault",
       accelerator: "CmdOrCtrl+Shift+L",

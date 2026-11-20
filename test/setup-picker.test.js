@@ -1,7 +1,7 @@
 "use strict";
 
-const SetupPicker = require("../setup-picker");
-const PluginCategories = require("../plugin-categories");
+const SetupPicker = require("../src/shared/setup-picker");
+const PluginCategories = require("../src/shared/plugin-categories");
 
 const index = [
   { id: "freshservice", name: "Freshservice", category: "Sites", site: true, status: "available", requires: [] },

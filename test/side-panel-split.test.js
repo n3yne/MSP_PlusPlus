@@ -1,5 +1,5 @@
-const S = require("../side-panel-split");
-const { DEFAULT_SETTINGS, validateSettings } = require("../utils");
+const S = require("../src/shared/side-panel-split");
+const { DEFAULT_SETTINGS, validateSettings } = require("../src/main/utils");
 
 describe("side panel split view", () => {
   test("clampSplit keeps the split in range and defaults bad values", () => {

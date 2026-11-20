@@ -6,7 +6,7 @@ const { spawn } = require("child_process");
 const path = require("path");
 
 const electronPath = require("electron");
-const appPath = path.join(__dirname, ".");
+const appPath = path.join(__dirname, "..");
 
 // Build a clean env with ELECTRON_RUN_AS_NODE fully removed
 const cleanEnv = Object.assign({}, process.env);

@@ -1,7 +1,7 @@
 "use strict";
 
 const { EventEmitter } = require("events");
-const { createUpdater, detectUpdateMode, isNewerVersion } = require("../updater");
+const { createUpdater, detectUpdateMode, isNewerVersion } = require("../src/main/updater");
 
 describe("isNewerVersion", () => {
   test("compares each part numerically", () => {

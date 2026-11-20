@@ -18,8 +18,23 @@ function isPackaged(relPath) {
   });
 }
 
-// Files that run inside the app: the listed top-level files.
+function walk(dir) {
+  const out = [];
+  for (const entry of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+    const rel = dir + "/" + entry.name;
+    if (entry.isDirectory()) out.push(...walk(rel));
+    else out.push(rel);
+  }
+  return out;
+}
+
+// Files listed by name in build.files.
 const topLevel = buildFiles.filter((f) => !f.includes("*"));
+// Files that run inside the app: the named files plus everything under a
+// "<folder>/**/*" entry (such as src/**/*).
+const appFiles = topLevel.concat(
+  ...buildFiles.filter((f) => f.endsWith("/**/*")).map((f) => walk(f.slice(0, -"/**/*".length)))
+);
 
 function localRequires(source) {
   const out = [];
@@ -50,13 +65,19 @@ describe("package.json build.files", () => {
     expect(fs.existsSync(path.join(ROOT, file))).toBe(true);
   });
 
+  test("every folder listed in build.files has files in it", () => {
+    for (const entry of buildFiles.filter((f) => f.endsWith("/**/*"))) {
+      expect(walk(entry.slice(0, -"/**/*".length)).length).toBeGreaterThan(0);
+    }
+  });
+
   test("main entry point is packaged", () => {
     expect(isPackaged(pkg.main)).toBe(true);
   });
 
   test("every local require() in a packaged file points at a packaged file", () => {
     const problems = [];
-    for (const file of topLevel.filter((f) => f.endsWith(".js"))) {
+    for (const file of appFiles.filter((f) => f.endsWith(".js"))) {
       const source = fs.readFileSync(path.join(ROOT, file), "utf8");
       for (const spec of localRequires(source)) {
         const resolved = resolveRequire(file, spec);
@@ -69,7 +90,7 @@ describe("package.json build.files", () => {
 
   test("every script, stylesheet and image an HTML page loads is packaged", () => {
     const problems = [];
-    for (const file of topLevel.filter((f) => f.endsWith(".html"))) {
+    for (const file of appFiles.filter((f) => f.endsWith(".html"))) {
       const source = fs.readFileSync(path.join(ROOT, file), "utf8");
       for (const ref of htmlRefs(source)) {
         const rel = path.relative(ROOT, path.resolve(path.dirname(path.join(ROOT, file)), ref));

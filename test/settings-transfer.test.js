@@ -9,7 +9,7 @@ const {
   pluginChanges,
   sensitiveChanges,
   defaultExportFileName,
-} = require("../settings-transfer");
+} = require("../src/main/settings-transfer");
 
 const CREDENTIALS = ["fsApiKey", "aiApiKey"].map((plain) => ({
   plain,

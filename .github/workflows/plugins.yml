@@ -18,8 +18,8 @@ on:
       - main
     paths:
       - "plugins/**"
-      - "plugin-package.js"
-      - "plugin-categories.js"
+      - "src/plugin-system/plugin-package.js"
+      - "src/shared/plugin-categories.js"
       - "scripts/build-plugin-directory.js"
       - ".github/workflows/plugins.yml"
   workflow_dispatch:

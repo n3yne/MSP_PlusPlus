@@ -7,7 +7,7 @@ const {
   cleanStoredAnswers,
   createPermissionPolicy,
   installPermissionHandlers,
-} = require("../permissions");
+} = require("../src/main/permissions");
 
 const TAB = { getType: () => "webview" };
 const APP_WINDOW = { getType: () => "window" };

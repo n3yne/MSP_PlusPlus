@@ -13,6 +13,23 @@ npm start
 
 In a development checkout every plugin in `plugins/` loads as if it came with the app, so the first-start plugin picker doesn't open. On Linux the development data folder is `~/.config/msp-pp`.
 
+## Repository layout
+
+| Folder | What's in it |
+|---|---|
+| `src/main/` | The main process: `main.js` (the app's entry point), `preload.js`, settings (`utils.js`), updates, permissions, passkeys, settings export, safe file writes, and the Windows Hello and device sign-on wrappers |
+| `src/plugin-system/` | Loading plugins (`plugin-manager.js`), the plugin directory, plugin packages, and `moved-plugins.json` |
+| `src/windows/` | The main, Settings and child windows: their HTML, `styles.css` and window scripts (`renderer.js`, `settings_renderer.js`, `child-window.js`) |
+| `src/shared/` | Scripts the windows load with a `<script>` tag that the main process or the tests also `require()`: address bar, tab shortcuts, command palette, page zoom, side panel split, site colours, plugin categories, the first-start plugin picker, ticket preview and so on |
+| `assets/` | The app icon (`icon.svg` is the source; `icon.png` and `icon.ico` are used by the app and the build) |
+| `native/` | The native Windows modules (see below) |
+| `plugins/` | Every plugin, one folder each (see the [plugin guide](plugins.md)) |
+| `scripts/` | `npm start` (`launch.js`), the native module build and checks, and the plugin directory build |
+| `test/` | The Jest tests |
+| `docs/` | These pages |
+
+Everything under `src/` goes into the packaged app (`build.files` in `package.json`).
+
 ## Lint and test
 
 ```bash

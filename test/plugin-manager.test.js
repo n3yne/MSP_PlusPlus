@@ -5,7 +5,7 @@ const os = require("os");
 const path = require("path");
 const { fileURLToPath } = require("url");
 
-const pluginManager = require("../plugin-manager");
+const pluginManager = require("../src/plugin-system/plugin-manager");
 
 // Builds a user plugin under a userData folder whose path contains characters
 // that must be percent-encoded in a file:// URL.

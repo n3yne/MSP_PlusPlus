@@ -1,6 +1,6 @@
 "use strict";
 
-const { nextZoomFactor, zoomActionForKey, zoomPercent, ZOOM_STEPS } = require("../page-zoom");
+const { nextZoomFactor, zoomActionForKey, zoomPercent, ZOOM_STEPS } = require("../src/shared/page-zoom");
 
 describe("nextZoomFactor", () => {
   test("steps through browser presets", () => {

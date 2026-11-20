@@ -2,9 +2,9 @@
   "name": "msp-pp",
   "version": "0.8.8",
   "description": "MSP++: a wrapper for MSP and ticketing sites with a plugin side panel and ticket note backup",
-  "main": "main.js",
+  "main": "src/main/main.js",
   "scripts": {
-    "start": "node launch.js",
+    "start": "node scripts/launch.js",
     "lint": "eslint .",
     "test": "jest",
     "build": "node scripts/build-native.js && electron-builder --win",
@@ -41,53 +41,21 @@
       "native/windows-sso/build/Release/*.node"
     ],
     "files": [
-      "main.js",
-      "preload.js",
-      "renderer.js",
-      "address-bar.js",
-      "page-zoom.js",
-      "side-panel-split.js",
-      "tab-shortcuts.js",
-      "command-palette.js",
-      "unread-tabs.js",
-      "site-colors.js",
-      "plugin-categories.js",
-      "ticket-preview.js",
-      "safe-html.js",
-      "settings_renderer.js",
-      "launch.js",
-      "utils.js",
-      "updater.js",
-      "webauthn.js",
-      "permissions.js",
-      "settings-transfer.js",
-      "safe-file.js",
-      "windows-hello.js",
+      "src/**/*",
+      "assets/icon.png",
       "native/windows-hello/index.js",
       "native/windows-hello/package.json",
       "native/windows-hello/build/Release/*.node",
-      "windows-sso.js",
       "native/windows-sso/index.js",
       "native/windows-sso/package.json",
-      "native/windows-sso/build/Release/*.node",
-      "plugin-manager.js",
-      "plugin-directory.js",
-      "plugin-package.js",
-      "moved-plugins.json",
-      "setup-picker.js",
-      "index.html",
-      "child-window.html",
-      "child-window.js",
-      "settings.html",
-      "styles.css",
-      "icon.png"
+      "native/windows-sso/build/Release/*.node"
     ],
     "win": {
       "target": [
         "portable",
         "nsis"
       ],
-      "icon": "icon.ico"
+      "icon": "assets/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -106,7 +74,7 @@
       "target": [
         "dmg"
       ],
-      "icon": "icon.png",
+      "icon": "assets/icon.png",
       "category": "public.app-category.business"
     },
     "publish": [

@@ -1,6 +1,6 @@
 "use strict";
 
-const { createWindowsSso, isLoginUrl, headersFromCookies } = require("../windows-sso");
+const { createWindowsSso, isLoginUrl, headersFromCookies } = require("../src/main/windows-sso");
 
 const PROOF = "eyJhbGciOiJSUzI1NiJ9.eyJyZWZyZXNoX3Rva2VuIjoieCJ9.c2ln";
 

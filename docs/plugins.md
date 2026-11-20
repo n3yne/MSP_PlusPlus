@@ -83,7 +83,7 @@ Every plugin must have a `manifest.json` at its root:
 | `name` | No | Human-readable display name. |
 | `version` | No | Plugin version: `major.minor.patch`, or `major.minor.patch.fix` for a plugin-only fix (app 0.8.7+). See [Plugin version numbers](#plugin-version-numbers). |
 | `description` | No | One-line summary. |
-| `category` | No | The group the plugin is listed under in Settings → Plugins and in the Settings nav. The built-in categories, in display order, are `Sites`, `Tickets`, `Notes & Replies`, `Time & Reminders`, `AI`, `Tabs & Toolbars` and `Security` (matched case-insensitively). Any other name (up to 40 characters) becomes its own group after those. Without one, a site plugin goes under `Sites` and anything else under `Other`. See `plugin-categories.js`. |
+| `category` | No | The group the plugin is listed under in Settings → Plugins and in the Settings nav. The built-in categories, in display order, are `Sites`, `Tickets`, `Notes & Replies`, `Time & Reminders`, `AI`, `Tabs & Toolbars` and `Security` (matched case-insensitively). Any other name (up to 40 characters) becomes its own group after those. Without one, a site plugin goes under `Sites` and anything else under `Other`. See `src/shared/plugin-categories.js`. |
 | `author` | No | Plugin author name. |
 | `main` | No | Relative path to the main-process entry file. |
 | `renderer` | No | Relative path to the main-window renderer entry file. |
@@ -844,7 +844,7 @@ In a development checkout (`npm start`) every folder here loads as a bundled plu
 - The directory is `index.json` on the `plugin-directory` release of this repo: `https://github.com/n3yne/MSP_PlusPlus/releases/download/plugin-directory/index.json`. That release is a pre-release, so the app updater (which follows the latest release) never mistakes it for an app version.
 - Each entry gives the plugin's id, name, description, category, version, `minAppVersion`, `requires` (ids of other plugins it needs; installing it installs those too), the package file name, its SHA-256 and its size in bytes. A download that doesn't match the size and SHA-256 exactly is refused before anything is unpacked. Package URLs have to stay inside the same release folder.
 - MSP++ checks the directory 30 seconds after it starts and then once a day, plus **Check Now**. Updates for installed plugins show a count on Plugins and Browse, an **Update All** button and a notification in the main window. **Install Plugin Updates Automatically** (off by default) downloads them by itself.
-- No plugin is bundled with the app any more: every plugin in `plugins/` is a directory plugin, and a new install (or an update from 0.8.0) opens the first-start plugin picker (`setup-picker.js`) whenever no site plugin is installed. In a development checkout (`npm start`) every plugin in `plugins/` still loads as bundled, so the picker doesn't open there.
+- No plugin is bundled with the app any more: every plugin in `plugins/` is a directory plugin, and a new install (or an update from 0.8.0) opens the first-start plugin picker (`src/shared/setup-picker.js`) whenever no site plugin is installed. In a development checkout (`npm start`) every plugin in `plugins/` still loads as bundled, so the picker doesn't open there.
 - If an installed plugin has the same `id` as a bundled one, the newer version loads and the other is skipped (a tie goes to the bundled copy). A fixed bundled plugin can go out through the directory before the next app release that way; removing the directory copy brings back the bundled one.
 
 Index entry example:
@@ -897,7 +897,7 @@ Rules the app and the publish workflow apply:
 
 ### Plugin packages (`.mspplugin`)
 
-A package is a zip of the plugin folder with `manifest.json` at the top (a zip of the folder itself, with everything under one top folder, also works). Files only, stored or deflated: no encryption, no zip64, no links, no paths with `..`, at most 5 MB packed and 20 MB unpacked. `plugin-package.js` reads and writes them; `packFolder(dir)` builds one from a folder, with the same bytes every time for the same files.
+A package is a zip of the plugin folder with `manifest.json` at the top (a zip of the folder itself, with everything under one top folder, also works). Files only, stored or deflated: no encryption, no zip64, no links, no paths with `..`, at most 5 MB packed and 20 MB unpacked. `src/plugin-system/plugin-package.js` reads and writes them; `packFolder(dir)` builds one from a folder, with the same bytes every time for the same files.
 
 ### Importing a plugin yourself
 

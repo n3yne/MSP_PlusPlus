@@ -5,7 +5,7 @@ const os = require("os");
 const path = require("path");
 const zlib = require("zlib");
 
-const PluginPackage = require("../plugin-package");
+const PluginPackage = require("../src/plugin-system/plugin-package");
 
 const manifest = { id: "pkg-test", name: "Package test", version: "1.2.3", main: "main.js" };
 

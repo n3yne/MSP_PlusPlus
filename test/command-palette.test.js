@@ -1,6 +1,6 @@
 "use strict";
 
-const { matchScore, scoreItem, rankItems, sanitizeCommand } = require("../command-palette");
+const { matchScore, scoreItem, rankItems, sanitizeCommand } = require("../src/shared/command-palette");
 
 const run = () => {};
 const item = (title, extra = {}) => Object.assign({ id: title, title, run }, extra);

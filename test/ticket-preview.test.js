@@ -3,7 +3,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const TP = require("../ticket-preview");
+const TP = require("../src/shared/ticket-preview");
 const fsApi = require("../plugins/freshservice/main");
 const tsMain = require("../plugins/ticket-search/main");
 const rtMain = require("../plugins/recent-tickets/main");

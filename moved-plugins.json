@@ -51,7 +51,8 @@
       "onByDefault": true,
       "settings": {
         "bookmarksBarVisible": true,
-        "bookmarksBarItems": []
+        "bookmarksBarItems": [],
+        "bookmarksBarClickBackground": true
       }
     },
     {

@@ -28,10 +28,14 @@ module.exports = {
   defaultSettings: {
     bookmarksBarVisible: true,
     bookmarksBarItems: [],
+    // Middle-click / Ctrl+click on a bookmark: open the tab in the background.
+    // False switches to the new tab.
+    bookmarksBarClickBackground: true,
   },
 
   validateSettings: function (s) {
     if (s.bookmarksBarVisible !== undefined && typeof s.bookmarksBarVisible !== "boolean") return false;
+    if (s.bookmarksBarClickBackground !== undefined && typeof s.bookmarksBarClickBackground !== "boolean") return false;
     if (s.bookmarksBarItems !== undefined) {
       if (!Array.isArray(s.bookmarksBarItems) || s.bookmarksBarItems.length > MAX_BOOKMARKS) return false;
       const ids = new Set();

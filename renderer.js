@@ -2376,7 +2376,10 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 
   // openerWebContentsId: the page that opened the link, when it was a tab's page.
-  window.backupAPI.onOpenInNewTab(function (url, openerWebContentsId) {
+  // background: the link was middle-clicked or Ctrl+clicked. Those open behind
+  // the current tab only with Settings > General > "Middle-Click Opens Links in
+  // Background"; by default every new tab is switched to.
+  window.backupAPI.onOpenInNewTab(function (url, openerWebContentsId, background) {
     console.log("[Tab] Opening in new tab:", url);
     let openerTabId = null;
     if (openerWebContentsId) {
@@ -2386,7 +2389,8 @@ document.addEventListener("DOMContentLoaded", function () {
         } catch { /* webview may not be ready */ }
       }
     }
-    createTab(url, { activate: true, openerTabId: openerTabId });
+    const stayHere = background === true && appSettings.linkClickBackground === true && tabs.length > 0;
+    createTab(url, { activate: !stayHere, openerTabId: openerTabId });
   });
 
   window.backupAPI.onWebviewClose(function (webContentsId) {

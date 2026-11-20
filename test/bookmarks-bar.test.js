@@ -16,6 +16,12 @@ describe("bookmarks-bar validateSettings", () => {
     expect(validateSettings({ bookmarksBarVisible: "no" })).toBe(false);
   });
 
+  test("bookmarksBarClickBackground defaults on and must be a boolean", () => {
+    expect(defaultSettings.bookmarksBarClickBackground).toBe(true);
+    expect(validateSettings({ bookmarksBarClickBackground: false })).toBe(true);
+    expect(validateSettings({ bookmarksBarClickBackground: "no" })).toBe(false);
+  });
+
   test("accepts web bookmarks, with or without a name", () => {
     expect(validateSettings({ bookmarksBarItems: [ok(), ok({ id: "bm-2", title: "", url: "http://localhost:3000/x" })] })).toBe(true);
   });

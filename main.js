@@ -383,7 +383,7 @@ function setupGuestContents(hostWin, webviewContents) {
     hostWin.webContents.send("page-zoom", { webContentsId: webviewContents.id, action: direction });
   });
 
-  webviewContents.setWindowOpenHandler(({ url }) => {
+  webviewContents.setWindowOpenHandler(({ url, disposition }) => {
     // Identity-provider popups and auth-path popups on a site's hosts open as real windows so the
     // window.opener / postMessage login handshake works. Everything else goes
     // to a new tab. The console log below shows the exact URL and disposition
@@ -431,9 +431,11 @@ function setupGuestContents(hostWin, webviewContents) {
       // Ignore malformed URLs
     }
 
-    // Normal links: open in a new tab instead (web pages only — no file: or other schemes)
+    // Normal links: open in a new tab instead (web pages only — no file: or other schemes).
+    // Middle-click and Ctrl+click arrive as "background-tab"; the renderer decides
+    // whether to switch to the tab (linkClickBackground setting).
     if (isWebUrl(url)) {
-      openInMainTab(url, hostWin === mainWindow ? webviewContents.id : null);
+      openInMainTab(url, hostWin === mainWindow ? webviewContents.id : null, disposition === "background-tab");
     } else {
       console.warn("[Popup] Blocked non-web URL:", url);
     }
@@ -625,12 +627,29 @@ const CHILD_WINDOW_MAX = 20;
 // has gone (a child window's popups and links normally open as tabs, like a browser).
 // openerId is the webContents id of the tab page that opened the link, if any,
 // so plugins (Tree Style Tabs) can nest the new tab under it.
-function openInMainTab(url, openerId) {
+// background: the link was middle-clicked or Ctrl+clicked, so the tab may open
+// without switching to it (the renderer checks the linkClickBackground setting).
+function openInMainTab(url, openerId, background) {
   if (!isWebUrl(url)) return;
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.webContents.send("open-in-new-tab", url, typeof openerId === "number" ? openerId : null);
+    mainWindow.webContents.send("open-in-new-tab", url, typeof openerId === "number" ? openerId : null, background === true);
   } else {
     createChildBrowserWindow(url);
+  }
+}
+
+// Settings > General > "Keep Pop-Out Windows on Top". Kept here because
+// createChildBrowserWindow is synchronous; applyCoreWindowSettings updates it.
+let popOutAlwaysOnTop = false;
+
+// Called whenever the settings change (and at startup) to apply core settings
+// that main.js acts on itself.
+function applyCoreWindowSettings(settings) {
+  const onTop = Boolean(settings && settings.popOutAlwaysOnTop === true);
+  if (onTop === popOutAlwaysOnTop) return;
+  popOutAlwaysOnTop = onTop;
+  for (const win of childWindows) {
+    if (!win.isDestroyed()) win.setAlwaysOnTop(onTop);
   }
 }
 
@@ -660,6 +679,7 @@ function createChildBrowserWindow(url) {
     width,
     height,
     ...(x !== undefined && y !== undefined ? { x, y } : {}),
+    alwaysOnTop: popOutAlwaysOnTop,
     minWidth: 400,
     minHeight: 300,
     title: "MSP++",
@@ -988,6 +1008,7 @@ async function forgetPluginCredentials(id) {
     if (!(await saveSettings(raw))) return;
     const settings = applySettingsDefaults(raw);
     pluginManager.updateSettings(settings);
+    applyCoreWindowSettings(settings);
     const publicSettings = toPublicSettings(settings);
     pluginManager.fireEvent("settings:changed", publicSettings);
     electron.BrowserWindow.getAllWindows().forEach((win) => {
@@ -1217,6 +1238,7 @@ function registerIpcHandlers() {
     // Plugins get the new settings before the event, so one that calls
     // getSettings() in its handler sees them.
     pluginManager.updateSettings(toSave);
+    applyCoreWindowSettings(toSave);
     pluginManager.fireEvent("settings:changed", publicMerged);
     const sender = electron.BrowserWindow.fromWebContents(event.sender);
     electron.BrowserWindow.getAllWindows().forEach((win) => {
@@ -1331,6 +1353,7 @@ function registerIpcHandlers() {
 
       const publicSettings = toPublicSettings(toSave);
       pluginManager.updateSettings(toSave);
+      applyCoreWindowSettings(toSave);
       pluginManager.fireEvent("settings:changed", publicSettings);
       electron.BrowserWindow.getAllWindows().forEach((win) => {
         if (!win.isDestroyed()) win.webContents.send("settings-changed", publicSettings);
@@ -1774,6 +1797,7 @@ electron.app.whenReady().then(async () => {
 
   const initialSettings = applySettingsDefaults(effectiveRaw);
   pluginManager.updateSettings(initialSettings);
+  applyCoreWindowSettings(initialSettings);
 
   installSiteUserAgent();
   pluginManager.setSiteHostsListener(installSiteUserAgent);

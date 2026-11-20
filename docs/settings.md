@@ -12,6 +12,8 @@ The left-hand list has **General** and **Plugins**, with a tab for every install
 |---|---|
 | **Home URL** | The page new tabs open. Starts as the Freshservice sign-in page when the Freshservice plugin is installed. |
 | **Restore Tabs from Last Session** | Reopens the tabs you had open. Off: start on the Home URL (pinned tabs still come back). |
+| **Middle-Click Opens Links in Background** | Off (default): middle-clicking or `Ctrl`+clicking a link on a page opens a new tab and switches to it. On: the new tab opens behind the one you're on, like Chrome. Bookmarks have [their own setting](plugins/bookmarks-bar.md#settings). |
+| **Keep Pop-Out Windows on Top** | Off by default. On: windows from [Open in New Window](browser.md#open-in-new-window) stay in front of other windows, including the main window. Applies to windows already open too. |
 | **Unread Badge on Tabs** | Shows a dot on a background tab whose page changed on its own. |
 | **Colour Tabs by Site** | A coloured stripe on tabs that belong to a site plugin. See [Tab colours](#tab-colours). |
 | **Light Mode** | Light theme instead of dark. |

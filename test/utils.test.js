@@ -209,6 +209,19 @@ describe("tabsToRestore", () => {
     expect(validateSettings(Object.assign({}, base, { restoreTabs: "no" }))).toBe(false);
   });
 
+  test("linkClickBackground and popOutAlwaysOnTop default off and must be booleans", () => {
+    const base = Object.assign({}, DEFAULT_SETTINGS);
+    expect(DEFAULT_SETTINGS.linkClickBackground).toBe(false);
+    expect(DEFAULT_SETTINGS.popOutAlwaysOnTop).toBe(false);
+    for (const key of ["linkClickBackground", "popOutAlwaysOnTop"]) {
+      expect(validateSettings(Object.assign({}, base, { [key]: true }))).toBe(true);
+      expect(validateSettings(Object.assign({}, base, { [key]: "yes" }))).toBe(false);
+      const without = Object.assign({}, base);
+      delete without[key];
+      expect(validateSettings(without)).toBe(true);
+    }
+  });
+
   test("unreadTabBadges defaults on and must be a boolean when present", () => {
     const base = Object.assign({}, DEFAULT_SETTINGS);
     expect(DEFAULT_SETTINGS.unreadTabBadges).toBe(true);

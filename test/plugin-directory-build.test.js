@@ -6,8 +6,8 @@ const os = require("os");
 const path = require("path");
 
 const { readPluginManifests, checkManifests, buildDirectory } = require("../scripts/build-plugin-directory");
-const PluginDirectory = require("../plugin-directory");
-const PluginPackage = require("../plugin-package");
+const PluginDirectory = require("../src/plugin-system/plugin-directory");
+const PluginPackage = require("../src/plugin-system/plugin-package");
 const pkg = require("../package.json");
 
 const quiet = { warn: () => {}, error: () => {}, log: () => {} };

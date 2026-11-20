@@ -1,6 +1,6 @@
 "use strict";
 
-const U = require("../unread-tabs");
+const U = require("../src/shared/unread-tabs");
 
 // A tab that finished its first load at time 0 and has settled.
 function settledTab(title = "Ticket #1") {

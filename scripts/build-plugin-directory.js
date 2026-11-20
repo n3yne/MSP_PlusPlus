@@ -26,9 +26,9 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
-const PluginPackage = require("../plugin-package");
-const PluginCategories = require("../plugin-categories");
-const { compareVersions } = require("../plugin-directory");
+const PluginPackage = require("../src/plugin-system/plugin-package");
+const PluginCategories = require("../src/shared/plugin-categories");
+const { compareVersions } = require("../src/plugin-system/plugin-directory");
 
 const ROOT = path.join(__dirname, "..");
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}$/;

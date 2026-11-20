@@ -5,8 +5,8 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const PluginPackage = require("../plugin-package");
-const PluginDirectory = require("../plugin-directory");
+const PluginPackage = require("../src/plugin-system/plugin-package");
+const PluginDirectory = require("../src/plugin-system/plugin-directory");
 
 const INDEX_URL = "https://example.test/releases/download/plugin-directory/index.json";
 const BASE = "https://example.test/releases/download/plugin-directory/";

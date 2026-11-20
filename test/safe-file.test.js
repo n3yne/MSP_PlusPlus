@@ -3,8 +3,8 @@
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const safeFile = require("../safe-file");
-const { repairStoredSettings, DEFAULT_SETTINGS, validateSettings } = require("../utils");
+const safeFile = require("../src/main/safe-file");
+const { repairStoredSettings, DEFAULT_SETTINGS, validateSettings } = require("../src/main/utils");
 
 let dir;
 beforeEach(() => { dir = fs.mkdtempSync(path.join(os.tmpdir(), "msppp-safe-file-")); });

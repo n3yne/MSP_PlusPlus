@@ -1,6 +1,6 @@
 const fs = require("fs");
 const path = require("path");
-const PluginCategories = require("../plugin-categories");
+const PluginCategories = require("../src/shared/plugin-categories");
 
 const { normalizeCategory, categoryOf, groupPlugins, sortPlugins, CATEGORIES, OTHER } = PluginCategories;
 const builtInNames = CATEGORIES.map((c) => c.name);

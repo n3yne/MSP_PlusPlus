@@ -1,6 +1,6 @@
 "use strict";
 
-const { parseAddress, displayAddress } = require("../address-bar");
+const { parseAddress, displayAddress } = require("../src/shared/address-bar");
 
 describe("parseAddress", () => {
   test("keeps full http and https URLs", () => {
@@ -59,7 +59,7 @@ describe("displayAddress", () => {
 });
 
 describe("ticketAddress", () => {
-  const { ticketAddress } = require("../address-bar");
+  const { ticketAddress } = require("../src/shared/address-bar");
   const fs = { id: "fs", ticketUrl: (q) => (/^\d+$/.test(q) ? "https://acme.freshservice.com/a/tickets/" + q : null) };
   const cw = {
     id: "cw",

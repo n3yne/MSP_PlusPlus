@@ -1,6 +1,6 @@
 "use strict";
 
-const C = require("../site-colors");
+const C = require("../src/shared/site-colors");
 
 describe("site tab colours", () => {
   test("normalizeColor accepts #rgb and #rrggbb only", () => {

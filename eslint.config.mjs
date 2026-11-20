@@ -6,7 +6,7 @@ export default [
 
   // Main process + Node.js files
   {
-    files: ["main.js", "preload.js", "launch.js", "utils.js", "updater.js", "webauthn.js", "permissions.js", "settings-transfer.js", "safe-file.js", "plugin-manager.js", "plugin-directory.js", "plugin-package.js", "scripts/**/*.js", "plugins/**/main.js", "plugins/ai-features/m365.js", "plugins/ai-features/copilot-web.js", "plugins/ai-features/http.js", "plugins/note-backup/legacy-import.js", "plugins/password-vault/vault-*.js", "windows-hello.js", "native/windows-hello/index.js", "windows-sso.js", "native/windows-sso/index.js"],
+    files: ["src/main/**/*.js", "src/plugin-system/**/*.js", "scripts/**/*.js", "plugins/**/main.js", "plugins/ai-features/m365.js", "plugins/ai-features/copilot-web.js", "plugins/ai-features/http.js", "plugins/note-backup/legacy-import.js", "plugins/password-vault/vault-*.js", "native/windows-hello/index.js", "native/windows-sso/index.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "commonjs",
@@ -21,7 +21,7 @@ export default [
 
   // Renderer scripts (browser — no import/export, no Node globals)
   {
-    files: ["renderer.js", "settings_renderer.js", "child-window.js", "plugins/**/renderer.js", "plugins/**/settings.js"],
+    files: ["src/windows/**/*.js", "plugins/**/renderer.js", "plugins/**/settings.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "script",
@@ -40,7 +40,7 @@ export default [
 
   // Shared by the window (script tag) and the tests (require)
   {
-    files: ["address-bar.js", "command-palette.js", "page-zoom.js", "side-panel-split.js", "safe-html.js", "tab-shortcuts.js", "unread-tabs.js", "site-colors.js", "plugin-categories.js", "setup-picker.js", "ticket-preview.js", "plugins/tree-tabs/renderer.js"],
+    files: ["src/shared/**/*.js", "plugins/tree-tabs/renderer.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "script",

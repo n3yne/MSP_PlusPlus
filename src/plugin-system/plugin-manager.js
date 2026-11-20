@@ -6,13 +6,13 @@ const fsp = fs.promises;
 const { EventEmitter } = require("events");
 const { pathToFileURL } = require("url");
 
-const { version: APP_VERSION } = require("./package.json");
-const SiteColors = require("./site-colors");
+const { version: APP_VERSION } = require("../../package.json");
+const SiteColors = require("../shared/site-colors");
 const PluginDirectory = require("./plugin-directory");
-const PluginCategories = require("./plugin-categories");
-const safeFile = require("./safe-file");
-const WindowsHello = require("./windows-hello");
-const WindowsSso = require("./windows-sso");
+const PluginCategories = require("../shared/plugin-categories");
+const safeFile = require("../main/safe-file");
+const WindowsHello = require("../main/windows-hello");
+const WindowsSso = require("../main/windows-sso");
 
 const pluginBus = new EventEmitter();
 pluginBus.setMaxListeners(100);
@@ -645,7 +645,7 @@ async function loadPlugin(pluginDir, source, ipcMain) {
 async function findPluginFolders(userData) {
   const registry = PluginDirectory.readRegistry(userData);
   const searchDirs = [
-    { dir: path.join(__dirname, "plugins"), source: () => "bundled" },
+    { dir: path.join(__dirname, "..", "..", "plugins"), source: () => "bundled" },
     {
       dir: path.join(userData, PluginDirectory.INSTALLED_DIR),
       // Only an install the registry says came from the directory counts as one;

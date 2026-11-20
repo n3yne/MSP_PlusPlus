@@ -5,12 +5,12 @@ const path = require("path");
 const fs = require("fs");
 const fsp = fs.promises;
 const { DEFAULT_SETTINGS, validateSettings, migrateCoreSettings, findLegacyUserDataDir, tabsToRestore, repairStoredSettings } = require("./utils");
-const { tabShortcutForKey } = require("./tab-shortcuts");
-const pluginManager = require("./plugin-manager");
-const PluginDirectory = require("./plugin-directory");
+const { tabShortcutForKey } = require("../shared/tab-shortcuts");
+const pluginManager = require("../plugin-system/plugin-manager");
+const PluginDirectory = require("../plugin-system/plugin-directory");
 const { installPasskeyAccountChooser } = require("./webauthn");
 const { createUpdater } = require("./updater");
-const { zoomActionForKey } = require("./page-zoom");
+const { zoomActionForKey } = require("../shared/page-zoom");
 const { createPermissionPolicy, installPermissionHandlers } = require("./permissions");
 const settingsTransfer = require("./settings-transfer");
 const safeFile = require("./safe-file");
@@ -220,7 +220,7 @@ function createWindow() {
     ...(winX !== undefined && winY !== undefined ? { x: winX, y: winY } : {}),
     show: false,
     title: "MSP++",
-    icon: path.join(__dirname, "icon.png"),
+    icon: path.join(__dirname, "..", "..", "assets", "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -249,7 +249,7 @@ function createWindow() {
   });
 
   lockDownWindow(mainWindow);
-  mainWindow.loadFile("index.html");
+  mainWindow.loadFile(path.join(__dirname, "..", "windows", "index.html"));
 
   setApplicationMenu();
 
@@ -683,7 +683,7 @@ function createChildBrowserWindow(url) {
     minWidth: 400,
     minHeight: 300,
     title: "MSP++",
-    icon: path.join(__dirname, "icon.png"),
+    icon: path.join(__dirname, "..", "..", "assets", "icon.png"),
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -709,7 +709,7 @@ function createChildBrowserWindow(url) {
   });
   childWindows.add(win);
   win.on("closed", () => { childWindows.delete(win); });
-  win.loadFile("child-window.html", { query: { url } });
+  win.loadFile(path.join(__dirname, "..", "windows", "child-window.html"), { query: { url } });
   return win;
 }
 
@@ -963,7 +963,7 @@ function createSettingsWindow(target) {
     minWidth: 600,
     minHeight: 500,
     title: "Settings",
-    icon: path.join(__dirname, "icon.png"),
+    icon: path.join(__dirname, "..", "..", "assets", "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -979,7 +979,7 @@ function createSettingsWindow(target) {
     if (isWebUrl(url)) electron.shell.openExternal(url);
     return { action: "deny" };
   });
-  settingsWindow.loadFile("settings.html", show ? { query: show } : undefined);
+  settingsWindow.loadFile(path.join(__dirname, "..", "windows", "settings.html"), show ? { query: show } : undefined);
   settingsWindow.on("closed", () => { settingsWindow = null; });
 }
 
@@ -1054,7 +1054,7 @@ async function findMovedPlugins() {
   const userData = electron.app.getPath("userData");
   const readText = (file) => fsp.readFile(file, "utf-8").catch(() => "");
   const parse = (text, fallback) => { try { return JSON.parse(text) || fallback; } catch { return fallback; } };
-  const movedFile = parse(await readText(path.join(__dirname, "moved-plugins.json")), {});
+  const movedFile = parse(await readText(path.join(__dirname, "..", "plugin-system", "moved-plugins.json")), {});
   return PluginDirectory.findMovedPlugins({
     userData,
     moved: movedFile.plugins,

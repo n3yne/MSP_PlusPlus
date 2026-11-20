@@ -1,6 +1,6 @@
 "use strict";
 
-const { DEFAULT_SETTINGS, validateSettings, migrateCoreSettings, findLegacyUserDataDir } = require("../utils");
+const { DEFAULT_SETTINGS, validateSettings, migrateCoreSettings, findLegacyUserDataDir } = require("../src/main/utils");
 const path = require("path");
 
 // ==================== validateSettings ====================
@@ -171,7 +171,7 @@ describe("findLegacyUserDataDir", () => {
 });
 
 describe("tabsToRestore", () => {
-  const { tabsToRestore } = require("../utils");
+  const { tabsToRestore } = require("../src/main/utils");
   const saved = [
     { url: "https://a.example/", pinned: true },
     { url: "https://b.example/", pinned: false },

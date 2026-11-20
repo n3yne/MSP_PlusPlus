@@ -1,7 +1,7 @@
 "use strict";
 
 const { EventEmitter } = require("events");
-const { accountLabel, chooseAccount, installPasskeyAccountChooser } = require("../webauthn");
+const { accountLabel, chooseAccount, installPasskeyAccountChooser } = require("../src/main/webauthn");
 
 const A = { credentialId: "aaa", name: "sean@example.com", displayName: "Sean" };
 const B = { credentialId: "bbb", name: "admin@example.com" };

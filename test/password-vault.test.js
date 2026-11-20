@@ -8,7 +8,7 @@ const crypto = require("crypto");
 const C = require("../plugins/password-vault/vault-crypto");
 const V = require("../plugins/password-vault/vault-session");
 const T = require("../plugins/password-vault/vault-tools");
-const H = require("../windows-hello");
+const H = require("../src/main/windows-hello");
 
 // The lightest Argon2 settings a vault file may have, so the tests stay quick.
 const FAST_KDF = { m: 19456, t: 2, p: 1 };
@@ -687,7 +687,7 @@ describe("password-vault Windows Hello through the app", () => {
   });
 
   test("plugins get api.windowsHello", () => {
-    const src = fs.readFileSync(require.resolve("../plugin-manager.js"), "utf8");
+    const src = fs.readFileSync(require.resolve("../src/plugin-system/plugin-manager.js"), "utf8");
     expect(src).toMatch(/windowsHello: WindowsHello\.getShared\(\)\.forPlugin\(pluginId\)/);
   });
 

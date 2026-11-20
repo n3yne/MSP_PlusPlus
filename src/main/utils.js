@@ -4,8 +4,8 @@
 // Contains only core app settings. Plugin-specific defaults and validators
 // live in each plugin's main.js (defaultSettings + validateSettings exports).
 
-const SiteColors = require("./site-colors");
-const SidePanelSplit = require("./side-panel-split");
+const SiteColors = require("../shared/site-colors");
+const SidePanelSplit = require("../shared/side-panel-split");
 
 const DEFAULT_SETTINGS = {
   sidePanelEnabled: true,

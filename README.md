@@ -1,4 +1,4 @@
-<p align="center"><img src="icon.svg" alt="MSP++ icon" width="128"></p>
+<p align="center"><img src="assets/icon.svg" alt="MSP++ icon" width="128"></p>
 
 # MSP++
 

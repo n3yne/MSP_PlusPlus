@@ -4,8 +4,8 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const PluginDirectory = require("../plugin-directory");
-const moved = require("../moved-plugins.json").plugins;
+const PluginDirectory = require("../src/plugin-system/plugin-directory");
+const moved = require("../src/plugin-system/moved-plugins.json").plugins;
 const { readPluginManifests } = require("../scripts/build-plugin-directory");
 
 describe("moved-plugins.json", () => {

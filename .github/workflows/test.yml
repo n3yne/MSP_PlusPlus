@@ -101,8 +101,11 @@ jobs:
           npx --yes @electron/asar@3.4.1 list dist/win-unpacked/resources/app.asar > asar-files.txt
           # Every file the build block lists must end up in the package.
           node -e '
-            const files = require("./package.json").build.files.filter(f => !f.includes("*"));
-            const packed = new Set(require("fs").readFileSync("asar-files.txt", "utf8").split(/\r?\n/).map(l => l.replace(/\\/g, "/")));
+            const fs = require("fs");
+            const walk = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(d + "/" + e.name) : [d + "/" + e.name]);
+            const listed = require("./package.json").build.files;
+            const files = listed.filter(f => !f.includes("*")).concat(...listed.filter(f => f.endsWith("/**/*")).map(f => walk(f.slice(0, -5))));
+            const packed = new Set(fs.readFileSync("asar-files.txt", "utf8").split(/\r?\n/).map(l => l.replace(/\\/g, "/")));
             const missing = files.filter(f => !packed.has("/" + f));
             if (missing.length) { console.error("Missing from app.asar: " + missing.join(", ")); process.exit(1); }
             console.log("All " + files.length + " listed files are packed.");

@@ -1,6 +1,6 @@
 "use strict";
 
-const { tabShortcutForKey, targetTabIndex } = require("../tab-shortcuts");
+const { tabShortcutForKey, targetTabIndex } = require("../src/shared/tab-shortcuts");
 
 // Electron before-input-event style input.
 const key = (k, mods = {}) => Object.assign({ key: k, control: true, shift: false, alt: false, meta: false }, mods);

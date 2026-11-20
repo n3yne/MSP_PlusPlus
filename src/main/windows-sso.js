@@ -63,7 +63,7 @@ function hasRefreshCredential(headers) {
 function createWindowsSso(options) {
   const o = options || {};
   const platform = o.platform || process.platform;
-  const load = o.loader || (() => require("./native/windows-sso"));
+  const load = o.loader || (() => require("../../native/windows-sso"));
   const fromPartition = o.fromPartition || ((name) => require("electron").session.fromPartition(name));
   const now = o.now || Date.now;
   let mod = null;

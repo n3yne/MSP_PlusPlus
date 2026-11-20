@@ -4,7 +4,8 @@
   if (!settingsAPI) return;
 
   function toggle(id, label) {
-    return '<label class="settings-toggle">' +
+    // settings-toggle-spaced: stacked toggles otherwise touch.
+    return '<label class="settings-toggle settings-toggle-spaced">' +
       '  <input type="checkbox" id="' + id + '" />' +
       '  <span class="settings-toggle-slider"></span>' +
       '  <span class="settings-toggle-label">' + label + "</span>" +

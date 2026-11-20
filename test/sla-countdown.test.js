@@ -195,7 +195,7 @@ describe("freshservice SLA handlers", () => {
     const res = await handlers["my-sla-tickets"]({});
     expect(res.error).toBeUndefined();
     const filterUrl = global.fetch.mock.calls.map((c) => c[0]).find((u) => u.includes("/tickets/filter"));
-    expect(decodeURIComponent(filterUrl)).toContain("\"agent_id:9 AND (status:<4 OR status:>5)\"");
+    expect(decodeURIComponent(filterUrl)).toContain("\"agent_id:9 AND (status:2 OR status:3 OR status:>5)\"");
     expect(decodeURIComponent(filterUrl)).not.toMatch(/NOT/i);
     expect(res.tickets.map((t) => [t.id, t.state, t.responded])).toEqual([[1, "running", true], [2, "paused", null], [3, "running", null]]);
     expect(res.accountHosts).toEqual(["acme.freshservice.com"]);
@@ -203,6 +203,38 @@ describe("freshservice SLA handlers", () => {
     expect(statsCalls()).toBe(1);
     await handlers["my-sla-tickets"]({});
     expect(statsCalls()).toBe(1); // same updated_at → cached
+  });
+
+  test("my-sla-tickets names custom open statuses, never ranges that reach Resolved or Closed, and says when it stops short", async () => {
+    global.fetch = jest.fn(async (url) => {
+      if (url.includes("/agents/me")) return jsonResponse({ agent: { id: 9 } });
+      if (url.includes("/ticket_form_fields")) {
+        return jsonResponse({ ticket_fields: [{ name: "status", choices: [
+          { id: 2, value: "Open" }, { id: 3, value: "Pending" }, { id: 4, value: "Resolved" },
+          { id: 5, value: "Closed" }, { id: 6, value: "Awaiting Vendor" }, { id: 8, value: "In Progress" },
+        ] }] });
+      }
+      if (url.includes("/tickets/filter")) {
+        const page = Number(/page=(\d+)/.exec(url)[1]);
+        const tickets = Array.from({ length: 30 }, (_, i) => ({ id: page * 100 + i, status: 2, due_by: at(60) }));
+        return jsonResponse({ tickets, total: 200 });
+      }
+      return jsonResponse({}, 404);
+    });
+    const res = await handlers["my-sla-tickets"]({});
+    const urls = global.fetch.mock.calls.map((c) => decodeURIComponent(c[0])).filter((u) => u.includes("/tickets/filter"));
+    expect(urls[0]).toContain("\"agent_id:9 AND (status:2 OR status:3 OR status:6 OR status:8 OR status:>8)\"");
+    expect(urls).toHaveLength(5);
+    expect(res.tickets).toHaveLength(150);
+    expect(res.warnings).toContain("Showing the first 150 of your 200 open tickets.");
+  });
+
+  test("slaOpenStatusQuery", () => {
+    expect(fsApi.slaOpenStatusQuery(fsApi.choicesToLabels({}))).toBe("(status:2 OR status:3 OR status:>5)");
+    expect(fsApi.slaOpenStatusQuery(fsApi.choicesToLabels({ status: [
+      { value: 2, label: "Open" }, { value: 9, label: "Closed" }, { value: 7, label: "On Hold" },
+    ] }))).toBe("(status:2 OR status:7 OR status:>9)");
+    expect(fsApi.slaOpenStatusQuery(null)).toBe("(status:2 OR status:3 OR status:>5)");
   });
 
   test("my-sla-tickets passes on a missing API key", async () => {

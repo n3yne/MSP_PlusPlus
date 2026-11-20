@@ -18,7 +18,7 @@ Freshservice has no API for dashboard widgets, so the query has to describe the 
 |---|---|
 | **Fields** | `agent_id`, `group_id`, `requester_id`, `status`, `priority`, `impact`, `urgency`, `tag`, `due_by`, `fr_due_by`, `created_at`, `updated_at` and custom fields |
 | **Statuses** | 2 Open, 3 Pending, 4 Resolved, 5 Closed. Custom statuses have higher numbers. |
-| **Operators** | `AND`, `OR`, brackets, and `:<` / `:>` for less / greater than |
+| **Operators** | `AND`, `OR`, brackets, and `:<` / `:>` for "up to" / "from". They include the number itself: `status:<3` is Open and Pending, `status:>6` is 6 and up |
 | **Quotes** | Text and dates go in single quotes: `tag:'vip'`, `updated_at:>'2026-11-01'` |
 | **Dates** | `{today}`, `{weekStart}` and `{monthStart}` are filled in for you |
 
@@ -28,11 +28,11 @@ Examples:
 |---|---|
 | My open tickets | `agent_id:123 AND status:2` |
 | My tickets resolved this week (approximate) | `agent_id:123 AND status:4 AND updated_at:>'{weekStart}'` |
-| Not resolved or closed | `agent_id:123 AND (status:<4 OR status:>5)` |
+| Not resolved or closed (with a custom status 6) | `agent_id:123 AND (status:<3 OR status:>6)` |
 
 ## Limits
 
-- There is no NOT. Use ranges instead, as in the last example.
+- There is no NOT. Use ranges instead, as in the last example, remembering that `:<` and `:>` include the number: `status:<4 OR status:>5` matches every status, Resolved and Closed too.
 - There is no "resolved on" date, so "resolved this week" can only be approximated with `updated_at`.
 - Freshservice reads a date as a whole day in UTC, so tickets from the first or last few hours of a day can count on the neighbouring day.
 - Some widget filters, such as "tickets I'm watching", can't be expressed as a query. Keep reading those from the dashboard.

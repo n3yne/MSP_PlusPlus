@@ -18,7 +18,7 @@
       '    <span class="settings-toggle-slider"></span>' +
       '    <span class="settings-toggle-label">Show a desktop alert when a reminder is due</span>' +
       "  </label>" +
-      '  <label class="settings-toggle">' +
+      '  <label class="settings-toggle settings-toggle-spaced">' +
       '    <input type="checkbox" id="plugin-fup-sound" />' +
       '    <span class="settings-toggle-slider"></span>' +
       '    <span class="settings-toggle-label">Play the notification sound</span>' +

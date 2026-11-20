@@ -1462,7 +1462,8 @@ body.settings-page {
   gap: 6px;
 }
 
-.settings-toggle-spaced {
+.settings-toggle-spaced,
+.settings-toggle + .settings-toggle {
   margin-top: 12px;
 }
 

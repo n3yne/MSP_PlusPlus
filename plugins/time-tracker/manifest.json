@@ -1,12 +1,12 @@
 {
   "id": "time-tracker",
   "name": "Time Tracker",
-  "version": "0.8.4",
+  "version": "0.8.8.1",
   "distribution": "directory",
   "description": "A Time tab in the side panel with a timer per ticket. When you're done, it logs the time as a time entry on the ticket (Freshservice, through its API) or fills in the open time entry (ConnectWise Manage), or copies it for anywhere else.",
   "category": "Time & Reminders",
   "main": "main.js",
   "renderer": "renderer.js",
   "settings": "settings.js",
-  "minAppVersion": "0.7.4"
+  "minAppVersion": "0.8.7"
 }

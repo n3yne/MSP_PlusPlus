@@ -1,12 +1,12 @@
 {
   "id": "follow-ups",
   "name": "Follow-up Reminders",
-  "version": "0.8.4",
+  "version": "0.8.8.1",
   "distribution": "directory",
   "description": "Set a follow-up reminder on a ticket (in an hour, tomorrow morning, next week or a time you pick) and get a desktop alert when it's due. Reminders are listed in a Follow-ups tab in the side panel.",
   "category": "Time & Reminders",
   "main": "main.js",
   "renderer": "renderer.js",
   "settings": "settings.js",
-  "minAppVersion": "0.7.4"
+  "minAppVersion": "0.8.7"
 }

@@ -49,13 +49,12 @@ const MAX_GROUP_PAGES = 5;
 // MAX_SLA_PAGES pages of the ticket filter; the first response time (which the
 // filter doesn't return) is read per ticket for up to MAX_SLA_STATS_LOOKUPS of
 // them, and kept until the ticket's updated_at changes.
-const MAX_SLA_PAGES = 3;
+const MAX_SLA_PAGES = 5;
 const MAX_SLA_STATS_LOOKUPS = 25;
 const SLA_STATS_CONCURRENCY = 4;
 const SLA_STATS_CACHE_MS = 30 * 60 * 1000;
-// The filter for "open": every status but Resolved (4) and Closed (5). The
-// filter has no NOT, so it is two ranges; custom statuses are 6 and up.
-const SLA_OPEN_STATUS_QUERY = "(status:<4 OR status:>5)";
+// The filter for "open" (every status but Resolved and Closed) is built from
+// the account's statuses by slaOpenStatusQuery(); the filter has no NOT.
 // Statuses whose names mean the SLA clock is normally stopped (Pending, and
 // custom ones such as "Awaiting Vendor" or "On Hold"). Freshservice's API
 // doesn't say which statuses stop the clock, so this goes by name.
@@ -827,7 +826,8 @@ module.exports = {
       if (conn.error) return conn;
       try {
         const me = Number(await currentAgentId(conn));
-        const built = buildFilterQuery("agent_id:" + me + " AND " + SLA_OPEN_STATUS_QUERY);
+        const labels = await fieldLabels(conn);
+        const built = buildFilterQuery("agent_id:" + me + " AND " + slaOpenStatusQuery(labels));
         if (built.error) return built;
         const what = Object.assign({ what: "Ticket filter" }, conn);
         const q = encodeURIComponent("\"" + built.query + "\"");
@@ -840,7 +840,6 @@ module.exports = {
           raw.push(...batch);
           if (batch.length < FILTER_PAGE_SIZE || raw.length >= total) break;
         }
-        const labels = await fieldLabels(conn);
         // Which tickets need their first response time: a response due time,
         // a running clock, and nothing cached for this version of the ticket.
         const warnings = [];
@@ -871,6 +870,9 @@ module.exports = {
         }
         if (failed) warnings.push("Couldn't check the first response on " + failed + " ticket" + (failed === 1 ? "" : "s") + ".");
         const tickets = raw.map((t) => formatTicketSla(t, labels)).filter(Boolean);
+        if (total > raw.length) {
+          warnings.push("Showing the first " + raw.length + " of your " + total + " open tickets.");
+        }
         return {
           tickets,
           total: Math.max(total, tickets.length),
@@ -924,6 +926,7 @@ module.exports = {
   formatTicketState,
   buildTicketUpdate,
   formatTicketSla,
+  slaOpenStatusQuery,
 };
 
 // What the user typed in ticket search → the parts each kind of search uses:
@@ -1381,6 +1384,23 @@ function formatTicketState(t) {
     groupId: isId(t.group_id) ? t.group_id : null,
     updatedAt: typeof t.updated_at === "string" ? t.updated_at : "",
   };
+}
+
+// The ticket filter for "not resolved or closed", e.g.
+// "(status:2 OR status:3 OR status:6 OR status:>6)". Freshservice's :< and :>
+// include the number itself (status:<4 matches Resolved too), so a range
+// like (status:<4 OR status:>5) matches every ticket, closed ones included.
+// Instead each open status from the account's form is named, plus everything
+// above the highest status known, for custom statuses the form didn't list
+// (that range can't reach 4 or 5 whichever way the operator works).
+function slaOpenStatusQuery(labels) {
+  const names = (labels && labels.status) || STATUS_LABELS;
+  const all = Object.keys(names).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+  const open = all
+    .filter((n) => n !== 4 && n !== 5 && !/^(?:resolved|closed)$/i.test(String(names[n] || "")))
+    .sort((a, b) => a - b);
+  const top = Math.max(5, ...all);
+  return "(" + open.map((n) => "status:" + n).concat("status:>" + top).join(" OR ") + ")";
 }
 
 // A ticket from the API (raw, with or without ?include=stats) → its SLA view

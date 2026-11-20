@@ -35,7 +35,7 @@ Settings only, in `settings.json`. Due times are kept in memory.
 ## Limits and known issues
 
 - Freshservice only, and tickets only (not changes, problems or releases).
-- "Your open tickets" shows up to 90 tickets (three pages from the API).
+- "Your open tickets" shows up to 150 tickets (five pages from the API), and says so when you have more.
 - **Hold** is a guess from the status name: if your SLA policy keeps counting in a status like Pending, the countdown won't show it.
 - Due times come from Freshservice, so they follow your SLA policies and business hours there.
 

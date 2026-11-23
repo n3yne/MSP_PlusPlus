@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › AI Assistant
 
-**Category:** AI · **Side panel tab:** 🤖 Assistant · **Needs:** MSP++ 0.8.7 or later, [AI Features](ai-features.md) 0.8.8.1+ and [Freshservice](freshservice.md) 0.8.8.2+ with [its API](freshservice.md#the-freshservice-api) (installed together)
+**Category:** AI · **Side panel tab:** 🤖 Assistant · **Needs:** MSP++ 0.8.7 or later, [AI Features](ai-features.md) 0.8.8+ and [Freshservice](freshservice.md) 0.8.8.2+ with [its API](freshservice.md#the-freshservice-api) (installed together)
 
 A general AI chat in the side panel that can look things up in Freshservice to answer your questions. It reads tickets, requesters, agents, groups, assets, problems, changes and Solutions articles through the Freshservice API. It can't change anything.
 

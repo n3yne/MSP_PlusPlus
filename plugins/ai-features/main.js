@@ -113,7 +113,7 @@ module.exports = {
       }
 
       if (aiProvider === "copilotweb") {
-        return copilotWeb.chat(prompt, api.getSettings());
+        return copilotWeb.chat(prompt, api.getSettings(), { chatId: aiSettings.chatId || "" });
       }
 
       if (aiProvider === "azure") {
@@ -375,7 +375,10 @@ module.exports = {
       const notReady = configError(provider, current, aiApiKey);
       if (notReady) return { error: notReady };
       try {
-        return { result: await runPrompt(prompt, { aiProvider: provider, aiModelName: current.aiModelName }, aiApiKey) };
+        // chatId: a chat website keeps one chat per caller conversation, so
+        // follow-ups with the same id continue it instead of opening new chats.
+        const chatId = typeof data.chatId === "string" && /^[\w-]{1,64}$/.test(data.chatId) ? data.chatId : "";
+        return { result: await runPrompt(prompt, { aiProvider: provider, aiModelName: current.aiModelName, chatId }, aiApiKey) };
       } catch (err) {
         return { error: err.message || String(err) };
       }

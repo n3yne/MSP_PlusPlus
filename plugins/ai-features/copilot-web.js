@@ -110,6 +110,20 @@ function normalizeSiteUrl(raw) {
   }
 }
 
+// A prompt on one line: blank lines become " | ", other line breaks spaces.
+function flattenPrompt(text) {
+  return String(text || "")
+    .replace(/\r\n?/g, "\n")
+    .replace(/[ \t]*\n[ \t]*\n\s*/g, " | ")
+    .replace(/[ \t]*\n[ \t]*/g, " ")
+    .trim();
+}
+
+// How long the prompt reads back from the message box (whitespace collapsed).
+function promptLength(text) {
+  return String(text || "").replace(/\s+/g, " ").trim().length;
+}
+
 function isHttps(url) {
   try { return new URL(url).protocol === "https:"; } catch { return false; }
 }
@@ -123,9 +137,11 @@ function isHttps(url) {
 //   "send":  clicks the Send button
 //   "selection": the text the user has selected
 //   "insert":  types `arg` into the message box from inside the page
+//   "paste":   pastes `arg` into the message box (a synthetic paste event), which
+//              keeps line breaks without the site treating them as Enter
 //   "enter":   presses Enter in the message box (sites that send on Enter)
 //   "diagnose": a summary of the page's structure (no message text) for bug reports
-/* global document, window, location, KeyboardEvent */
+/* global document, window, location, KeyboardEvent, DataTransfer, ClipboardEvent */
 function pageAction(action, sel, arg) {
   function shown(el) {
     return !!el && el.getClientRects().length > 0;
@@ -221,6 +237,26 @@ function pageAction(action, sel, arg) {
     return true;
   }
 
+  if (action === "paste") {
+    const input = firstShown(sel.input);
+    if (!input || typeof DataTransfer !== "function" || typeof ClipboardEvent !== "function") return false;
+    input.focus();
+    const isField = input.tagName === "TEXTAREA" || input.tagName === "INPUT";
+    if (isField) input.setSelectionRange(0, String(input.value).length); else document.execCommand("selectAll");
+    const data = new DataTransfer();
+    data.setData("text/plain", String(arg));
+    const evt = new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true });
+    input.dispatchEvent(evt);
+    // A plain textarea ignores a synthetic paste: put the text in the way typing does.
+    if (!evt.defaultPrevented && isField) {
+      const proto = Object.getPrototypeOf(input);
+      const desc = Object.getOwnPropertyDescriptor(proto, "value");
+      if (desc && desc.set) desc.set.call(input, String(arg)); else input.value = String(arg);
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    return true;
+  }
+
   if (action === "enter") {
     const input = firstShown(sel.input);
     if (!input) return false;
@@ -301,8 +337,9 @@ function pageScript(action, arg) {
 
 // True when `text` is just the prompt echoed back (the user's own message).
 function isPromptEcho(text, prompt) {
-  const t = String(text || "").trim();
-  const p = String(prompt || "").trim();
+  // Compare with whitespace collapsed: the prompt may have gone in pasted or flattened.
+  const t = String(text || "").replace(/\s+/g, " ").trim();
+  const p = String(prompt || "").replace(/\s+/g, " ").trim();
   if (!t || !p) return false;
   return t === p || (p.length > 40 && t.startsWith(p.slice(0, 40)));
 }
@@ -341,6 +378,7 @@ function createCopilotWeb(api, deps) {
   let win = null;
   let view = null;
   let pending = null;      // the request waiting on the window
+  let openChat = null;     // { siteUrl, chatId } of the chat in the window, for options.chatId
   let closeWatchSet = false;
 
   function chromeUserAgent() {
@@ -490,19 +528,31 @@ function createCopilotWeb(api, deps) {
   // emulation makes the page act as if its window had focus. Copilot's editor
   // (Lexical) only takes text that arrives that way; text put into the box
   // from inside the page shows up but Send ignores it.
+  // Puts the prompt in the message box. Typing a line break there counts as
+  // pressing Enter on chat sites (Copilot sends the first line on its own), so
+  // the prompt is pasted, which keeps its lines. If the site ignores the paste,
+  // the prompt is typed with its line breaks turned into spaces.
   async function typePrompt(prompt, hidden) {
     if (!(await page("focus"))) return false;
+    const want = promptLength(prompt);
     let p;
-    if (hidden && (await devtools("Input.insertText", { text: prompt }))) {
+    if (await page("paste", prompt)) {
+      await sleep(300);
+      p = await page("probe");
+      if (p && p.inputLength >= want * 0.8) return true;
+    }
+    const flat = flattenPrompt(prompt);
+    if (p && p.inputLength > 0 && !(await page("focus"))) return false; // select a partial paste so it's replaced
+    if (hidden && (await devtools("Input.insertText", { text: flat }))) {
       await sleep(300);
       p = await page("probe");
       if (p && p.inputLength > 0) return true;
     }
-    view.webContents.insertText(prompt);
+    view.webContents.insertText(flat);
     await sleep(200);
     p = await page("probe");
     if (p && p.inputLength > 0) return true;
-    await page("insert", prompt);
+    await page("insert", flat);
     await sleep(300);
     p = await page("probe");
     return !!(p && p.inputLength > 0);
@@ -647,8 +697,11 @@ function createCopilotWeb(api, deps) {
     }
   }
 
-  // Runs one prompt through the site. Resolves with the reply text.
-  async function chat(prompt, settings) {
+  // Runs one prompt through the site, in a new chat. With options.chatId (a
+  // caller's conversation id), a later request with the same id continues that
+  // chat while it's still the one open in the window, instead of opening
+  // another; any other request opens a new chat as before.
+  async function chat(prompt, settings, options) {
     const site = siteFor(settings);
     if (!site.url) throw new Error("Enter the chat site's address in Settings → AI Features.");
     if (prompt.length > site.maxPromptChars) {
@@ -673,11 +726,22 @@ function createCopilotWeb(api, deps) {
     }, autoSend ? PAGE_LOAD_TIMEOUT_MS + AUTO_REPLY_TIMEOUT_MS + 30000 : ONE_CLICK_TIMEOUT_MS);
     if (req.timer && req.timer.unref) req.timer.unref();
 
-    setBar({ mode: "working", text: "Opening a new chat…" });
+    const chatId = options && typeof options.chatId === "string" && /^[\w-]{1,64}$/.test(options.chatId) ? options.chatId : "";
+    const continuing = !!(chatId && alive() && openChat && openChat.siteUrl === site.url && openChat.chatId === chatId);
+    setBar({ mode: "working", text: continuing ? "Continuing the chat…" : "Opening a new chat…" });
     if (!autoSend) show();
 
     (async () => {
-      const ready = await loadSite(site, PAGE_LOAD_TIMEOUT_MS);
+      let ready = false;
+      if (continuing) {
+        const p = await page("probe");
+        ready = !!(p && p.hasInput);
+      }
+      if (!ready) {
+        openChat = null;
+        ready = await loadSite(site, PAGE_LOAD_TIMEOUT_MS);
+      }
+      openChat = ready && chatId ? { siteUrl: site.url, chatId } : null;
       if (pending !== req) return;
       if (ready) {
         req.base = (await page("probe")) || req.base;
@@ -761,6 +825,7 @@ function createCopilotWeb(api, deps) {
     applyDeviceSso(settings);
     ensureWindow();
     if (!pending) setBar({ mode: "idle", text: "Sign in here if asked. MSP++ keeps you signed in. Close this window when you're done." });
+    openChat = null;
     view.webContents.loadURL(site.url).catch(() => {});
     show();
     return { ok: true };
@@ -768,6 +833,7 @@ function createCopilotWeb(api, deps) {
 
   // Forgets the site's sign-in (cookies and storage of the Copilot session).
   async function signOut() {
+    openChat = null;
     finishPending(new Error("Signed out of the chat site."));
     if (win && !win.isDestroyed()) win.destroy();
     try {
@@ -790,6 +856,8 @@ module.exports = {
   replyFinished,
   pickReply,
   isPromptEcho,
+  flattenPrompt,
+  promptLength,
   SITES,
   SELECTORS,
   PARTITION,

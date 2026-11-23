@@ -910,6 +910,8 @@ module.exports = {
         domain: conn.domain,
         get: (what, pathAndQuery) => apiGet(Object.assign({}, conn, { what }), pathAndQuery),
         labels: () => fieldLabels(conn),
+        myAgentId: () => currentAgentId(conn),
+        openStatusQuery: async () => slaOpenStatusQuery(await fieldLabels(conn)),
         ticketText: async (id) => {
           const [ticketJson, conversations, labels] = await Promise.all([
             apiGet(conn, `/tickets/${id}?include=requester`),

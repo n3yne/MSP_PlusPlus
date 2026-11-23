@@ -13,7 +13,7 @@ function copilotPage(options) {
   const body = [thread];
   if (input) body.push(input);
   body.push(send);
-  const page = makePage({ url: "https://copilot.cloud.microsoft/chat", body });
+  const page = makePage({ url: "https://copilot.cloud.microsoft/chat", body, clipboard: opts.clipboard });
   page.selection.toString = () => "";
   page.input = input;
   page.thread = thread;
@@ -415,6 +415,68 @@ describe("copilot-web hands-off requests", () => {
   });
 });
 
+describe("copilot-web conversations", () => {
+  async function ask(fake, page, client, prompt, options, reply) {
+    const result = client.chat(prompt, {}, options);
+    await until(() => fake.bar() && fake.bar().mode === "waiting");
+    page.addReply(reply);
+    await client._onBarAction("use");
+    return result;
+  }
+
+  test("requests with the same chat id continue one chat; others open a new one", async () => {
+    const { page, fake, client } = setup();
+    await expect(ask(fake, page, client, "First", { chatId: "aa-1" }, "One")).resolves.toBe("One");
+    await expect(ask(fake, page, client, "Second", { chatId: "aa-1" }, "Two")).resolves.toBe("Two");
+    expect(fake.state.loads).toHaveLength(1);
+    await expect(ask(fake, page, client, "Other", { chatId: "aa-2" }, "Three")).resolves.toBe("Three");
+    expect(fake.state.loads).toHaveLength(2);
+    await expect(ask(fake, page, client, "Suggest", undefined, "Four")).resolves.toBe("Four");
+    expect(fake.state.loads).toHaveLength(3);
+    // The chat open now isn't aa-2's any more.
+    await expect(ask(fake, page, client, "Back", { chatId: "aa-2" }, "Five")).resolves.toBe("Five");
+    expect(fake.state.loads).toHaveLength(4);
+  });
+
+  test("opens a new chat when the open one has no message box", async () => {
+    const { page, fake, client } = setup();
+    await ask(fake, page, client, "First", { chatId: "aa-1" }, "One");
+    page.input.style.display = "none";
+    const result = client.chat("Second", {}, { chatId: "aa-1" });
+    await until(() => fake.state.loads.length === 2);
+    page.input.style.display = "";
+    await until(() => fake.bar() && fake.bar().mode === "waiting");
+    page.addReply("Two");
+    await client._onBarAction("use");
+    await expect(result).resolves.toBe("Two");
+  });
+});
+
+describe("copilot-web multi-line prompts", () => {
+  test("pastes the prompt so its line breaks stay and nothing is sent early", async () => {
+    const { page, fake, client } = setup();
+    const prompt = "You are an assistant.\n\nData:\nTicket #1\n\nQuestion:\nWhat next?";
+    let early = false;
+    page.input.addEventListener("keydown", (e) => { if (e.key === "Enter") early = true; });
+    const result = client.chat(prompt, {});
+    await until(() => fake.bar() && fake.bar().mode === "waiting");
+    expect(page.input.value).toBe(prompt);
+    expect(early).toBe(false);
+    page.addReply("Done.");
+    await client._onBarAction("use");
+    await expect(result).resolves.toBe("Done.");
+  });
+
+  test("flattenPrompt joins lines and marks paragraphs", () => {
+    expect(web.flattenPrompt("A\nB\n\n  C\r\nD  ")).toBe("A B | C D");
+    expect(web.promptLength(" a \n\n b ")).toBe(3);
+  });
+
+  test("a reply that repeats the prompt with other line breaks counts as an echo", () => {
+    expect(web.isPromptEcho("You are an assistant for an IT service desk agent working in Freshservice. Today", "You are an assistant for an IT service desk agent\nworking in Freshservice.")).toBe(true);
+  });
+});
+
 describe("copilot-web hands-off on a changed page", () => {
   test("types from inside the page when Electron's typing doesn't land (hidden window)", async () => {
     const { page, fake, client } = setup();
@@ -442,7 +504,7 @@ describe("copilot-web hands-off on a changed page", () => {
       sendCommand: async (method, params) => {
         sent.push(method);
         if (method === "Input.insertText") { page.input.value = params.text; editorHasText = true; }
-        if (method === "Input.dispatchKeyEvent" && params.type === "keyDown" && params.key === "Enter" && editorHasText) {
+        if (method === "Input.dispatchKeyEvent" && params.type === "keyDown" && params.key === "Enter" && (editorHasText || page.input.value)) {
           page.addReply("Answer via DevTools");
         }
       },
@@ -450,7 +512,33 @@ describe("copilot-web hands-off on a changed page", () => {
     page.sendButton.click = () => {}; // Copilot's Send ignores the click here
     await expect(result).resolves.toBe("Answer via DevTools");
     expect(sent[0]).toBe("Emulation.setFocusEmulationEnabled");
+    expect(page.input.value).toBe("Prompt");
+  });
+
+  test("types through DevTools when the page has no paste support", async () => {
+    const { page, fake, client } = setup({ clipboard: false });
+    const sent = [];
+    const result = client.chat("Line one\nLine two", { aiWebAutoSend: true });
+    await until(() => fake.state.windows[0] && fake.state.windows[0].child);
+    const wc = fake.state.windows[0].child.webContents;
+    wc.insertText = () => {};
+    let attached = false;
+    wc.debugger = {
+      isAttached: () => attached,
+      attach: () => { attached = true; },
+      sendCommand: async (method, params) => {
+        sent.push(method);
+        if (method === "Input.insertText") page.input.value = params.text;
+        if (method === "Input.dispatchKeyEvent" && params.type === "keyDown" && params.key === "Enter" && page.input.value) {
+          page.addReply("Answer via DevTools");
+        }
+      },
+    };
+    page.sendButton.click = () => {};
+    await expect(result).resolves.toBe("Answer via DevTools");
     expect(sent).toContain("Input.insertText");
+    // Typed line breaks would press Enter, so the prompt goes in on one line.
+    expect(page.input.value).toBe("Line one Line two");
   });
 
   test("presses Enter when the Send button does nothing", async () => {

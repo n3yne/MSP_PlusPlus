@@ -354,3 +354,97 @@ describe("freshservice assistant lookups", () => {
     expect(fsMain.assistantTicketHeader({})).toBe("");
   });
 });
+
+// ===== Negotiation for AIs without tool calling =====
+
+describe("ai-assistant lookup requests", () => {
+  const names = ["get_ticket", "find_requester", "filter_tickets"];
+
+  test("reads a LOOKUP line, a code block or a {lookups} object", () => {
+    expect(aa.parseLookupRequest('LOOKUP [{"tool": "get_ticket", "args": {"ticket_id": 12}}]', names))
+      .toEqual([{ tool: "get_ticket", args: { ticket_id: 12 } }]);
+    expect(aa.parseLookupRequest('I need more.\n```json\n[{"tool":"find_requester","args":{"email":"a@b.com"}},\n {"tool":"filter_tickets","args":{"query":"status:2 AND group_id:{x}"}}]\n```', names))
+      .toEqual([{ tool: "find_requester", args: { email: "a@b.com" } }, { tool: "filter_tickets", args: { query: "status:2 AND group_id:{x}" } }]);
+    expect(aa.parseLookupRequest('{"lookups": [{"tool": "get_ticket", "args": {"ticket_id": 3}}]}', names))
+      .toEqual([{ tool: "get_ticket", args: { ticket_id: 3 } }]);
+  });
+
+  test("copes with smart quotes and ignores unknown tools and answers", () => {
+    expect(aa.parseLookupRequest("LOOKUP [{“tool”: “get_ticket”, “args”: {“ticket_id”: 5}}]", names))
+      .toEqual([{ tool: "get_ticket", args: { ticket_id: 5 } }]);
+    expect(aa.parseLookupRequest('LOOKUP [{"tool": "update_ticket", "args": {"id": 1}}]', names)).toEqual([]);
+    expect(aa.parseLookupRequest("Ticket #12 is about printers. {not json}", names)).toEqual([]);
+  });
+
+  test("strips a leftover request from a final answer", () => {
+    expect(aa.stripLookupRequest('Here is what I know.\nLOOKUP [{"tool":"get_ticket","args":{}}]')).toBe("Here is what I know.");
+    expect(aa.stripLookupRequest('```json\n[{"tool":"get_ticket"}]\n```')).toBe("");
+  });
+
+  test("lists the lookups and how to ask only while lookups are left", () => {
+    const tools = [{ name: "get_ticket", description: "Read a ticket.", parameters: { type: "object", properties: { ticket_id: { type: "integer" } }, required: ["ticket_id"] } }];
+    expect(aa.describeTools(tools)).toBe("- get_ticket(ticket_id: integer): Read a ticket.");
+    const asking = aa.buildGatherPrompt("q", [], [], { tools, lookupsLeft: 4 }, 0);
+    expect(asking).toContain("LOOKUP [");
+    expect(asking).toContain("at most 4 lookups");
+    const final = aa.buildGatherPrompt("q", [], [], { tools, lookupsLeft: 0 }, 0);
+    expect(final).not.toContain("LOOKUP [");
+    expect(final).toContain("No more lookups are possible");
+  });
+});
+
+describe("ai-assistant negotiation loop", () => {
+  const tools = [{ name: "get_ticket", parameters: { type: "object", properties: {} } }, { name: "find_requester", parameters: { type: "object", properties: {} } }];
+
+  test("runs what the AI asks for, then sends the results back for an answer", async () => {
+    const prompts = [];
+    const replies = ['LOOKUP [{"tool":"find_requester","args":{"email":"bob@x.com"}}]', "Bob has 2 open tickets."];
+    const res = await aa.runNegotiation({
+      question: "how many tickets has bob@x.com got?", tools,
+      results: [{ tool: "get_ticket", args: { ticket_id: 1 }, label: "ticket #1", content: "Ticket #1" }],
+    }, {
+      complete: async (prompt) => { prompts.push(prompt); return { result: replies.shift() }; },
+      lookup: async (tool, args) => ({ label: "requester " + args.email, content: '{"requesters":[{"id":5}]}' }),
+    });
+    expect(res.text).toBe("Bob has 2 open tickets.");
+    expect(res.rounds).toBe(1);
+    expect(res.results.map((r) => r.label)).toEqual(["ticket #1", "requester bob@x.com"]);
+    expect(prompts[0]).toContain("at most 7 lookups");
+    expect(prompts[1]).toContain('<data source="requester bob@x.com">');
+  });
+
+  test("doesn't repeat a lookup and stops after the round limit", async () => {
+    const lookups = [];
+    let n = 0;
+    const res = await aa.runNegotiation({ question: "q", tools, maxRounds: 2 }, {
+      complete: async (prompt) => {
+        if (!prompt.includes("LOOKUP [")) return { result: "Final answer." };
+        return { result: 'LOOKUP [{"tool":"get_ticket","args":{"ticket_id":' + (++n) + "}}]" };
+      },
+      lookup: async (tool, args) => { lookups.push(args.ticket_id); return { label: "t", content: "x" }; },
+    });
+    expect(lookups).toEqual([1, 2]);
+    expect(res.text).toBe("Final answer.");
+
+    const again = await aa.runNegotiation({ question: "q", tools, results: [{ tool: "get_ticket", args: { ticket_id: 9 }, content: "x" }] }, {
+      complete: async () => ({ result: 'LOOKUP [{"tool":"get_ticket","args":{"ticket_id":9}}]' }),
+      lookup: async () => { throw new Error("should not run"); },
+    });
+    expect(again.text).toMatch(/more data than I can look up/);
+  });
+
+  test("caps the lookups across rounds and throws the AI's error", async () => {
+    const asked = [];
+    await aa.runNegotiation({ question: "q", tools, maxLookups: 3 }, {
+      complete: async (prompt) => (prompt.includes("LOOKUP [")
+        ? { result: "LOOKUP " + JSON.stringify([1, 2, 3, 4, 5].map((i) => ({ tool: "get_ticket", args: { ticket_id: i + asked.length } }))) }
+        : { result: "done" }),
+      lookup: async (tool, args) => { asked.push(args.ticket_id); return { content: "x" }; },
+    });
+    expect(asked).toHaveLength(3);
+    await expect(aa.runNegotiation({ question: "q", tools }, {
+      complete: async () => ({ error: "Copilot didn't reply in time." }),
+      lookup: async () => ({}),
+    })).rejects.toThrow("Copilot didn't reply in time.");
+  });
+});

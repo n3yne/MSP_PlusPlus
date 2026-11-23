@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › AI Assistant
 
-**Category:** AI · **Side panel tab:** 🤖 Assistant · **Needs:** MSP++ 0.8.7 or later, [AI Features](ai-features.md) 0.8.8+ and [Freshservice](freshservice.md) 0.8.8.2+ with [its API](freshservice.md#the-freshservice-api) (installed together)
+**Category:** AI · **Side panel tab:** 🤖 Assistant · **Needs:** MSP++ 0.8.7 or later, [AI Features](ai-features.md) 0.8.8.1+ and [Freshservice](freshservice.md) 0.8.8.3+ with [its API](freshservice.md#the-freshservice-api) (installed together)
 
 A general AI chat in the side panel that can look things up in Freshservice to answer your questions. It reads tickets, requesters, agents, groups, assets, problems, changes and Solutions articles through the Freshservice API. It can't change anything.
 
@@ -22,17 +22,18 @@ Which way it works depends on the provider chosen in [AI Features](ai-features.m
 | Provider | How lookups are chosen |
 |---|---|
 | Azure OpenAI, OpenAI, Anthropic | **The AI decides.** It asks for lookups (tool calling), the assistant runs them and sends back the results, and the AI answers. Up to 8 lookups per question. |
-| Copilot website, Microsoft 365 Copilot, Hatz AI | **The AI asks, MSP++ fetches.** The assistant first reads the open ticket and any ticket numbers (#1234, "ticket 1234", INC-1234) and email addresses in your question (for an email, also that requester's tickets from the last 90 days, and their assets when you ask about a laptop, device or asset). It sends that with the list of lookups it can run. The AI either answers, or replies with a lookup request (a `LOOKUP [...]` line), which MSP++ runs and sends back with the question. On the Copilot website that's up to 2 extra rounds; with the others, up to 3. |
+| Copilot website, Microsoft 365 Copilot, Hatz AI | **The AI asks, MSP++ fetches.** The assistant first reads the open ticket, any ticket numbers (#1234, "ticket 1234", INC-1234) and email addresses in your question, and your open tickets when you ask about "my tickets", "my queue" or what to work on next (for an email, also that requester's tickets from the last 90 days, and their assets when you ask about a laptop, device or asset). It sends that with the list of lookups it can run. The AI either answers, or replies with a lookup request (a `LOOKUP [...]` line), which MSP++ runs and sends back with the question. On the Copilot website that's up to 2 extra rounds; with the others, up to 3. |
 
 All lookups for one question, in either mode, count toward the limit of 8.
 
-**On the Copilot website, each round is a new Copilot chat.** You press **Send** in the Copilot window and then use its reply, once per round, so a question that needs more data takes two or three Sends. With **Send Automatically** turned on in AI Features, the rounds run by themselves. The status line in the Assistant tab says when Copilot is waiting for you.
+**On the Copilot website, each round is a new Copilot chat.** The request is pasted into Copilot's message box so its line breaks don't send it early. You press **Send** in the Copilot window and then use its reply, once per round, so a question that needs more data takes two or three Sends. With **Send Automatically** turned on in AI Features, the rounds run by themselves. The status line in the Assistant tab says when Copilot is waiting for you.
 
 ### What it can look up
 
 | Lookup | What it reads |
 |---|---|
 | Ticket | Subject, status, priority, requester, agent, group, dates, tags, description, replies and notes |
+| Your open tickets | The open tickets assigned to you (the agent your API key belongs to), with priority, status, due dates and escalation |
 | Ticket filter | Up to 30 tickets matching a Freshservice filter (status, priority, requester, agent, group, department, type, tag, dates), with the total count |
 | Requester | Find by email or name, or read by id: name, email, job title, phones, department and location |
 | Agent | Find by email or name |

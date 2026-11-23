@@ -12,6 +12,8 @@
 //   get(what, pathAndQuery) → parsed JSON (throws a readable Error),
 //   labels()                → { status: {2: "Open"…}, priority: {…} },
 //   ticketText(id)          → the ticket and its conversations as text,
+//   myAgentId()             → the id of the agent the API key belongs to,
+//   openStatusQuery()       → a filter for every status but Resolved and Closed,
 //   domain                  → the Freshservice host, for links,
 // }
 
@@ -57,6 +59,14 @@ const TOOLS = [
       },
       required: ["query"],
     },
+  },
+  {
+    name: "my_open_tickets",
+    description:
+      "List the open tickets (every status but Resolved and Closed) assigned to the agent using this tool, " +
+      "with priority, status, due dates and whether they're escalated, up to 30, plus the total. " +
+      "Use this for \"my tickets\", \"my queue\" or \"what should I work on next\".",
+    parameters: { type: "object", properties: {} },
   },
   {
     name: "find_requester",
@@ -224,6 +234,8 @@ function formatTicketRow(t, labels) {
     created_at: str(t.created_at),
     updated_at: str(t.updated_at),
     due_by: str(t.due_by),
+    first_response_due_by: str(t.fr_due_by),
+    escalated: t.is_escalated === true ? true : null,
   });
 }
 
@@ -404,6 +416,16 @@ async function runLookup(ctx, tool, rawArgs) {
         label: `${total} ticket${total === 1 ? "" : "s"} matching ${checked.query}`,
         data: { total, page, tickets },
       };
+    }
+
+    case "my_open_tickets": {
+      const [me, open, labels] = await Promise.all([ctx.myAgentId(), ctx.openStatusQuery(), ctx.labels()]);
+      const checked = checkFilterQuery("agent_id:" + Number(me) + " AND " + open);
+      if (checked.error) return checked;
+      const json = await ctx.get("Ticket filter", "/tickets/filter?query=" + encodeURIComponent("\"" + checked.query + "\"") + "&page=1");
+      const tickets = list(json, "tickets").map((t) => formatTicketRow(t, labels)).filter(Boolean).slice(0, MAX_LIST_RESULTS);
+      const total = typeof json.total === "number" ? json.total : tickets.length;
+      return { label: `your ${total} open ticket${total === 1 ? "" : "s"}`, data: { agent_id: Number(me), total, tickets } };
     }
 
     case "find_requester":

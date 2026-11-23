@@ -242,6 +242,8 @@ function fakeCtx(responses) {
     },
     labels: async () => ({ status: { 2: "Open", 3: "Pending", 4: "Resolved", 5: "Closed", 6: "Awaiting Vendor" }, priority: { 1: "Low", 2: "Medium", 3: "High", 4: "Urgent" } }),
     ticketText: async (id) => "Ticket #" + id + ": Printer jam",
+    myAgentId: async () => 42,
+    openStatusQuery: async () => "(status:2 OR status:3 OR status:6 OR status:>6)",
   };
 }
 
@@ -446,5 +448,28 @@ describe("ai-assistant negotiation loop", () => {
       complete: async () => ({ error: "Copilot didn't reply in time." }),
       lookup: async () => ({}),
     })).rejects.toThrow("Copilot didn't reply in time.");
+  });
+});
+
+describe("ai-assistant my tickets", () => {
+  test("spots questions about the agent's own tickets", () => {
+    for (const q of ["Please help determine which of my open tickets should be worked on next.", "what's in my queue", "tickets assigned to me", "What should I work on next?"]) {
+      expect(aa.wantsMyTickets(q)).toBe(true);
+    }
+    expect(aa.wantsMyTickets("summarise ticket #12")).toBe(false);
+    expect(aa.planGather("which of my open tickets is most urgent?", "")).toEqual([{ tool: "my_open_tickets", args: {} }]);
+  });
+
+  test("my_open_tickets filters by the key's agent and open statuses", async () => {
+    const ctx = fakeCtx([["/tickets/filter", { total: 2, tickets: [
+      { id: 7, subject: "Printer", status: 2, priority: 4, due_by: "2026-11-24T10:00:00Z", fr_due_by: "2026-11-23T12:00:00Z", is_escalated: true },
+      { id: 8, subject: "VPN", status: 6, priority: 2 },
+    ] }]]);
+    const res = await fsTools.lookup(ctx, "my_open_tickets", {});
+    expect(decodeURIComponent(ctx.calls[0])).toBe("/tickets/filter?query=\"agent_id:42 AND (status:2 OR status:3 OR status:6 OR status:>6)\"&page=1");
+    const data = JSON.parse(res.content);
+    expect(data.total).toBe(2);
+    expect(data.tickets[0]).toMatchObject({ id: 7, priority: "Urgent", first_response_due_by: "2026-11-23T12:00:00Z", escalated: true });
+    expect(res.label).toBe("your 2 open tickets");
   });
 });

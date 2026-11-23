@@ -77,6 +77,13 @@
     return out;
   }
 
+  // "my open tickets", "my queue", "assigned to me", "what should I work on next".
+  const MY_TICKETS_RE = /\b(?:my|mine)\b[^.?!]{0,40}\b(?:tickets?|queue|backlog|work ?load)\b|\bassigned to me\b|\bwork on next\b/i;
+
+  function wantsMyTickets(text) {
+    return MY_TICKETS_RE.test(String(text || ""));
+  }
+
   function wantsAssets(text) {
     return ASSET_WORDS_RE.test(String(text || ""));
   }
@@ -123,6 +130,7 @@
     if (openTicketId && !ids.includes(String(openTicketId))) ids.unshift(String(openTicketId));
     for (const id of ids.slice(0, MAX_TICKET_IDS)) steps.push({ tool: "get_ticket", args: { ticket_id: Number(id) } });
     for (const email of extractEmails(question)) steps.push({ tool: "find_requester", args: { email } });
+    if (wantsMyTickets(question)) steps.push({ tool: "my_open_tickets", args: {} });
     return steps;
   }
 
@@ -393,7 +401,7 @@
 
   const lib = {
     extractTicketIds, extractEmails, wantsAssets, formatHistory, historyToMessages, buildSystemPrompt,
-    planGather, requesterIdsFrom, followUpLookups, fitResults, buildGatherPrompt, runToolLoop, answerToHtml,
+    wantsMyTickets, planGather, requesterIdsFrom, followUpLookups, fitResults, buildGatherPrompt, runToolLoop, answerToHtml,
     describeTools, jsonObjects, parseLookupRequest, stripLookupRequest, runNegotiation,
     MAX_LOOKUPS,
   };
@@ -575,7 +583,8 @@
         fetched = result.fetched;
       } else {
         // Gather what the question names, then let the AI ask for more.
-        const first = planGather(question, openId);
+        const offered = new Set(target.tools.map((t) => t.name));
+        const first = planGather(question, openId).filter((st) => offered.has(st.tool));
         setStatus(reply, first.length ? "Looking things up…" : "Getting ready…");
         const results = [];
         for (const step of first) {
@@ -643,6 +652,7 @@
     switch (c && c.name) {
       case "get_ticket": return "ticket #" + a.ticket_id;
       case "filter_tickets": return "tickets";
+      case "my_open_tickets": return "your open tickets";
       case "find_requester": return "requester " + (a.email || a.name || "");
       case "get_requester": return "requester";
       case "find_agent": return "agent " + (a.email || a.name || "");

@@ -13,7 +13,7 @@ function copilotPage(options) {
   const body = [thread];
   if (input) body.push(input);
   body.push(send);
-  const page = makePage({ url: "https://copilot.cloud.microsoft/chat", body });
+  const page = makePage({ url: "https://copilot.cloud.microsoft/chat", body, clipboard: opts.clipboard });
   page.selection.toString = () => "";
   page.input = input;
   page.thread = thread;
@@ -415,6 +415,31 @@ describe("copilot-web hands-off requests", () => {
   });
 });
 
+describe("copilot-web multi-line prompts", () => {
+  test("pastes the prompt so its line breaks stay and nothing is sent early", async () => {
+    const { page, fake, client } = setup();
+    const prompt = "You are an assistant.\n\nData:\nTicket #1\n\nQuestion:\nWhat next?";
+    let early = false;
+    page.input.addEventListener("keydown", (e) => { if (e.key === "Enter") early = true; });
+    const result = client.chat(prompt, {});
+    await until(() => fake.bar() && fake.bar().mode === "waiting");
+    expect(page.input.value).toBe(prompt);
+    expect(early).toBe(false);
+    page.addReply("Done.");
+    await client._onBarAction("use");
+    await expect(result).resolves.toBe("Done.");
+  });
+
+  test("flattenPrompt joins lines and marks paragraphs", () => {
+    expect(web.flattenPrompt("A\nB\n\n  C\r\nD  ")).toBe("A B | C D");
+    expect(web.promptLength(" a \n\n b ")).toBe(3);
+  });
+
+  test("a reply that repeats the prompt with other line breaks counts as an echo", () => {
+    expect(web.isPromptEcho("You are an assistant for an IT service desk agent working in Freshservice. Today", "You are an assistant for an IT service desk agent\nworking in Freshservice.")).toBe(true);
+  });
+});
+
 describe("copilot-web hands-off on a changed page", () => {
   test("types from inside the page when Electron's typing doesn't land (hidden window)", async () => {
     const { page, fake, client } = setup();
@@ -442,7 +467,7 @@ describe("copilot-web hands-off on a changed page", () => {
       sendCommand: async (method, params) => {
         sent.push(method);
         if (method === "Input.insertText") { page.input.value = params.text; editorHasText = true; }
-        if (method === "Input.dispatchKeyEvent" && params.type === "keyDown" && params.key === "Enter" && editorHasText) {
+        if (method === "Input.dispatchKeyEvent" && params.type === "keyDown" && params.key === "Enter" && (editorHasText || page.input.value)) {
           page.addReply("Answer via DevTools");
         }
       },
@@ -450,7 +475,33 @@ describe("copilot-web hands-off on a changed page", () => {
     page.sendButton.click = () => {}; // Copilot's Send ignores the click here
     await expect(result).resolves.toBe("Answer via DevTools");
     expect(sent[0]).toBe("Emulation.setFocusEmulationEnabled");
+    expect(page.input.value).toBe("Prompt");
+  });
+
+  test("types through DevTools when the page has no paste support", async () => {
+    const { page, fake, client } = setup({ clipboard: false });
+    const sent = [];
+    const result = client.chat("Line one\nLine two", { aiWebAutoSend: true });
+    await until(() => fake.state.windows[0] && fake.state.windows[0].child);
+    const wc = fake.state.windows[0].child.webContents;
+    wc.insertText = () => {};
+    let attached = false;
+    wc.debugger = {
+      isAttached: () => attached,
+      attach: () => { attached = true; },
+      sendCommand: async (method, params) => {
+        sent.push(method);
+        if (method === "Input.insertText") page.input.value = params.text;
+        if (method === "Input.dispatchKeyEvent" && params.type === "keyDown" && params.key === "Enter" && page.input.value) {
+          page.addReply("Answer via DevTools");
+        }
+      },
+    };
+    page.sendButton.click = () => {};
+    await expect(result).resolves.toBe("Answer via DevTools");
     expect(sent).toContain("Input.insertText");
+    // Typed line breaks would press Enter, so the prompt goes in on one line.
+    expect(page.input.value).toBe("Line one Line two");
   });
 
   test("presses Enter when the Send button does nothing", async () => {

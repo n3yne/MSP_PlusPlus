@@ -377,7 +377,7 @@ Renderer scripts can also call other plugins' handlers, so a plugin can use the 
 
 | Call | Returns | Notes |
 |---|---|---|
-| `invoke("ai-features", "complete", { prompt })` | `{ result }` or `{ error }` | Runs `prompt` (up to 60,000 characters) with the provider and model chosen in Settings → AI Features. |
+| `invoke("ai-features", "complete", { prompt, chatId? })` | `{ result }` or `{ error }` | Runs `prompt` (up to 60,000 characters) with the provider and model chosen in Settings → AI Features. With the Copilot website, requests with the same `chatId` (letters, digits, `_`, `-`; AI Features 0.8.8.1+) continue one Copilot chat while it's still open, instead of opening a new chat each time. |
 | `invoke("ai-features", "info")` | `{ provider, singleRequest, maxPromptChars, tools }` | How to use the provider: `singleRequest` (a chat website: one request per question), the longest prompt, and `tools` (AI Features 0.8.8+: `true` when `chat-tools` works, i.e. Azure OpenAI, OpenAI or Anthropic). |
 | `invoke("ai-features", "chat-tools", { system, messages, tools, toolChoice? })` | `{ text, toolCalls }` or `{ error }` | One step of tool calling (AI Features 0.8.8+). `messages` are `{ role: "user", text }`, `{ role: "assistant", text, toolCalls }` and `{ role: "tool", id, name, content }`; `tools` are `{ name, description, parameters }` (JSON schema); `toolChoice` is `"auto"` or `"none"`. Each returned tool call is `{ id, name, arguments }`: run it yourself and send the result back as a `tool` message. |
 | `invoke("freshservice", "get-ticket", { ticketId, host })` | `{ text }` or `{ error, skipped? }` | Plain-text ticket, description and conversation. |

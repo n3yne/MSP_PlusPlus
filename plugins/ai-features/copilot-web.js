@@ -378,6 +378,7 @@ function createCopilotWeb(api, deps) {
   let win = null;
   let view = null;
   let pending = null;      // the request waiting on the window
+  let openChat = null;     // { siteUrl, chatId } of the chat in the window, for options.chatId
   let closeWatchSet = false;
 
   function chromeUserAgent() {
@@ -696,8 +697,11 @@ function createCopilotWeb(api, deps) {
     }
   }
 
-  // Runs one prompt through the site. Resolves with the reply text.
-  async function chat(prompt, settings) {
+  // Runs one prompt through the site, in a new chat. With options.chatId (a
+  // caller's conversation id), a later request with the same id continues that
+  // chat while it's still the one open in the window, instead of opening
+  // another; any other request opens a new chat as before.
+  async function chat(prompt, settings, options) {
     const site = siteFor(settings);
     if (!site.url) throw new Error("Enter the chat site's address in Settings → AI Features.");
     if (prompt.length > site.maxPromptChars) {
@@ -722,11 +726,22 @@ function createCopilotWeb(api, deps) {
     }, autoSend ? PAGE_LOAD_TIMEOUT_MS + AUTO_REPLY_TIMEOUT_MS + 30000 : ONE_CLICK_TIMEOUT_MS);
     if (req.timer && req.timer.unref) req.timer.unref();
 
-    setBar({ mode: "working", text: "Opening a new chat…" });
+    const chatId = options && typeof options.chatId === "string" && /^[\w-]{1,64}$/.test(options.chatId) ? options.chatId : "";
+    const continuing = !!(chatId && alive() && openChat && openChat.siteUrl === site.url && openChat.chatId === chatId);
+    setBar({ mode: "working", text: continuing ? "Continuing the chat…" : "Opening a new chat…" });
     if (!autoSend) show();
 
     (async () => {
-      const ready = await loadSite(site, PAGE_LOAD_TIMEOUT_MS);
+      let ready = false;
+      if (continuing) {
+        const p = await page("probe");
+        ready = !!(p && p.hasInput);
+      }
+      if (!ready) {
+        openChat = null;
+        ready = await loadSite(site, PAGE_LOAD_TIMEOUT_MS);
+      }
+      openChat = ready && chatId ? { siteUrl: site.url, chatId } : null;
       if (pending !== req) return;
       if (ready) {
         req.base = (await page("probe")) || req.base;
@@ -810,6 +825,7 @@ function createCopilotWeb(api, deps) {
     applyDeviceSso(settings);
     ensureWindow();
     if (!pending) setBar({ mode: "idle", text: "Sign in here if asked. MSP++ keeps you signed in. Close this window when you're done." });
+    openChat = null;
     view.webContents.loadURL(site.url).catch(() => {});
     show();
     return { ok: true };
@@ -817,6 +833,7 @@ function createCopilotWeb(api, deps) {
 
   // Forgets the site's sign-in (cookies and storage of the Copilot session).
   async function signOut() {
+    openChat = null;
     finishPending(new Error("Signed out of the chat site."));
     if (win && !win.isDestroyed()) win.destroy();
     try {

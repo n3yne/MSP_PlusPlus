@@ -26,7 +26,7 @@ Which way it works depends on the provider chosen in [AI Features](ai-features.m
 
 All lookups for one question, in either mode, count toward the limit of 8.
 
-**On the Copilot website, each round is a new Copilot chat.** The request is pasted into Copilot's message box so its line breaks don't send it early. You press **Send** in the Copilot window and then use its reply, once per round, so a question that needs more data takes two or three Sends. With **Send Automatically** turned on in AI Features, the rounds run by themselves. The status line in the Assistant tab says when Copilot is waiting for you.
+**On the Copilot website, one Assistant conversation is one Copilot chat.** Lookup rounds and follow-up questions continue the same chat until you click **New chat** (or another feature, such as Suggest, uses the Copilot window in between, which starts a fresh chat next time). The request is pasted into Copilot's message box so its line breaks don't send it early. You press **Send** in the Copilot window and then use its reply, once per round, so a question that needs more data takes two or three Sends. With **Send Automatically** turned on in AI Features, the rounds run by themselves. The status line in the Assistant tab says when Copilot is waiting for you.
 
 ### What it can look up
 

@@ -450,6 +450,9 @@
 
   let history = [];
   let busy = false;
+  // One Copilot chat per Assistant conversation: every request in it, lookup
+  // rounds and follow-up questions, continues the same chat. New chat starts another.
+  let chatId = newChatId();
   let requestSeq = 0;
 
   function showIntro() {
@@ -465,10 +468,15 @@
   panel.querySelector("#aa-new").addEventListener("click", function () {
     requestSeq++; // drop any reply still in flight
     history = [];
+    chatId = newChatId();
     setBusy(false);
     showIntro();
     elInput.focus();
   });
+
+  function newChatId() {
+    return "aa-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+  }
 
   function setBusy(value) {
     busy = value;
@@ -618,7 +626,7 @@
                 ? "Sending what it asked for back to Copilot… press Send in the Copilot window, then use its reply."
                 : "Sending what it asked for back to the AI…");
             }
-            return call("ai-features", "complete", { prompt }, "AI Features");
+            return call("ai-features", "complete", { prompt, chatId }, "AI Features");
           },
           lookup: function (tool, args) {
             if (stale()) return Promise.resolve({ error: "Cancelled.", content: "Error: cancelled." });

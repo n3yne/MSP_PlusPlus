@@ -369,7 +369,17 @@ describe("ai-features Copilot website provider", () => {
     const settings = { aiProvider: "copilotweb", aiWebSite: "copilot-work" };
     const handlers = init(load(chat), settings);
     expect(await handlers.complete({ prompt: "Say OK" })).toEqual({ result: "OK" });
-    expect(chat).toHaveBeenCalledWith("Say OK", settings);
+    expect(chat).toHaveBeenCalledWith("Say OK", settings, { chatId: "" });
+  });
+
+  test("complete passes a conversation's chat id to the website", async () => {
+    const chat = jest.fn(async () => "OK");
+    const settings = { aiProvider: "copilotweb", aiWebSite: "copilot-work" };
+    const handlers = init(load(chat), settings);
+    await handlers.complete({ prompt: "Again", chatId: "aa-1" });
+    await handlers.complete({ prompt: "Bad id", chatId: "../x" });
+    expect(chat.mock.calls[0][2]).toEqual({ chatId: "aa-1" });
+    expect(chat.mock.calls[1][2]).toEqual({ chatId: "" });
   });
 
   test("info tells other plugins to make one request with a shorter prompt", async () => {

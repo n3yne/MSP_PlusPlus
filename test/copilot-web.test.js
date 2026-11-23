@@ -415,6 +415,43 @@ describe("copilot-web hands-off requests", () => {
   });
 });
 
+describe("copilot-web conversations", () => {
+  async function ask(fake, page, client, prompt, options, reply) {
+    const result = client.chat(prompt, {}, options);
+    await until(() => fake.bar() && fake.bar().mode === "waiting");
+    page.addReply(reply);
+    await client._onBarAction("use");
+    return result;
+  }
+
+  test("requests with the same chat id continue one chat; others open a new one", async () => {
+    const { page, fake, client } = setup();
+    await expect(ask(fake, page, client, "First", { chatId: "aa-1" }, "One")).resolves.toBe("One");
+    await expect(ask(fake, page, client, "Second", { chatId: "aa-1" }, "Two")).resolves.toBe("Two");
+    expect(fake.state.loads).toHaveLength(1);
+    await expect(ask(fake, page, client, "Other", { chatId: "aa-2" }, "Three")).resolves.toBe("Three");
+    expect(fake.state.loads).toHaveLength(2);
+    await expect(ask(fake, page, client, "Suggest", undefined, "Four")).resolves.toBe("Four");
+    expect(fake.state.loads).toHaveLength(3);
+    // The chat open now isn't aa-2's any more.
+    await expect(ask(fake, page, client, "Back", { chatId: "aa-2" }, "Five")).resolves.toBe("Five");
+    expect(fake.state.loads).toHaveLength(4);
+  });
+
+  test("opens a new chat when the open one has no message box", async () => {
+    const { page, fake, client } = setup();
+    await ask(fake, page, client, "First", { chatId: "aa-1" }, "One");
+    page.input.style.display = "none";
+    const result = client.chat("Second", {}, { chatId: "aa-1" });
+    await until(() => fake.state.loads.length === 2);
+    page.input.style.display = "";
+    await until(() => fake.bar() && fake.bar().mode === "waiting");
+    page.addReply("Two");
+    await client._onBarAction("use");
+    await expect(result).resolves.toBe("Two");
+  });
+});
+
 describe("copilot-web multi-line prompts", () => {
   test("pastes the prompt so its line breaks stay and nothing is sent early", async () => {
     const { page, fake, client } = setup();

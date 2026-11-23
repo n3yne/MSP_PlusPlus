@@ -9,9 +9,11 @@
 // Settings → AI Features, used one of two ways:
 //   - tool calling (Azure OpenAI, OpenAI, Anthropic): the AI picks the lookups
 //     itself, up to MAX_LOOKUPS per question, through AI Features "chat-tools".
-//   - gather first (Copilot website, Microsoft 365 Copilot, Hatz): this plugin
+//   - negotiation (Copilot website, Microsoft 365 Copilot, Hatz): this plugin
 //     looks up the open ticket and any ticket numbers and email addresses in
-//     the question, then sends one prompt through AI Features "complete".
+//     the question, then sends a prompt through AI Features "complete" that
+//     lists the lookups. The AI answers or replies "LOOKUP [...]"; those are
+//     run and the prompt is sent again with the results, for a few rounds.
 // Every answer lists what was looked up, which is also what was sent to the AI.
 //
 // The pure helpers at the top are exported for tests when loaded under Node.
@@ -21,6 +23,10 @@
 
   const MAX_LOOKUPS = 8;
   const MAX_ROUNDS = 6;
+  // Rounds of "ask for lookups" for an AI without tool calling. On the Copilot
+  // website each round is another Send, so it gets fewer.
+  const MAX_NEGOTIATION_ROUNDS = 3;
+  const MAX_WEBSITE_ROUNDS = 2;
   const MAX_HISTORY_MESSAGES = 6;
   const MAX_HISTORY_CHARS = 2000;
   const MAX_QUESTION_CHARS = 2000;
@@ -157,8 +163,30 @@
     return out;
   }
 
+  // One line per lookup for a prompt: name(arg: type, …): what it does.
+  function describeTools(tools) {
+    return (Array.isArray(tools) ? tools : []).map(function (t) {
+      const props = t.parameters && t.parameters.properties ? t.parameters.properties : {};
+      const required = t.parameters && Array.isArray(t.parameters.required) ? t.parameters.required : [];
+      const args = Object.keys(props).map((k) => k + (required.includes(k) ? "" : "?") + ": " + (props[k].type || "string")).join(", ");
+      return "- " + t.name + "(" + args + "): " + String(t.description || "").replace(/\s+/g, " ").trim();
+    }).join("\n");
+  }
+
+  function lookupInstructions(o) {
+    return "\n\nYou can ask for more data before answering. To do that, reply with ONLY a lookup request and nothing else, " +
+      "as JSON objects with \"tool\" and \"args\", for example:\n" +
+      "LOOKUP [{\"tool\": \"find_requester\", \"args\": {\"email\": \"jane@example.com\"}}, " +
+      "{\"tool\": \"get_ticket\", \"args\": {\"ticket_id\": 4521}}]\n" +
+      "Ask for at most " + o.lookupsLeft + " lookup" + (o.lookupsLeft === 1 ? "" : "s") + " in one request. " +
+      "The agent's tool will run them and send you the results with this question again. " +
+      "Only ask when the data below can't answer the question; ids you need (requester_id, group_id) often appear in it. " +
+      "Lookups available (read-only):\n" + describeTools(o.tools);
+  }
+
   function buildGatherPrompt(question, history, results, opts, maxChars) {
     const o = opts || {};
+    const canAsk = Array.isArray(o.tools) && o.tools.length > 0 && o.lookupsLeft > 0;
     const limit = maxChars > 0 ? Math.min(maxChars, MAX_GATHER_PROMPT_CHARS) : MAX_GATHER_PROMPT_CHARS;
     const build = function (list) {
       const past = formatHistory(history);
@@ -166,13 +194,19 @@
       const data = list.length
         ? list.map((r) => "<data source=\"" + String(r.label || r.tool).replace(/["<>]/g, "") + "\">\n" +
           String(r.content || "").trim() + "\n</data>").join("\n\n")
-        : "(Nothing was looked up for this question.)";
+        : "(Nothing was looked up for this question yet.)";
+      const intro = canAsk
+        ? "Below is data looked up from " + site + " for the agent's question so far."
+        : o.tools
+          ? "Below is data looked up from " + site + " for the agent's question. No more lookups are possible now, so " +
+            "answer from it, and say what is missing if it can't answer the question."
+          : "Below is data looked up from " + site + " for the agent's question. You can't look up anything else, so if " +
+            "the answer needs other data, say what to ask for (for example a ticket number or the person's email address).";
       return "You are an assistant for an IT service desk agent working in " + site + ". " +
-        "Today is " + (o.today || isoDate(new Date())) + ". " +
-        "Below is data looked up from " + site + " for the agent's question. You can't look up anything else, so if " +
-        "the answer needs other data, say what to ask for (for example a ticket number or the person's email address).\n" +
+        "Today is " + (o.today || isoDate(new Date())) + ". " + intro + "\n" +
         (o.openTicketId ? "The agent has ticket #" + o.openTicketId + " open. \"This ticket\" means that one.\n" : "") +
         ANSWER_RULES +
+        (canAsk ? lookupInstructions(o) : "") +
         "\n\n" + data +
         (past ? "\n\nEarlier in this conversation:\n" + past : "") +
         "\n\nAgent's question:\n" + clip(question, MAX_QUESTION_CHARS);
@@ -184,6 +218,105 @@
       extra += 200 + results.length * 20;
     }
     return prompt;
+  }
+
+  // Every balanced {...} in a text, so a lookup request is found whether it
+  // comes as a code block, after "LOOKUP", or with words around it.
+  function jsonObjects(text) {
+    const out = [];
+    const s = String(text || "");
+    for (let i = 0; i < s.length && out.length < 50; i++) {
+      if (s[i] !== "{") continue;
+      let depth = 0;
+      let inString = false;
+      for (let j = i; j < s.length; j++) {
+        const ch = s[j];
+        if (inString) {
+          if (ch === "\\") j++;
+          else if (ch === "\"") inString = false;
+          continue;
+        }
+        if (ch === "\"") inString = true;
+        else if (ch === "{") depth++;
+        else if (ch === "}" && --depth === 0) {
+          out.push(s.substring(i, j + 1));
+          i = j;
+          break;
+        }
+      }
+    }
+    return out;
+  }
+
+  // Reads a lookup request out of a chat reply: [{ tool, args }], or [] when
+  // the reply is an answer. Copes with smart quotes and code fences, and
+  // ignores tools that aren't offered.
+  function parseLookupRequest(text, toolNames) {
+    const names = new Set(toolNames || []);
+    const s = String(text || "").replace(/[\u201c\u201d]/g, "\"").replace(/[\u2018\u2019]/g, "'");
+    if (!/"tool"\s*:/.test(s)) return [];
+    const found = [];
+    for (const candidate of jsonObjects(s)) {
+      let obj;
+      try { obj = JSON.parse(candidate); } catch { continue; }
+      if (!obj || typeof obj !== "object") continue;
+      const list = Array.isArray(obj.lookups) ? obj.lookups : [obj];
+      for (const item of list) {
+        if (!item || typeof item.tool !== "string" || !names.has(item.tool)) continue;
+        const args = item.args && typeof item.args === "object" && !Array.isArray(item.args) ? item.args : {};
+        found.push({ tool: item.tool, args });
+      }
+    }
+    return found;
+  }
+
+  // Text left when a lookup request is taken out of a reply (for a final
+  // answer that still has one).
+  function stripLookupRequest(text) {
+    return String(text || "")
+      .replace(/```[a-z]*\s*[\s\S]*?"tool"[\s\S]*?```/gi, "")
+      .replace(/LOOKUP\s*\[[\s\S]*?\]\s*$/i, "")
+      .trim();
+  }
+
+  function lookupKey(step) {
+    return step.tool + ":" + JSON.stringify(step.args || {});
+  }
+
+  // The negotiation loop for an AI that can't call tools: each round sends the
+  // question with the data so far and the list of lookups; the AI either
+  // answers or asks for lookups, which are run and sent back next round.
+  // deps: { complete(prompt) → { result } | { error }, lookup(tool, args),
+  //         onRequest?(steps, round) }. opts.results are lookups already run.
+  async function runNegotiation(opts, deps) {
+    const maxLookups = opts.maxLookups || MAX_LOOKUPS;
+    const maxRounds = opts.maxRounds || MAX_NEGOTIATION_ROUNDS;
+    const names = (opts.tools || []).map((t) => t.name);
+    const results = (opts.results || []).slice();
+    const done = new Set(results.map((r) => lookupKey(r)));
+    let rounds = 0;
+    for (;;) {
+      const lookupsLeft = rounds >= maxRounds ? 0 : Math.max(0, maxLookups - results.length);
+      const prompt = buildGatherPrompt(opts.question, opts.history, results.filter((r) => !r.error),
+        Object.assign({}, opts.promptOptions, { tools: opts.tools || [], lookupsLeft }), opts.maxChars);
+      const res = await deps.complete(prompt, rounds);
+      if (!res || res.error) throw new Error((res && res.error) || "The AI returned nothing.");
+      const text = String(res.result || "");
+      const asked = lookupsLeft > 0 ? parseLookupRequest(text, names) : [];
+      const fresh = asked.filter((st) => !done.has(lookupKey(st))).slice(0, lookupsLeft);
+      if (!fresh.length) {
+        const answer = stripLookupRequest(text) ||
+          "I'd need more data than I can look up for one question to answer that. Try a narrower question, or include a ticket number or email address.";
+        return { text: answer, results, rounds };
+      }
+      rounds++;
+      if (deps.onRequest) deps.onRequest(fresh, rounds);
+      for (const step of fresh) {
+        done.add(lookupKey(step));
+        const r = (await deps.lookup(step.tool, step.args)) || { error: "No result.", content: "Error: no result." };
+        results.push(Object.assign({ tool: step.tool, args: step.args }, r));
+      }
+    }
   }
 
   // The tool-calling loop. deps: { chat(req) → { text, toolCalls } | { error },
@@ -261,6 +394,7 @@
   const lib = {
     extractTicketIds, extractEmails, wantsAssets, formatHistory, historyToMessages, buildSystemPrompt,
     planGather, requesterIdsFrom, followUpLookups, fitResults, buildGatherPrompt, runToolLoop, answerToHtml,
+    describeTools, jsonObjects, parseLookupRequest, stripLookupRequest, runNegotiation,
     MAX_LOOKUPS,
   };
 
@@ -440,32 +574,56 @@
         answer = result.text;
         fetched = result.fetched;
       } else {
-        // Gather first, then one request.
+        // Gather what the question names, then let the AI ask for more.
         const first = planGather(question, openId);
-        setStatus(reply, first.length ? "Looking things up…" : "Writing an answer…");
+        setStatus(reply, first.length ? "Looking things up…" : "Getting ready…");
         const results = [];
         for (const step of first) {
           const r = await lookup(step.tool, step.args);
           if (stale()) return;
-          results.push(Object.assign({ tool: step.tool }, r));
+          results.push(Object.assign({ tool: step.tool, args: step.args }, r));
         }
         for (const step of followUpLookups(question, results).slice(0, MAX_LOOKUPS - results.length)) {
           const r = await lookup(step.tool, step.args);
           if (stale()) return;
-          results.push(Object.assign({ tool: step.tool }, r));
+          results.push(Object.assign({ tool: step.tool, args: step.args }, r));
         }
-        const usable = results.filter((r) => !r.error);
-        setStatus(reply, info.provider === "copilotweb"
-          ? "Waiting for Copilot… (press Send in the Copilot window if it's waiting for you)"
-          : "Writing an answer…");
-        const maxChars = info.maxPromptChars > 0 ? info.maxPromptChars : 0;
-        const answered = await call("ai-features", "complete", {
-          prompt: buildGatherPrompt(question, pastTurns, usable, { siteName, today, openTicketId: openId }, maxChars),
-        }, "AI Features");
+        const website = info.provider === "copilotweb";
+        const waiting = website
+          ? "Waiting for Copilot… (press Send in the Copilot window, then use its reply)"
+          : "Writing an answer…";
+        setStatus(reply, waiting);
+        const result = await runNegotiation({
+          question,
+          history: pastTurns,
+          tools: target.tools,
+          results,
+          maxRounds: website ? MAX_WEBSITE_ROUNDS : MAX_NEGOTIATION_ROUNDS,
+          maxChars: info.maxPromptChars > 0 ? info.maxPromptChars : 0,
+          promptOptions: { siteName, today, openTicketId: openId },
+        }, {
+          complete: function (prompt, round) {
+            if (stale()) return Promise.resolve({ error: "Cancelled." });
+            if (round > 0) {
+              setStatus(reply, website
+                ? "Sending what it asked for back to Copilot… press Send in the Copilot window, then use its reply."
+                : "Sending what it asked for back to the AI…");
+            }
+            return call("ai-features", "complete", { prompt }, "AI Features");
+          },
+          lookup: function (tool, args) {
+            if (stale()) return Promise.resolve({ error: "Cancelled.", content: "Error: cancelled." });
+            return lookup(tool, args);
+          },
+          onRequest: function (steps) {
+            setStatus(reply, "The AI asked for " + steps.map(function (st) {
+              return describeCall({ name: st.tool, arguments: st.args });
+            }).join(", ") + ". Looking it up…");
+          },
+        });
         if (stale()) return;
-        if (answered.error) throw new Error(answered.error);
-        answer = answered.result;
-        fetched = results.map((r) => ({ tool: r.tool, label: r.label || r.tool, link: r.link || "", error: r.error || "" }));
+        answer = result.text;
+        fetched = result.results.map((r) => ({ tool: r.tool, label: r.label || r.tool, link: r.link || "", error: r.error || "" }));
       }
 
       if (!String(answer || "").trim()) answer = "I couldn't come up with an answer. Try rephrasing the question.";

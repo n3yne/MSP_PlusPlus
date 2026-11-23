@@ -22,9 +22,11 @@ Which way it works depends on the provider chosen in [AI Features](ai-features.m
 | Provider | How lookups are chosen |
 |---|---|
 | Azure OpenAI, OpenAI, Anthropic | **The AI decides.** It asks for lookups (tool calling), the assistant runs them and sends back the results, and the AI answers. Up to 8 lookups per question. |
-| Copilot website, Microsoft 365 Copilot, Hatz AI | **Gathered first.** These can't ask for lookups, so the assistant reads the open ticket and any ticket numbers (#1234, "ticket 1234", INC-1234) and email addresses in your question. For an email address it also gets that requester's tickets from the last 90 days, and their assets when you ask about a laptop, device or asset. Then it asks once (one Send in the Copilot window). |
+| Copilot website, Microsoft 365 Copilot, Hatz AI | **The AI asks, MSP++ fetches.** The assistant first reads the open ticket and any ticket numbers (#1234, "ticket 1234", INC-1234) and email addresses in your question (for an email, also that requester's tickets from the last 90 days, and their assets when you ask about a laptop, device or asset). It sends that with the list of lookups it can run. The AI either answers, or replies with a lookup request (a `LOOKUP [...]` line), which MSP++ runs and sends back with the question. On the Copilot website that's up to 2 extra rounds; with the others, up to 3. |
 
-In the gather-first mode, questions that don't mention a ticket or an email ("how many urgent tickets are open?") can't be answered. The assistant says what it would need instead.
+All lookups for one question, in either mode, count toward the limit of 8.
+
+**On the Copilot website, each round is a new Copilot chat.** You press **Send** in the Copilot window and then use its reply, once per round, so a question that needs more data takes two or three Sends. With **Send Automatically** turned on in AI Features, the rounds run by themselves. The status line in the Assistant tab says when Copilot is waiting for you.
 
 ### What it can look up
 
@@ -57,7 +59,8 @@ None of its own. It uses the AI Features and Freshservice settings, and keeps th
 - **What you look up goes to the AI.** Ticket text, names, emails and asset details that the assistant looks up are sent to your AI provider with the question. Each answer lists them.
 - Everything is read as the agent your API key belongs to. Lookups that agent can't see fail (403) and are shown as failed.
 - Results are trimmed (about 6,000 characters each, 8,000 for a ticket) and lists are capped (30 tickets, 10 assets, 5 people, 5 articles), so very long tickets or big lists are cut short.
-- With the AI deciding, each question takes several AI requests (one per round of lookups), which count toward your provider's usage.
+- When the AI asks for more data, each question takes several AI requests (one per round of lookups), which count toward your provider's usage. On the Copilot website that means one Send per round.
+- An AI without tool calling sometimes answers without asking for the data it needs, or asks in a format MSP++ can't read. Then you get its answer as it is. Rephrasing ("look up …") usually helps.
 - Freshservice only for now. Another site plugin can take part by answering the same `assistant-tools` and `assistant-lookup` handlers.
 - Not yet tested against a live Freshservice account or a live Azure OpenAI deployment.
 

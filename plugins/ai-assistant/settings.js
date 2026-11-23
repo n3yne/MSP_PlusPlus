@@ -94,9 +94,10 @@
       } else if (TOOL_PROVIDERS.includes(provider)) {
         setLine(elMode, null, "With " + name + " the AI decides what to look up (up to 8 lookups per question).");
       } else {
-        setLine(elMode, null, "With " + name + " the AI can't look things up itself, so the assistant looks up the open ticket " +
-          "and any ticket numbers and email addresses in your question first, then asks once. " +
-          "Azure OpenAI, OpenAI or Anthropic let the AI choose its own lookups.");
+        setLine(elMode, null, "With " + name + " the assistant first looks up the open ticket and any ticket numbers " +
+          "and email addresses in your question. The AI can then ask for more lookups, which are sent back to it" +
+          (provider === "copilotweb" ? " (up to 2 more rounds, each one another Send in the Copilot window)." : " (up to 3 more rounds).") +
+          " Azure OpenAI, OpenAI or Anthropic look things up in one go.");
       }
 
       if (s.fsApiEnabled === false) {

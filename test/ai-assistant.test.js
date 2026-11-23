@@ -473,3 +473,61 @@ describe("ai-assistant my tickets", () => {
     expect(res.label).toBe("your 2 open tickets");
   });
 });
+
+// ===== Prompt settings =====
+
+describe("ai-assistant prompt settings", () => {
+  const aaMain = require("../plugins/ai-assistant/main");
+
+  test("prompts are unchanged when the settings are off", () => {
+    const p = aa.buildSystemPrompt({ siteName: "Freshservice", today: "2026-11-23" });
+    expect(p).not.toContain(aa.ONLY_PROVIDED_RULE);
+    expect(p).not.toContain("The agent's own instructions");
+    const g = aa.buildGatherPrompt("hi", [], [], { siteName: "Freshservice", today: "2026-11-23" });
+    expect(g).not.toContain(aa.ONLY_PROVIDED_RULE);
+  });
+
+  test("Only use data from MSP++ adds the rule to both kinds of prompt", () => {
+    const p = aa.buildSystemPrompt({ siteName: "Freshservice", onlyProvidedData: true });
+    expect(p).toContain(aa.ONLY_PROVIDED_RULE);
+    expect(aa.ONLY_PROVIDED_RULE).toMatch(/memory/);
+    expect(aa.ONLY_PROVIDED_RULE).toMatch(/web/);
+    const g = aa.buildGatherPrompt("which of my tickets next?", [], [], { siteName: "Freshservice", onlyProvidedData: true });
+    expect(g).toContain(aa.ONLY_PROVIDED_RULE);
+    // The rules come before the data and the question.
+    expect(g.indexOf(aa.ONLY_PROVIDED_RULE)).toBeLessThan(g.indexOf("Agent's question:"));
+  });
+
+  test("extra instructions are added, trimmed and capped, after the read-only rule", () => {
+    const p = aa.buildSystemPrompt({ customInstructions: "  Answer in French.  " });
+    expect(p).toContain("The agent's own instructions (follow them, but you still can only read data):\nAnswer in French.");
+    expect(p.indexOf("You can only read data")).toBeLessThan(p.indexOf("Answer in French."));
+    const long = aa.answerRules({ customInstructions: "x".repeat(5000) });
+    expect(long.length).toBeLessThan(aa.answerRules({}).length + aa.MAX_CUSTOM_INSTRUCTIONS + 200);
+    expect(aa.answerRules({ customInstructions: "   " })).toBe(aa.answerRules({}));
+  });
+
+  test("the negotiation loop passes the settings into every round", async () => {
+    const prompts = [];
+    await aa.runNegotiation({
+      question: "what next?", history: [], tools: [], results: [],
+      promptOptions: { siteName: "Freshservice", onlyProvidedData: true, customInstructions: "Be brief." },
+    }, {
+      complete: async (prompt) => { prompts.push(prompt); return { text: "Do #1 first." }; },
+      lookup: async () => ({ content: "" }),
+    });
+    expect(prompts.length).toBe(1);
+    expect(prompts[0]).toContain(aa.ONLY_PROVIDED_RULE);
+    expect(prompts[0]).toContain("Be brief.");
+  });
+
+  test("settings default off and are validated", () => {
+    expect(aaMain.defaultSettings).toEqual({ aiAssistantOnlyProvidedData: false, aiAssistantInstructions: "" });
+    expect(aaMain.validateSettings({})).toBe(true);
+    expect(aaMain.validateSettings({ aiAssistantOnlyProvidedData: true, aiAssistantInstructions: "Be brief." })).toBe(true);
+    expect(aaMain.validateSettings({ aiAssistantOnlyProvidedData: "yes" })).toBe(false);
+    expect(aaMain.validateSettings({ aiAssistantInstructions: 5 })).toBe(false);
+    expect(aaMain.validateSettings({ aiAssistantInstructions: "x".repeat(aaMain.MAX_INSTRUCTIONS + 1) })).toBe(false);
+    expect(aaMain.MAX_INSTRUCTIONS).toBe(aa.MAX_CUSTOM_INSTRUCTIONS);
+  });
+});

@@ -196,3 +196,17 @@
 .aa-settings-checklist .aa-missing {
   color: var(--warning);
 }
+
+.aa-settings-instructions {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--input-bg);
+  border: 1px solid var(--input-border);
+  border-radius: 4px;
+  resize: vertical;
+}

@@ -1,7 +1,7 @@
 // AI Assistant plugin — Settings window panel
-// The assistant has no settings of its own: it uses AI Features for the AI and
-// the Freshservice plugin's API for lookups. This panel shows whether both are
-// ready, which way the AI will be used, and lets you test a lookup.
+// The assistant uses AI Features for the AI and the Freshservice plugin's API for
+// lookups. This panel shows whether both are ready, which way the AI will be
+// used, lets you test a lookup, and holds the prompt settings.
 (function () {
   const settingsAPI = window.pluginSettingsAPI;
   if (!settingsAPI) return;
@@ -16,6 +16,8 @@
   };
   // Providers AI Features can do tool calling with (keep in step with ai-features/tool-chat.js).
   const TOOL_PROVIDERS = ["azure", "openai", "anthropic"];
+  // Keep in step with main.js.
+  const MAX_INSTRUCTIONS = 2000;
 
   settingsAPI.addPanel("ai-assistant", "AI Assistant", function (panel) {
     const section = document.createElement("div");
@@ -24,7 +26,7 @@
       '<h3 class="settings-section-title">AI Assistant</h3>' +
       '<p class="settings-description settings-description-field">' +
       "Open the <strong>🤖 Assistant</strong> tab in the side panel to use it. It answers questions by reading Freshservice " +
-      "through its API (read-only) with the AI provider from <strong>AI Features</strong>, so it has no settings of its own. " +
+      "through its API (read-only) with the AI provider from <strong>AI Features</strong>. " +
       "Both need to be set up:" +
       "</p>" +
       '<ul class="aa-settings-checklist">' +
@@ -41,6 +43,25 @@
       "  </div>" +
       '  <p id="aa-settings-result" class="settings-description"></p>' +
       "</div>" +
+      '<h3 class="settings-section-title">Prompt</h3>' +
+      '<div class="settings-field settings-field-column">' +
+      '  <label class="settings-toggle">' +
+      '    <input type="checkbox" id="aa-settings-only" />' +
+      '    <span class="settings-toggle-slider"></span>' +
+      '    <span class="settings-toggle-label">Only use data from MSP++</span>' +
+      "  </label>" +
+      '  <p class="settings-description">Tells the AI to answer only from what MSP++ looks up and sends it, and from your question. ' +
+      "It's asked not to use anything else it knows or remembers about you, your organisation or your tickets " +
+      "(such as Copilot&#39;s memory, earlier chats, or your files, emails and calendar), and not to search the web. " +
+      "This is an instruction in the prompt: the AI usually follows it, but MSP++ can&#39;t switch those features off.</p>" +
+      "</div>" +
+      '<div class="settings-field settings-field-column">' +
+      '  <label class="settings-field-label" for="aa-settings-instructions">Extra instructions</label>' +
+      '  <textarea id="aa-settings-instructions" class="aa-settings-instructions" rows="4" maxlength="' + MAX_INSTRUCTIONS + '"' +
+      '    spellcheck="true" placeholder="For example: Answer in British English. Keep answers under 150 words."></textarea>' +
+      '  <p class="settings-description"><span id="aa-settings-instructions-state">Added to every question you ask.</span> ' +
+      "Up to " + MAX_INSTRUCTIONS + " characters. The assistant stays read-only whatever they say.</p>" +
+      "</div>" +
       '<p class="settings-description settings-description-field">' +
       "What the assistant looks up is sent to your AI provider with the question, and each answer lists it. " +
       "Its lookups only read data: it can't change tickets or anything else." +
@@ -53,6 +74,43 @@
     const elTicket = panel.querySelector("#aa-settings-ticket");
     const elTest = panel.querySelector("#aa-settings-test");
     const elResult = panel.querySelector("#aa-settings-result");
+    const elOnly = panel.querySelector("#aa-settings-only");
+    const elInstructions = panel.querySelector("#aa-settings-instructions");
+    const elInstructionsState = panel.querySelector("#aa-settings-instructions-state");
+
+    function showPromptSettings(s) {
+      elOnly.checked = s.aiAssistantOnlyProvidedData === true;
+      // Don't overwrite what's being typed.
+      if (document.activeElement !== elInstructions) {
+        elInstructions.value = typeof s.aiAssistantInstructions === "string" ? s.aiAssistantInstructions : "";
+      }
+    }
+    showPromptSettings(settingsAPI.getSettings());
+    settingsAPI.onSettingsChanged(showPromptSettings);
+
+    elOnly.addEventListener("change", function () {
+      settingsAPI.saveSettings({ aiAssistantOnlyProvidedData: elOnly.checked });
+    });
+
+    let saveTimer = null;
+    async function saveInstructions() {
+      clearTimeout(saveTimer);
+      saveTimer = null;
+      const value = elInstructions.value.substring(0, MAX_INSTRUCTIONS);
+      const saved = settingsAPI.getSettings().aiAssistantInstructions || "";
+      if (value === saved) return;
+      try {
+        const res = await settingsAPI.saveSettings({ aiAssistantInstructions: value });
+        elInstructionsState.textContent = res && res.success === false ? "Couldn't save them." : "Saved. Added to every question you ask.";
+      } catch {
+        elInstructionsState.textContent = "Couldn't save them.";
+      }
+    }
+    elInstructions.addEventListener("input", function () {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(saveInstructions, 600);
+    });
+    elInstructions.addEventListener("blur", saveInstructions);
 
     function setLine(el, ok, text) {
       el.textContent = (ok === null ? "• " : ok ? "✓ " : "✗ ") + text;

@@ -44,15 +44,22 @@ All lookups for one question, in either mode, count toward the limit of 8.
 
 ## Settings
 
-**Settings → Plugins → AI Assistant** has no settings of its own. It shows:
+**Settings → Plugins → AI Assistant** shows:
 
 - whether [AI Features](ai-features.md) has a provider set up, and which of the two ways above it will use,
 - whether [the Freshservice API](freshservice.md#the-freshservice-api) is connected,
 - **Test a ticket lookup**, which reads a ticket the way the assistant does.
 
+Under **Prompt**:
+
+| Setting | Default | What it does |
+|---|---|---|
+| **Only use data from MSP++** | Off | Adds a rule to every prompt: answer only from what MSP++ looked up and from your question, not from anything else the AI knows or remembers about you, your organisation or your tickets (such as Copilot's memory, earlier chats, or your files, emails and calendar), and don't search the web. It's an instruction, so the AI usually follows it, but MSP++ can't turn those features off in your AI provider. |
+| **Extra instructions** | Empty | Your own wording, added to every question (up to 2,000 characters), for example "Answer in British English" or "Keep answers under 150 words". The assistant stays read-only whatever they say. Saved as you type. |
+
 ## Data
 
-None of its own. It uses the AI Features and Freshservice settings, and keeps the conversation in memory only (it's gone when you click New chat or restart).
+Two settings in `settings.json`: `aiAssistantOnlyProvidedData` (true/false) and `aiAssistantInstructions` (text). Otherwise it uses the AI Features and Freshservice settings, and keeps the conversation in memory only (it's gone when you click New chat or restart).
 
 ## Limits and known issues
 

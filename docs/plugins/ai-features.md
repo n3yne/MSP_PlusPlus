@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › AI Features
 
-**Category:** AI · **Needs:** MSP++ 0.8.7 or later, an AI provider account, and [Note Backup](note-backup.md) for its buttons · **Used by:** [Solutions Chat](solutions-chat.md)
+**Category:** AI · **Needs:** MSP++ 0.8.7 or later, an AI provider account, and [Note Backup](note-backup.md) for its buttons · **Used by:** [AI Assistant](ai-assistant.md), [Solutions Chat](solutions-chat.md)
 
 Adds **✨ Suggest** and **📋 Summarize** to the [Notes tab](note-backup.md). Works with Hatz AI, OpenAI, Anthropic, Azure OpenAI, Microsoft 365 Copilot, and the Copilot website signed in inside MSP++.
 
@@ -60,4 +60,4 @@ Suggest sends your note to the provider. Summarize sends the ticket's text, whic
 ## See also
 
 - [AI provider setup](ai-providers.md) for Azure OpenAI and Microsoft 365 Copilot
-- [Solutions Chat](solutions-chat.md), which uses the provider set up here
+- [AI Assistant](ai-assistant.md) and [Solutions Chat](solutions-chat.md), which use the provider set up here

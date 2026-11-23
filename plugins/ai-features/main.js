@@ -3,6 +3,7 @@
 const { createM365Client, TENANT_PATTERN, CLIENT_ID_PATTERN } = require("./m365");
 const { fetchWithTimeout } = require("./http");
 const { createCopilotWeb, siteFor, normalizeSiteUrl, SITES } = require("./copilot-web");
+const toolChat = require("./tool-chat");
 
 const PROVIDERS = ["hatz", "openai", "anthropic", "azure", "m365copilot", "copilotweb"];
 
@@ -181,6 +182,43 @@ module.exports = {
       return json.choices?.[0]?.message?.content ?? "";
     }
 
+    // One step of a tool-calling conversation (see tool-chat.js): returns the
+    // AI's text and any lookups it wants run. Azure OpenAI, OpenAI and Anthropic only.
+    async function callAiTools(req, provider, aiApiKey, aiModelName) {
+      if (provider === "azure" || provider === "openai") {
+        const s = api.getSettings();
+        const url = provider === "azure"
+          ? normalizeAzureEndpoint(s.aiAzureEndpoint || "") + "/openai/v1/chat/completions"
+          : "https://api.openai.com/v1/chat/completions";
+        const model = provider === "azure" ? s.aiAzureDeployment : (aiModelName || "gpt-4o");
+        const headers = provider === "azure"
+          ? { "api-key": aiApiKey, "Content-Type": "application/json" }
+          : { "Authorization": `Bearer ${aiApiKey}`, "Content-Type": "application/json" };
+        const label = provider === "azure" ? "Azure OpenAI" : "OpenAI";
+        const resp = await fetchWithTimeout(url, {
+          method: "POST", headers, body: JSON.stringify(toolChat.toOpenAiBody(req, model)),
+        }, REQUEST_TIMEOUT_MS, label);
+        if (!resp.ok) {
+          const body = await resp.text().catch(() => "");
+          throw new Error(`${label} error ${resp.status}${body ? ": " + body.substring(0, 200) : ""}`);
+        }
+        return toolChat.fromOpenAiResponse(await resp.json());
+      }
+      if (provider === "anthropic") {
+        const resp = await fetchWithTimeout("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "x-api-key": aiApiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+          body: JSON.stringify(toolChat.toAnthropicBody(req, aiModelName || "claude-opus-4-6")),
+        }, REQUEST_TIMEOUT_MS, "Anthropic");
+        if (!resp.ok) {
+          const body = await resp.text().catch(() => "");
+          throw new Error(`Anthropic API error ${resp.status}${body ? ": " + body.substring(0, 200) : ""}`);
+        }
+        return toolChat.fromAnthropicResponse(await resp.json());
+      }
+      throw new Error("This AI provider can't look things up by itself.");
+    }
+
     async function fetchAiModels(aiProvider, aiApiKey) {
       if (aiProvider === "openai") {
         const resp = await fetchWithTimeout("https://api.openai.com/v1/models", {
@@ -343,6 +381,26 @@ module.exports = {
       }
     });
 
+    // Tool calling for other plugins (the AI Assistant). data: see tool-chat.js.
+    // Returns { text, toolCalls } or { error }. Check "info" (tools: true) first.
+    api.handle("chat-tools", async function (data) {
+      const current = api.getSettings();
+      const provider = current.aiProvider;
+      if (!toolChat.supportsTools(provider)) return { error: "The selected AI provider can't look things up by itself." };
+      const aiApiKey = keyForProvider(current, provider);
+      const notReady = configError(provider, current, aiApiKey);
+      if (notReady) return { error: notReady };
+      const req = toolChat.checkRequest(data);
+      if (req.error) return req;
+      try {
+        const res = await callAiTools(req, provider, aiApiKey, current.aiModelName);
+        if (!res.toolCalls.length && !res.text.trim()) throw new Error("The AI provider returned an empty reply. Try again.");
+        return res;
+      } catch (err) {
+        return { error: err.message || String(err) };
+      }
+    });
+
     // The most characters a prompt for this provider can have.
     function promptLimit(provider, settings) {
       return provider === "copilotweb" ? siteFor(settings).maxPromptChars : MAX_COMPLETE_CHARS;
@@ -354,7 +412,7 @@ module.exports = {
       const current = api.getSettings();
       const provider = current.aiProvider;
       const website = provider === "copilotweb";
-      return { provider, singleRequest: website, maxPromptChars: promptLimit(provider, current) };
+      return { provider, singleRequest: website, maxPromptChars: promptLimit(provider, current), tools: toolChat.supportsTools(provider) };
     });
 
     api.handle("copilotweb-open", async function () {

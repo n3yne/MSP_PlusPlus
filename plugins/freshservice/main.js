@@ -1,6 +1,7 @@
 "use strict";
 
 const crypto = require("crypto");
+const assistantTools = require("./assistant-tools");
 
 // Main-process half of the Freshservice site plugin: reads ticket details and
 // Solutions articles through the Freshservice REST API v2 (the page-side half,
@@ -886,6 +887,44 @@ module.exports = {
       }
     });
 
+    // ===== AI Assistant lookups =====
+    //
+    // The AI Assistant plugin asks for the list of lookups (assistant-tools)
+    // and runs them one at a time (assistant-lookup). All of them are GETs to
+    // the configured domain; see assistant-tools.js.
+    api.handle("assistant-tools", async function () {
+      const conn = connection();
+      return {
+        site: "Freshservice",
+        tools: assistantTools.TOOLS,
+        ready: !conn.error,
+        error: conn.error || undefined,
+        linkBase: conn.error ? "" : "https://" + conn.domain + "/a/tickets/",
+      };
+    });
+
+    api.handle("assistant-lookup", async function (data) {
+      const conn = connection();
+      if (conn.error) return { error: conn.error, content: "Error: " + conn.error };
+      const ctx = {
+        domain: conn.domain,
+        get: (what, pathAndQuery) => apiGet(Object.assign({}, conn, { what }), pathAndQuery),
+        labels: () => fieldLabels(conn),
+        ticketText: async (id) => {
+          const [ticketJson, conversations, labels] = await Promise.all([
+            apiGet(conn, `/tickets/${id}?include=requester`),
+            fetchConversations(conn, String(id)),
+            fieldLabels(conn),
+          ]);
+          const ticket = ticketJson.ticket || {};
+          return assistantTicketHeader(ticket) + formatTicketText(ticket, conversations, labels);
+        },
+      };
+      const res = await assistantTools.lookup(ctx, data && data.tool, data && data.args);
+      if (res.error) api.log("assistant-lookup " + String(data && data.tool).substring(0, 40) + " failed:", res.error);
+      return res;
+    });
+
     api.handle("test-connection", async function () {
       const conn = connection();
       if (conn.error) return { error: conn.error };
@@ -927,7 +966,24 @@ module.exports = {
   buildTicketUpdate,
   formatTicketSla,
   slaOpenStatusQuery,
+  assistantTicketHeader,
 };
+
+// The ids get_ticket adds above the ticket text, so the AI Assistant can look
+// up the agent, group or requester behind a ticket.
+function assistantTicketHeader(ticket) {
+  const ids = [];
+  if (isId(ticket.requester_id)) ids.push("requester_id " + ticket.requester_id);
+  if (isId(ticket.responder_id)) ids.push("agent_id " + ticket.responder_id);
+  if (isId(ticket.group_id)) ids.push("group_id " + ticket.group_id);
+  if (isId(ticket.department_id)) ids.push("department_id " + ticket.department_id);
+  if (typeof ticket.type === "string" && ticket.type) ids.push("type " + ticket.type.substring(0, 50));
+  if (typeof ticket.category === "string" && ticket.category) ids.push("category " + ticket.category.substring(0, 100));
+  if (typeof ticket.due_by === "string" && ticket.due_by) ids.push("due_by " + ticket.due_by);
+  if (typeof ticket.updated_at === "string" && ticket.updated_at) ids.push("updated_at " + ticket.updated_at);
+  if (Array.isArray(ticket.tags) && ticket.tags.length) ids.push("tags " + ticket.tags.slice(0, 10).map(String).join(", ").substring(0, 200));
+  return ids.length ? "[" + ids.join(" | ") + "]\n" : "";
+}
 
 // What the user typed in ticket search → the parts each kind of search uses:
 //   id             a ticket number ("123", "#123", "INC-123", "SR-123")

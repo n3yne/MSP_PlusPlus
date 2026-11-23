@@ -1,0 +1,198 @@
+/* ===== AI Assistant: its side panel tab ===== */
+.aa-panel {
+  background: var(--panel-content-bg);
+}
+
+.aa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.aa-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.aa-header-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.aa-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aa-msg {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.aa-msg p {
+  margin: 0 0 6px;
+}
+
+.aa-msg p:last-child {
+  margin-bottom: 0;
+}
+
+.aa-msg ol,
+.aa-msg ul {
+  margin: 0 0 6px;
+  padding-left: 20px;
+}
+
+.aa-msg-user {
+  align-self: flex-end;
+  background: var(--accent);
+  max-width: 85%;
+}
+
+.aa-msg-assistant {
+  align-self: stretch;
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+}
+
+.aa-loading {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.aa-error {
+  color: var(--warning);
+}
+
+.aa-ticket,
+.aa-fetched-link {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.aa-ticket:hover,
+.aa-fetched-link:hover {
+  text-decoration: underline;
+}
+
+.aa-msg code {
+  font-size: 11px;
+  padding: 0 3px;
+  border-radius: 3px;
+  background: var(--input-bg);
+}
+
+.aa-fetched {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+
+.aa-fetched-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.aa-fetched ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.aa-fetched-error {
+  color: var(--warning);
+}
+
+.aa-meta {
+  margin-top: 6px !important;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.aa-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.aa-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.aa-composer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.aa-ticket-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.aa-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--input-bg);
+  color: var(--text);
+  border: 1px solid var(--input-border);
+  border-radius: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+
+.aa-input:focus {
+  border-color: var(--primary);
+}
+
+#aa-send {
+  align-self: flex-end;
+}
+
+/* ===== AI Assistant: settings panel ===== */
+.aa-settings-checklist {
+  list-style: none;
+  padding-left: 0;
+  margin: 0 0 12px;
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.aa-settings-checklist .aa-ok {
+  color: var(--success);
+}
+
+.aa-settings-checklist .aa-missing {
+  color: var(--warning);
+}

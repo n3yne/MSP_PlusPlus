@@ -14,6 +14,7 @@ The panel on the right holds a tab for each plugin that adds one. The app has no
 | ⏱ Time | [Time Tracker](plugins/time-tracker.md) |
 | ⏰ Follow-ups | [Follow-up Reminders](plugins/follow-ups.md) |
 | 💬 Replies | [Canned Responses](plugins/canned-responses.md) |
+| 🤖 Assistant | [AI Assistant](plugins/ai-assistant.md) |
 | 📚 Solutions | [Solutions Chat](plugins/solutions-chat.md) |
 | 🌲 Tree | [Tree Style Tabs](plugins/tree-tabs.md) |
 

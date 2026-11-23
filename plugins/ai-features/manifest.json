@@ -1,7 +1,7 @@
 {
   "id": "ai-features",
   "name": "AI Features",
-  "version": "0.8.7.1",
+  "version": "0.8.8.1",
   "distribution": "directory",
   "description": "AI-powered note suggestions and ticket summarization via Hatz AI, OpenAI, Anthropic, Azure OpenAI, Microsoft 365 Copilot, or the Copilot website (no setup).",
   "category": "AI",

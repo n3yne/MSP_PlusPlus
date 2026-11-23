@@ -34,6 +34,7 @@ Everything done through the API is done as the agent the key belongs to. That ag
 | [Time Tracker](time-tracker.md) logging | Add time entries |
 | [SLA Countdown](sla-countdown.md), [Ticket Notifications](ticket-notifications.md) | View tickets |
 | [Solutions Chat](solutions-chat.md) | View Solutions articles |
+| [AI Assistant](ai-assistant.md) | View tickets, requesters, agents, groups, assets, problems, changes and Solutions articles (whatever it is asked about) |
 | [Metrics Bar](metrics-bar-api-queries.md) counts | View tickets |
 
 **Fallback:** if the API is turned off, not set up, rate-limited or returns an error, or the record is a change, problem or release, features that can read the page do so instead.

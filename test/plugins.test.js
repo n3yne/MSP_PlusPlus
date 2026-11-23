@@ -374,9 +374,9 @@ describe("ai-features Copilot website provider", () => {
 
   test("info tells other plugins to make one request with a shorter prompt", async () => {
     const handlers = init(load(jest.fn()), { aiProvider: "copilotweb", aiWebSite: "copilot-consumer" });
-    expect(await handlers.info()).toEqual({ provider: "copilotweb", singleRequest: true, maxPromptChars: 10000 });
+    expect(await handlers.info()).toEqual({ provider: "copilotweb", singleRequest: true, maxPromptChars: 10000, tools: false });
     const apiHandlers = init(load(jest.fn()), { aiProvider: "openai" });
-    expect(await apiHandlers.info()).toEqual({ provider: "openai", singleRequest: false, maxPromptChars: 60000 });
+    expect(await apiHandlers.info()).toEqual({ provider: "openai", singleRequest: false, maxPromptChars: 60000, tools: true });
   });
 
   test("a custom site without an address is reported, not opened", async () => {
@@ -465,6 +465,48 @@ describe("ai-features providers", () => {
     expect(calls[0].url).toBe("https://contoso.openai.azure.com/openai/v1/chat/completions");
     expect(calls[0].opts.headers["api-key"]).toBe("azkey");
     expect(JSON.parse(calls[0].opts.body).model).toBe("my-gpt4o");
+  });
+
+  test("chat-tools sends tools to Azure OpenAI and returns the tool calls", async () => {
+    settings = { aiProvider: "azure", aiApiKey: "azkey", aiApiKeyProvider: "azure", aiAzureDeployment: "my-gpt4o", aiAzureEndpoint: "https://contoso.openai.azure.com" };
+    initPlugin();
+    global.fetch = jest.fn(async () => jsonResponse({ choices: [{ message: { content: null, tool_calls: [
+      { id: "c1", type: "function", function: { name: "get_ticket", arguments: "{\"ticket_id\":7}" } },
+    ] } }] }));
+    const res = await handlers["chat-tools"]({
+      system: "sys",
+      messages: [{ role: "user", text: "what is #7?" }],
+      tools: [{ name: "get_ticket", description: "Read a ticket", parameters: { type: "object", properties: {} } }],
+    });
+    expect(res).toEqual({ text: "", toolCalls: [{ id: "c1", name: "get_ticket", arguments: { ticket_id: 7 } }] });
+    const [url, opts] = global.fetch.mock.calls[0];
+    expect(url).toBe("https://contoso.openai.azure.com/openai/v1/chat/completions");
+    expect(opts.headers["api-key"]).toBe("azkey");
+    const body = JSON.parse(opts.body);
+    expect(body.model).toBe("my-gpt4o");
+    expect(body.tools[0].function.name).toBe("get_ticket");
+  });
+
+  test("chat-tools refuses providers without tool calling and unconfigured ones", async () => {
+    settings = { aiProvider: "copilotweb", aiWebSite: "copilot-work" };
+    initPlugin();
+    global.fetch = jest.fn();
+    expect((await handlers["chat-tools"]({ messages: [{ role: "user", text: "q" }] })).error).toMatch(/can't look things up/);
+    settings = { aiProvider: "openai" };
+    initPlugin();
+    expect((await handlers["chat-tools"]({ messages: [{ role: "user", text: "q" }] })).error).toMatch(/No AI provider configured/);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test("chat-tools sends Anthropic tools and reads tool_use blocks", async () => {
+    settings = { aiProvider: "anthropic", aiApiKey: "ankey", aiApiKeyProvider: "anthropic", aiModelName: "claude-x" };
+    initPlugin();
+    global.fetch = jest.fn(async () => jsonResponse({ content: [{ type: "text", text: "Done." }] }));
+    const res = await handlers["chat-tools"]({ system: "sys", messages: [{ role: "user", text: "q" }], tools: [], toolChoice: "none" });
+    expect(res).toEqual({ text: "Done.", toolCalls: [] });
+    const body = JSON.parse(global.fetch.mock.calls[0][1].body);
+    expect(body).toMatchObject({ model: "claude-x", system: "sys" });
+    expect(body.tools).toBeUndefined();
   });
 
   test("complete runs a prompt with the provider chosen in settings", async () => {

@@ -24,7 +24,7 @@ Start with the page that matches what you want to do.
 - **Tickets:** [Quick Actions](plugins/quick-actions.md) · [Recent Tickets](plugins/recent-tickets.md) · [SLA Countdown](plugins/sla-countdown.md) · [Ticket Notifications](plugins/ticket-notifications.md) · [Ticket Search](plugins/ticket-search.md)
 - **Notes & Replies:** [Note Backup](plugins/note-backup.md) · [Canned Responses](plugins/canned-responses.md)
 - **Time & Reminders:** [Time Tracker](plugins/time-tracker.md) · [Follow-up Reminders](plugins/follow-ups.md)
-- **AI:** [AI Features](plugins/ai-features.md) · [Solutions Chat](plugins/solutions-chat.md)
+- **AI:** [AI Features](plugins/ai-features.md) · [AI Assistant](plugins/ai-assistant.md) · [Solutions Chat](plugins/solutions-chat.md)
 - **Tabs & Toolbars:** [Bookmarks Bar](plugins/bookmarks-bar.md) · [Metrics Bar](plugins/metrics-bar.md) · [Tree Style Tabs](plugins/tree-tabs.md)
 - **Security:** [Password Vault](plugins/password-vault.md)
 

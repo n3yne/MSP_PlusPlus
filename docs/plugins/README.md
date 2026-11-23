@@ -44,6 +44,7 @@ A site plugin teaches MSP++ about a ticketing site: how to find the ticket numbe
 | Plugin | What it does | Needs |
 |---|---|---|
 | [AI Features](ai-features.md) | ✨ Suggest and 📋 Summarize buttons in the Notes tab | an AI provider, Note Backup |
+| [AI Assistant](ai-assistant.md) | 🤖 Assistant tab: a general AI chat that looks up tickets, people and assets in Freshservice to answer questions (read-only) | AI Features, Freshservice API |
 | [Solutions Chat](solutions-chat.md) | 📚 Solutions tab: ask questions answered from your Freshservice Solutions articles | AI Features, Freshservice API |
 
 ### Tabs & Toolbars

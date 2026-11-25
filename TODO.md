@@ -40,9 +40,9 @@ Most of the app has only been run through automated tests and the Linux dev buil
 
 ## Next up
 
-- [x] **Code audit of everything since 0.8.2.** Done in the 24 November audit (fixed in #93 and #94). The last audit covered 0.8.2. Since then: Password Vault and its native Windows Hello module, Windows device sign-on (`native/windows-sso`), the Copilot website backend, four-part plugin versions, Password Vault auto-fill, and the move into `src/`.
+- [x] **Code audit of everything since 0.8.2.** Done in the 24 November audit; fixes in #93 and #94.
 - [ ] **Fix: Quick Actions "Set Ticket Status: …" palette items never appear.** The plugin registers its `Ctrl+K` provider with the id `quick-actions.set`, but the core only accepts letters, digits, `-` and `_`, so the call throws (one of the `commands.addProvider: invalid id` messages in the console at start-up). Rename the id or let the core accept dots, and find the second message.
-- [x] **Require a reviewer on the `plugin-directory` environment** (done: plugin publishes now wait for approval) in GitHub settings, so a plugin publish always waits for approval.
+- [x] **Require a reviewer on the `plugin-directory` environment.** Done: plugin publishes now wait for approval.
 
 ## Fixes and gaps
 

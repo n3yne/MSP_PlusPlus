@@ -56,7 +56,7 @@ From Microsoft Store Policies 7.20 (October 2026). These shape the listing and t
 
 - **Plugins (10.2.2).** Downloading code is allowed. Using it to change what the app does beyond its listing description is not. The description must say that features come as optional plugins from the MSP++ plugin directory. Plugins published later count as part of the app.
 - **Testable (10.3).** Reviewers need a working sign-in. Give them a Freshservice trial account (made for the review) in **Notes for certification**, and say the app works with the customer's own Freshservice or ConnectWise Manage.
-- **Privacy policy (10.5).** Every desktop app needs a privacy policy URL in Partner Center.
+- **Privacy policy (10.5).** Every desktop app needs a privacy policy URL in Partner Center. Use <https://github.com/n3yne/MSP_PlusPlus/blob/main/docs/privacy.md> ([privacy.md](privacy.md)). Keep it up to date when a feature sends data somewhere new.
 - **Web engine (10.2.1).** Apps that browse the web must stay within two major versions of current Chromium. Keep Electron up to date.
 - **Naming (10.1).** Say "for Freshservice and ConnectWise Manage" and don't suggest any connection with Freshworks or ConnectWise.
 - **Capabilities.** The package declares `runFullTrust`, which every Electron app needs. Partner Center asks why: "Desktop app (Electron) that needs full trust to run."

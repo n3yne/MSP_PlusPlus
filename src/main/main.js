@@ -8,6 +8,7 @@ const { DEFAULT_SETTINGS, validateSettings, migrateCoreSettings, findLegacyUserD
 const { tabShortcutForKey } = require("../shared/tab-shortcuts");
 const pluginManager = require("../plugin-system/plugin-manager");
 const PluginDirectory = require("../plugin-system/plugin-directory");
+const PluginStages = require("../shared/plugin-stages");
 const { installPasskeyAccountChooser } = require("./webauthn");
 const { chromeUserAgent, userAgentHosts } = require("./user-agent");
 const WindowsSso = require("./windows-sso");
@@ -648,10 +649,23 @@ let popOutAlwaysOnTop = false;
 // every Microsoft sign-in page load in tabs and pop-outs; see installSiteUserAgent.
 let deviceSignOnEnabled = true;
 
+// Settings > General > "Update Plugins To" and the per-plugin overrides, read by
+// the plugin directory to hold back updates below the chosen release stage.
+let pluginStageSettings = { pluginUpdateStage: PluginStages.DEFAULT_UPDATE_STAGE, pluginUpdateStageOverrides: {} };
+
 // Called whenever the settings change (and at startup) to apply core settings
 // that main.js acts on itself.
 function applyCoreWindowSettings(settings) {
   deviceSignOnEnabled = !settings || settings.windowsDeviceSignOn !== false;
+  const stages = {
+    pluginUpdateStage: settings && settings.pluginUpdateStage,
+    pluginUpdateStageOverrides: (settings && settings.pluginUpdateStageOverrides) || {},
+  };
+  if (JSON.stringify(stages) !== JSON.stringify(pluginStageSettings)) {
+    pluginStageSettings = stages;
+    // Which updates are held back may have changed.
+    if (pluginDirectory) broadcastPluginDirectory(pluginDirectory.getState());
+  }
   const onTop = Boolean(settings && settings.popOutAlwaysOnTop === true);
   if (onTop === popOutAlwaysOnTop) return;
   popOutAlwaysOnTop = onTop;
@@ -994,6 +1008,7 @@ function createSettingsWindow(target) {
 // plugins add their own with manifest "sensitiveSettings".
 const CORE_SENSITIVE_SETTINGS = [
   { key: "pluginAutoUpdate", label: "Install plugin updates automatically" },
+  { key: "pluginUpdateStage", label: "Update plugins to (lowest release stage)" },
 ];
 
 // Deletes the stored API keys (and their "set" flags and bindings) of a plugin
@@ -1084,6 +1099,7 @@ function startPluginDirectory() {
     userData: electron.app.getPath("userData"),
     appVersion: electron.app.getVersion(),
     getInstalled: () => pluginManager.getPluginInfo(),
+    getUpdateStage: (id) => PluginStages.updateStageFor(pluginStageSettings, id),
     indexUrl: override || PluginDirectory.DEFAULT_INDEX_URL,
     // net.fetch goes through the system proxy settings, like the tabs do.
     fetchImpl: electron.net && typeof electron.net.fetch === "function"

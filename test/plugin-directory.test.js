@@ -47,7 +47,7 @@ function fakeFetch(files, calls = []) {
   };
 }
 
-function setup({ installed = [], entries, packages }) {
+function setup({ installed = [], entries, packages, getUpdateStage }) {
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), "mspp-dir-"));
   const files = { [INDEX_URL]: Buffer.from(JSON.stringify({ plugins: entries })) };
   for (const [name, buf] of Object.entries(packages)) files[BASE + name] = buf;
@@ -58,6 +58,7 @@ function setup({ installed = [], entries, packages }) {
     indexUrl: INDEX_URL,
     fetchImpl: fakeFetch(files, calls),
     getInstalled: () => installed,
+    getUpdateStage,
     logger: quiet,
   });
   return { userData, dir, files, calls };
@@ -153,7 +154,7 @@ describe("createPluginDirectory", () => {
     expect(byId["time-tracker"].installedSource).toBe("bundled");
     expect(byId["ai-features"].status).toBe("installed");
     expect(byId["solutions-chat"].status).toBe("incompatible");
-    expect(state.updates).toEqual([{ id: "time-tracker", name: "Time Tracker", version: "0.8.1", installedVersion: "0.7.7" }]);
+    expect(state.updates).toEqual([{ id: "time-tracker", name: "Time Tracker", version: "0.8.1", installedVersion: "0.7.7", stage: "stable" }]);
   });
 
   test("keeps the error when the directory can't be reached", async () => {
@@ -463,5 +464,97 @@ describe("Windows file locks while staging", () => {
     expect(result.error).toMatch(/Bravo/);
     expect(result.error).toMatch(/Charlie wasn't installed/);
     expect(fs.existsSync(path.join(userData, "installed-plugins", ".pending", "alpha", "manifest.json"))).toBe(true);
+  });
+});
+
+describe("release stages", () => {
+  const man = { id: "time-tracker", name: "Time Tracker", version: "0.8.2" };
+  const pkg = makePackage(man);
+  const installed = [{ id: "time-tracker", version: "0.8.1", source: "directory", stage: "stable" }];
+
+  test("parseIndex reads a stage; missing or unknown is stable", () => {
+    const parsed = PluginDirectory.parseIndex({
+      plugins: [
+        entryFor(man, pkg, { stage: "beta" }),
+        entryFor({ id: "a", version: "1.0.0" }, pkg),
+        entryFor({ id: "b", version: "1.0.0" }, pkg, { stage: "nightly" }),
+      ],
+    }, INDEX_URL, quiet);
+    expect(parsed.plugins.map((p) => p.stage)).toEqual(["beta", "stable", "stable"]);
+  });
+
+  test("an update below the user's stage is held back, not announced or auto-installed", async () => {
+    const { dir } = setup({
+      installed,
+      entries: [entryFor(man, pkg, { stage: "alpha" })],
+      packages: { "time-tracker-0.8.2.mspplugin": pkg },
+      getUpdateStage: () => "beta",
+    });
+    const state = await dir.refresh();
+    const entry = state.plugins[0];
+    expect(entry.status).toBe("update");
+    expect(entry.belowUpdateStage).toBe(true);
+    expect(entry.updateStage).toBe("beta");
+    expect(state.updates).toEqual([]);
+    expect(state.heldBack).toEqual([expect.objectContaining({ id: "time-tracker", stage: "alpha", updateStage: "beta" })]);
+    const result = await dir.updateAll();
+    expect(result.staged).toEqual([]);
+  });
+
+  test("a held-back update can still be installed by hand", async () => {
+    const { dir } = setup({
+      installed,
+      entries: [entryFor(man, pkg, { stage: "alpha" })],
+      packages: { "time-tracker-0.8.2.mspplugin": pkg },
+      getUpdateStage: () => "stable",
+    });
+    await dir.refresh();
+    const result = await dir.install(["time-tracker"]);
+    expect(result.success).toBe(true);
+    expect(result.staged.map((s) => s.id)).toEqual(["time-tracker"]);
+  });
+
+  test("an update at or above the user's stage goes through as before", async () => {
+    for (const [stage, min] of [["beta", "beta"], ["rc", "beta"], ["stable", "stable"], ["pre-alpha", "pre-alpha"]]) {
+      const { dir } = setup({
+        installed,
+        entries: [entryFor(man, pkg, { stage })],
+        packages: { "time-tracker-0.8.2.mspplugin": pkg },
+        getUpdateStage: () => min,
+      });
+      const state = await dir.refresh();
+      expect(state.updates.map((u) => [u.id, u.stage])).toEqual([["time-tracker", stage]]);
+      expect(state.heldBack).toEqual([]);
+    }
+  });
+
+  test("defaults to stable only, and asks per plugin", async () => {
+    const asked = [];
+    const { dir } = setup({
+      installed,
+      entries: [entryFor(man, pkg, { stage: "rc" })],
+      packages: { "time-tracker-0.8.2.mspplugin": pkg },
+    });
+    expect((await dir.refresh()).updates).toEqual([]);
+
+    const second = setup({
+      installed,
+      entries: [entryFor(man, pkg, { stage: "rc" })],
+      packages: { "time-tracker-0.8.2.mspplugin": pkg },
+      getUpdateStage: (id) => { asked.push(id); return id === "time-tracker" ? "rc" : "stable"; },
+    });
+    expect((await second.dir.refresh()).updates.map((u) => u.id)).toEqual(["time-tracker"]);
+    expect(asked).toContain("time-tracker");
+  });
+
+  test("a getUpdateStage that throws falls back to stable", async () => {
+    const { dir } = setup({
+      installed,
+      entries: [entryFor(man, pkg, { stage: "beta" })],
+      packages: { "time-tracker-0.8.2.mspplugin": pkg },
+      getUpdateStage: () => { throw new Error("boom"); },
+    });
+    const state = await dir.refresh();
+    expect(state.plugins[0].belowUpdateStage).toBe(true);
   });
 });

@@ -10,6 +10,7 @@ const { version: APP_VERSION } = require("../../package.json");
 const SiteColors = require("../shared/site-colors");
 const PluginDirectory = require("./plugin-directory");
 const PluginCategories = require("../shared/plugin-categories");
+const PluginStages = require("../shared/plugin-stages");
 const safeFile = require("../main/safe-file");
 const WindowsHello = require("../main/windows-hello");
 const WindowsSso = require("../main/windows-sso");
@@ -504,6 +505,7 @@ async function loadPlugin(pluginDir, source, ipcMain) {
     version: manifest.version || "",
     description: manifest.description || "",
     category: PluginCategories.normalizeCategory(manifest.category),
+    stage: PluginStages.normalizeStage(manifest.stage),
     source,         // "bundled" | "directory" | "imported" (a file, folder or unknown source)
     dir: pluginDir,
     enabled,
@@ -774,6 +776,7 @@ function getPluginInfo() {
     version: p.version,
     description: p.description,
     category: p.category,
+    stage: p.stage,
     source: p.source,
     enabled: p.enabled,
     loaded: p.loaded,

@@ -6,6 +6,7 @@
 
 const SiteColors = require("../shared/site-colors");
 const SidePanelSplit = require("../shared/side-panel-split");
+const PluginStages = require("../shared/plugin-stages");
 
 const DEFAULT_SETTINGS = {
   sidePanelEnabled: true,
@@ -40,6 +41,11 @@ const DEFAULT_SETTINGS = {
   // (applied at the next start). Off: show them in Settings > Plugins > Browse
   // and the notifications list. See plugin-directory.js.
   pluginAutoUpdate: false,
+  // Lowest release stage (plugin-stages.js: pre-alpha, alpha, beta, rc, stable)
+  // a plugin update must be at to be announced or installed automatically.
+  // pluginUpdateStageOverrides { "<id>": "<stage>" } sets it for one plugin.
+  pluginUpdateStage: "stable",
+  pluginUpdateStageOverrides: {},
   // Middle-click or Ctrl+click on a link in a page: true opens the new tab in the
   // background and stays on the current tab (like Chrome). False switches to it.
   linkClickBackground: false,
@@ -74,6 +80,8 @@ function validateSettings(s) {
   if (s.unreadTabBadges !== undefined && typeof s.unreadTabBadges !== "boolean") return false;
   if (s.siteTabColors !== undefined && typeof s.siteTabColors !== "boolean") return false;
   if (s.pluginAutoUpdate !== undefined && typeof s.pluginAutoUpdate !== "boolean") return false;
+  if (s.pluginUpdateStage !== undefined && !PluginStages.isStage(s.pluginUpdateStage)) return false;
+  if (!PluginStages.validOverrides(s.pluginUpdateStageOverrides)) return false;
   if (s.linkClickBackground !== undefined && typeof s.linkClickBackground !== "boolean") return false;
   if (s.popOutAlwaysOnTop !== undefined && typeof s.popOutAlwaysOnTop !== "boolean") return false;
   if (s.windowsDeviceSignOn !== undefined && typeof s.windowsDeviceSignOn !== "boolean") return false;

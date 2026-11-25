@@ -287,6 +287,17 @@
                 your plugins download by themselves and apply the next time you start MSP++. With it off, they're
                 listed here and in the notifications.
               </p>
+
+              <div class="settings-field plugin-update-stage-field">
+                <label class="settings-field-label" for="setting-plugin-update-stage">Update Plugins To</label>
+                <select id="setting-plugin-update-stage" class="settings-select-input"></select>
+              </div>
+              <p class="settings-description">
+                Plugins can be marked pre-alpha, alpha, beta, RC (release candidate) or stable. An update below the
+                stage you pick here isn't announced or installed automatically; you stay on the version you have until
+                one at your stage comes out. You can still install it yourself from the list above. A plugin's own
+                settings tab can change this for that plugin.
+              </p>
             </div>
           </div>
 
@@ -298,6 +309,7 @@
     <script src="../shared/safe-html.js"></script>
     <script src="../shared/site-colors.js"></script>
     <script src="../shared/plugin-categories.js"></script>
+    <script src="../shared/plugin-stages.js"></script>
     <script src="settings_renderer.js"></script>
   </body>
 </html>

@@ -77,6 +77,8 @@ Every install, update and removal happens at the next start, because a running p
 
 MSP++ checks the directory 30 seconds after it starts, then once a day, or when you click **Check Now**. When updates are waiting you get a count on Plugins and Browse, an **Update All** button and a notification. Turn on **Install Plugin Updates Automatically** to download them without asking.
 
+Plugins can be marked **pre-alpha**, **alpha**, **beta** or **RC** when they're not finished yet, shown as a coloured badge. **Update Plugins To** (stable only by default) decides which of those updates you're offered. See [Plugin release stages](../plugin-release-stages.md).
+
 Each download is checked against the size and SHA-256 listed in the directory before it's unpacked.
 
 Plugin versions match the app release they belong to. A fix to a plugin between app releases gets a fourth number, so `0.8.7.1` is a fix to the plugin that came with MSP++ 0.8.7. Those need MSP++ 0.8.7 or later: older copies don't see them in Browse until the app is updated. See [Plugin version numbers](../plugins.md#plugin-version-numbers).

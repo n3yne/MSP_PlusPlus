@@ -83,6 +83,7 @@ Every plugin must have a `manifest.json` at its root:
 | `name` | No | Human-readable display name. |
 | `version` | No | Plugin version: `major.minor.patch`, or `major.minor.patch.fix` for a plugin-only fix (app 0.8.7+). See [Plugin version numbers](#plugin-version-numbers). |
 | `description` | No | One-line summary. |
+| `stage` | No | *App 0.8.10+.* Release stage: `pre-alpha`, `alpha`, `beta`, `rc` or `stable` (the default when left out). Shown as a badge; users choose the lowest stage they take updates at. See [Plugin release stages](plugin-release-stages.md). |
 | `category` | No | The group the plugin is listed under in Settings → Plugins and in the Settings nav. The built-in categories, in display order, are `Sites`, `Tickets`, `Notes & Replies`, `Time & Reminders`, `AI`, `Tabs & Toolbars` and `Security` (matched case-insensitively). Any other name (up to 40 characters) becomes its own group after those. Without one, a site plugin goes under `Sites` and anything else under `Other`. See `src/shared/plugin-categories.js`. |
 | `author` | No | Plugin author name. |
 | `main` | No | Relative path to the main-process entry file. |
@@ -853,7 +854,7 @@ In a development checkout (`npm start`) every folder here loads as a bundled plu
 **Settings → Plugins → Browse** lists plugins from the MSP++ plugin directory, grouped by the same categories as the Installed list. Each one can be installed, updated or removed there.
 
 - The directory is `index.json` on the `plugin-directory` release of this repo: `https://github.com/n3yne/MSP_PlusPlus/releases/download/plugin-directory/index.json`. That release is a pre-release, so the app updater (which follows the latest release) never mistakes it for an app version.
-- Each entry gives the plugin's id, name, description, category, version, `minAppVersion`, `requires` (ids of other plugins it needs; installing it installs those too), the package file name, its SHA-256 and its size in bytes. A download that doesn't match the size and SHA-256 exactly is refused before anything is unpacked. Package URLs have to stay inside the same release folder.
+- Each entry gives the plugin's id, name, description, category, version, `stage` (only when not stable; see [Plugin release stages](plugin-release-stages.md)), `minAppVersion`, `requires` (ids of other plugins it needs; installing it installs those too), the package file name, its SHA-256 and its size in bytes. A download that doesn't match the size and SHA-256 exactly is refused before anything is unpacked. Package URLs have to stay inside the same release folder.
 - MSP++ checks the directory 30 seconds after it starts and then once a day, plus **Check Now**. Updates for installed plugins show a count on Plugins and Browse, an **Update All** button and a notification in the main window. **Install Plugin Updates Automatically** (off by default) downloads them by itself.
 - No plugin is bundled with the app any more: every plugin in `plugins/` is a directory plugin, and a new install (or an update from 0.8.0) opens the first-start plugin picker (`src/shared/setup-picker.js`) whenever no site plugin is installed. In a development checkout (`npm start`) every plugin in `plugins/` still loads as bundled, so the picker doesn't open there.
 - If an installed plugin has the same `id` as a bundled one, the newer version loads and the other is skipped (a tie goes to the bundled copy). A fixed bundled plugin can go out through the directory before the next app release that way; removing the directory copy brings back the bundled one.
@@ -884,6 +885,7 @@ Plugin source stays in `plugins/` in this repo, tested like every other plugin. 
 |---|---|
 | `"distribution"` | `"bundled"` (the default) ships the plugin inside the app. `"directory"` leaves it out of the app and publishes it to the directory instead. A directory plugin's folder name must match its `id`, and it needs a `version`, `name`, `description` and `category`. |
 | `"requires"` | Ids of other plugins this one needs, such as `["ai-features"]`. Installing it from the directory installs those too, and removing one of them warns about what needs it. |
+| `"stage"` | How finished this version is: `pre-alpha`, `alpha`, `beta`, `rc` or `stable` (default). Users on "Stable only" (the default) aren't offered updates below stable automatically. See [Plugin release stages](plugin-release-stages.md). |
 
 A directory plugin must also be left out of the app build: add `"!plugins/<id>/**"` to `build.files` in `package.json` (a test checks the list matches).
 

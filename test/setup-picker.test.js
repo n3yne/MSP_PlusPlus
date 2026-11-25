@@ -2,6 +2,7 @@
 
 const SetupPicker = require("../src/shared/setup-picker");
 const PluginCategories = require("../src/shared/plugin-categories");
+const PluginStages = require("../src/shared/plugin-stages");
 
 const index = [
   { id: "freshservice", name: "Freshservice", category: "Sites", site: true, status: "available", requires: [] },
@@ -25,6 +26,15 @@ describe("setup picker choices", () => {
   test("pre-ticks plugins in use before the update, with what they need, but not incompatible ones", () => {
     const c = SetupPicker.buildChoices(index, ["solutions-chat", "future", "not-listed"], PluginCategories);
     expect([...c.selected].sort()).toEqual(["ai-features", "freshservice", "solutions-chat"]);
+  });
+
+  test("leaves plugins below stable unticked even if they were in use", () => {
+    const staged = index.map((p) => (p.id === "note-backup" ? Object.assign({}, p, { stage: "beta" }) : p));
+    const c = SetupPicker.buildChoices(staged, ["note-backup", "solutions-chat"], PluginCategories, PluginStages);
+    expect([...c.selected].sort()).toEqual(["ai-features", "freshservice", "solutions-chat"]);
+    // Without the stages module (older callers), nothing changes.
+    const old = SetupPicker.buildChoices(staged, ["note-backup"], PluginCategories);
+    expect([...old.selected]).toEqual(["note-backup"]);
   });
 
   test("ticking adds requirements; unticking a requirement unticks what needs it", () => {

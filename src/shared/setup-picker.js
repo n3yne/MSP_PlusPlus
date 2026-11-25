@@ -12,7 +12,8 @@
   // Directory entries, split into site plugins and the rest (grouped by category).
   //   plugins    plugin-directory getState().plugins
   //   preselect  ids to tick (plugins that were in use before the update)
-  function buildChoices(plugins, preselect, Categories) {
+  //   Stages     plugin-stages.js, when loaded: plugins below stable start unticked
+  function buildChoices(plugins, preselect, Categories, Stages) {
     const list = (Array.isArray(plugins) ? plugins : []).filter(function (p) {
       return p && p.status !== "installed" && p.status !== "update";
     });
@@ -25,7 +26,8 @@
     const selected = new Set();
     const pre = Array.isArray(preselect) ? preselect : [];
     for (const p of list) {
-      if (pre.includes(p.id) && p.compatible !== false) selected.add(p.id);
+      const stable = !Stages || Stages.isStable(p.stage);
+      if (pre.includes(p.id) && p.compatible !== false && stable) selected.add(p.id);
     }
     return { sites: sites, groups: groups, selected: closeOver(selected, list) };
   }
@@ -144,6 +146,14 @@
     const text = el("span", "plugin-setup-text");
     const title = el("span", "plugin-setup-name", p.name);
     if (p.version) title.appendChild(el("span", "plugin-setup-version", " v" + p.version));
+    const Stages = root.PluginStages;
+    if (Stages && !Stages.isStable(p.stage)) {
+      const st = Stages.info(p.stage);
+      const badge = el("span", "plugin-badge plugin-badge-stage plugin-badge-stage-" + st.id, st.label);
+      badge.title = st.description;
+      title.appendChild(document.createTextNode(" "));
+      title.appendChild(badge);
+    }
     text.appendChild(title);
     if (p.description) text.appendChild(el("span", "plugin-setup-desc", p.description));
     const needs = requiredNames(p, entries);
@@ -219,7 +229,8 @@
     }
     // On an update, keep ticks the user already changed on a retry.
     const keep = choices ? Array.from(selected) : status.preselect;
-    choices = buildChoices(state.plugins, keep, root.PluginCategories);
+    // A retry keeps whatever the user ticked, below stable or not.
+    choices = buildChoices(state.plugins, keep, root.PluginCategories, choices ? null : root.PluginStages);
     entries = [].concat(choices.sites, ...choices.groups.map(function (g) { return g.plugins; }));
     selected = choices.selected;
     if (!entries.length) {

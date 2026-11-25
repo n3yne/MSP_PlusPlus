@@ -11,7 +11,8 @@
     "build-portable": "node scripts/build-native.js && electron-builder --win portable",
     "build-installer": "node scripts/build-native.js && electron-builder --win nsis",
     "build-mac": "electron-builder --mac",
-    "build-native": "node scripts/build-native.js"
+    "build-native": "node scripts/build-native.js",
+    "build-store": "node scripts/build-native.js && electron-builder --win appx"
   },
   "author": "",
   "license": "MIT",
@@ -73,6 +74,21 @@
       "createStartMenuShortcut": true,
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
+    },
+    "appx": {
+      "identityName": "MSPPlusPlus.PLACEHOLDER",
+      "publisher": "CN=00000000-0000-0000-0000-000000000000",
+      "publisherDisplayName": "PLACEHOLDER",
+      "applicationId": "MSPPlusPlus",
+      "displayName": "MSP++",
+      "backgroundColor": "transparent",
+      "languages": [
+        "en-US"
+      ],
+      "minVersion": "10.0.18362.0",
+      "addAutoLaunchExtension": false,
+      "electronUpdaterAware": false,
+      "artifactName": "MSP-PlusPlus-Store-${version}.${ext}"
     },
     "mac": {
       "target": [

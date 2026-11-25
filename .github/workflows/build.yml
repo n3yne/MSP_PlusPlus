@@ -75,6 +75,31 @@ jobs:
             dist/latest.yml
           retention-days: 90
 
+      # Microsoft Store package (MSIX/AppX). It is built unsigned on purpose: the
+      # Store signs it with Microsoft's certificate after upload. It is not put on
+      # the GitHub release (an unsigned package can't be installed from there);
+      # download it from the run's artifacts and upload it in Partner Center.
+      # The Store copy doesn't update itself (src/main/updater.js, "store" mode).
+      # See docs/microsoft-store.md.
+      - name: Build Microsoft Store package
+        run: npx electron-builder --win appx --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - name: Check Store identity
+        shell: bash
+        run: |
+          if grep -q PLACEHOLDER package.json; then
+            echo "::warning::package.json build.appx still has placeholder identity values. Partner Center will refuse this package until they are replaced (docs/microsoft-store.md)."
+          fi
+
+      - name: Upload Microsoft Store artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-store
+          path: dist/*.appx
+          retention-days: 90
+
   build-mac:
     runs-on: macos-latest
 

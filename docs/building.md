@@ -47,11 +47,14 @@ npm run build
 npm run build-portable
 npm run build-installer
 
+# Microsoft Store package (.appx, Windows only)
+npm run build-store
+
 # macOS .dmg
 npm run build-mac
 ```
 
-Output goes to `dist/`. Building the Windows installer on Linux needs wine.
+Output goes to `dist/`. Building the Windows installer on Linux needs wine. The Store package needs the Windows SDK's `makeappx`, so it only builds on Windows; see [Microsoft Store build](microsoft-store.md).
 
 ### The native Windows modules
 

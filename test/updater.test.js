@@ -37,6 +37,12 @@ describe("detectUpdateMode", () => {
     expect(detectUpdateMode(base)).toEqual({ mode: "auto", reason: "" });
   });
 
+  test("Microsoft Store build leaves updates to the Store", () => {
+    expect(detectUpdateMode({ ...base, windowsStore: true })).toEqual({ mode: "store", reason: "store" });
+    // Running from source is still "dev", even inside a package.
+    expect(detectUpdateMode({ ...base, windowsStore: true, isPackaged: false }).reason).toBe("dev");
+  });
+
   test("portable, Mac, source and builds without app-update.yml only notify", () => {
     expect(detectUpdateMode({ ...base, env: { PORTABLE_EXECUTABLE_DIR: "D:\\" } }).reason).toBe("portable");
     expect(detectUpdateMode({ ...base, platform: "darwin" }).reason).toBe("mac");
@@ -184,5 +190,36 @@ describe("createUpdater (portable / Mac / source)", () => {
     const updater = createUpdater(notifyOpts(async () => ({ ok: false, status: 500 })).opts);
     expect(await updater.download()).toHaveProperty("error");
     expect(updater.install()).toHaveProperty("error");
+  });
+});
+
+describe("createUpdater (Microsoft Store)", () => {
+  test("never checks, downloads or installs", async () => {
+    jest.useFakeTimers();
+    try {
+      const fetchImpl = jest.fn();
+      const updater = createUpdater({
+        currentVersion: "0.8.10",
+        isPackaged: true,
+        platform: "win32",
+        env: {},
+        resourcesPath: "/res",
+        exists: () => true,
+        windowsStore: true,
+        getSettings: async () => ({}),
+        broadcast: () => {},
+        loadAutoUpdater: () => { throw new Error("must not load electron-updater"); },
+        fetchImpl,
+      });
+      updater.start();
+      jest.advanceTimersByTime(24 * 60 * 60 * 1000);
+      expect(await updater.check()).toMatchObject({ mode: "store", reason: "store", state: "idle" });
+      expect(fetchImpl).not.toHaveBeenCalled();
+      expect(await updater.download()).toHaveProperty("error");
+      expect(updater.install()).toHaveProperty("error");
+      updater.stop();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

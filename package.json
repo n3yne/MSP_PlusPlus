@@ -86,6 +86,7 @@
         "en-US"
       ],
       "minVersion": "10.0.18362.0",
+      "maxVersionTested": "10.0.26100.0",
       "addAutoLaunchExtension": false,
       "electronUpdaterAware": false,
       "artifactName": "MSP-PlusPlus-Store-${version}.${ext}"

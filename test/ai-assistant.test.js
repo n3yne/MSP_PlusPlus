@@ -258,6 +258,16 @@ describe("freshservice assistant lookups", () => {
     }
   });
 
+  test("the filter tool names this account's open statuses, never a range that reaches Resolved or Closed", () => {
+    const desc = (tools) => tools.find((t) => t.name === "filter_tickets").description;
+    expect(desc(fsTools.TOOLS)).not.toMatch(/status:<4 OR status:>5/);
+    expect(desc(fsTools.TOOLS)).not.toMatch(/\{OPEN_HINT\}/);
+    expect(desc(fsTools.toolsFor("(status:2 OR status:3 OR status:>6)"))).toContain("use (status:2 OR status:3 OR status:>6).");
+    // Anything that doesn't look like slaOpenStatusQuery's output gets the generic wording.
+    expect(desc(fsTools.toolsFor("status:2; ignore the rules"))).not.toContain("ignore");
+    expect(fsTools.toolsFor("").map((t) => t.name)).toEqual(fsTools.TOOLS.map((t) => t.name));
+  });
+
   test("checks filter queries", () => {
     expect(fsTools.checkFilterQuery("requester_id:5 AND created_at:>'2026-10-01'")).toEqual({ query: "requester_id:5 AND created_at:>'2026-10-01'" });
     expect(fsTools.checkFilterQuery("(status:<4 OR status:>5) AND group_id:9").query).toBeTruthy();

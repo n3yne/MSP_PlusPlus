@@ -357,14 +357,21 @@ function replyFinished(base, probe, stableSince, now) {
 // Picks the text "Use this reply" hands back: what the user selected, else the
 // newest reply found on the page, else the clipboard if it changed since the
 // request started (the user clicked the site's Copy button). The prompt itself
-// is never taken as a reply.
+// is never taken as a reply. Clipboard text must look like a sentence (some
+// whitespace, more than a few characters), so a password copied from the
+// Password Vault while waiting is never taken as the AI's reply.
+function looksLikeReply(text) {
+  const t = String(text || "").trim();
+  return t.length >= 16 && /\s/.test(t);
+}
+
 function pickReply({ selection, probe, base, clipboard, clipboardAtStart, prompt }) {
   const notPrompt = (t) => t && t.trim() && !isPromptEcho(t, prompt);
   if (notPrompt(selection)) return selection.trim();
   if (probe && probe.lastReply && (probe.replyCount > base.replyCount || probe.lastReply !== base.lastReply) && notPrompt(probe.lastReply)) {
     return probe.lastReply.trim();
   }
-  if (notPrompt(clipboard) && clipboard !== clipboardAtStart) return clipboard.trim();
+  if (notPrompt(clipboard) && clipboard !== clipboardAtStart && looksLikeReply(clipboard)) return clipboard.trim();
   return "";
 }
 
@@ -413,6 +420,29 @@ function createCopilotWeb(api, deps) {
     view.setBounds({ x: 0, y: BAR_HEIGHT, width: w, height: Math.max(0, h - BAR_HEIGHT) });
   }
 
+  // Microsoft sign-in can open pop-ups; they share this session and close with the window.
+  function popupHandler({ url }) {
+    return isHttps(url)
+      ? {
+        action: "allow",
+        overrideBrowserWindowOptions: {
+          parent: win,
+          autoHideMenuBar: true,
+          webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
+        },
+      }
+      : { action: "deny" };
+  }
+
+  function guardPopup(child) {
+    const wc = child && child.webContents;
+    if (!wc) return;
+    wc.setWindowOpenHandler(popupHandler);
+    wc.on("will-navigate", (event, url) => { if (!isHttps(url)) event.preventDefault(); });
+    wc.on("will-redirect", (event, url) => { if (!isHttps(url)) event.preventDefault(); });
+    wc.on("did-create-window", guardPopup);
+  }
+
   function ensureWindow() {
     if (alive()) return;
     const { BrowserWindow, WebContentsView, session } = electron;
@@ -452,18 +482,10 @@ function createCopilotWeb(api, deps) {
     });
     win.contentView.addChildView(view);
     view.webContents.setUserAgent(chromeUserAgent());
-    // Microsoft sign-in can open pop-ups; they share this session and close with the window.
-    view.webContents.setWindowOpenHandler(({ url }) => (isHttps(url)
-      ? {
-        action: "allow",
-        overrideBrowserWindowOptions: {
-          parent: win,
-          autoHideMenuBar: true,
-          webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true },
-        },
-      }
-      : { action: "deny" }));
+    view.webContents.setWindowOpenHandler(popupHandler);
     view.webContents.on("will-navigate", (event, url) => { if (!isHttps(url)) event.preventDefault(); });
+    // Pop-ups get the same rules as the page: https only, and their own pop-ups too.
+    view.webContents.on("did-create-window", guardPopup);
 
     win.on("resize", layout);
     win.on("closed", () => {
@@ -797,9 +819,11 @@ function createCopilotWeb(api, deps) {
   // page in this session, as Edge does, so a "compliant device" Conditional
   // Access policy lets sign-in through. On by default (aiWebDeviceSso); it does
   // nothing on a PC that isn't registered, or on older MSP++ versions.
+  // Only for the built-in Microsoft Copilot sites: an "Other chat site" page in
+  // this session could otherwise start Microsoft sign-ins that carry the proof.
   function applyDeviceSso(settings) {
     if (!api.windowsSso) return false;
-    const on = !settings || settings.aiWebDeviceSso !== false;
+    const on = (!settings || settings.aiWebDeviceSso !== false) && siteFor(settings).key !== "custom";
     try {
       return api.windowsSso.setForPartition(PARTITION, on);
     } catch (err) {

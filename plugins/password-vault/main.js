@@ -242,7 +242,12 @@ module.exports = {
       if (hello) hello.remove();
       return status();
     });
-    handle("change-password", async (d) => { await session.changePassword(d.current, d.next); return status(); });
+    handle("change-password", async (d) => {
+      const res = await session.changePassword(d.current, d.next);
+      // Windows Hello wrapped the old vault key, so it was turned off: drop its key too.
+      if (res && res.helloTurnedOff && hello) hello.remove();
+      return Object.assign(status(), { helloTurnedOff: !!(res && res.helloTurnedOff) });
+    });
     handle("backup", async () => {
       session.listEntries(); // throws when locked, before any dialog
       const win = BrowserWindow.getFocusedWindow();

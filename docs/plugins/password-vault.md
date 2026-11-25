@@ -32,7 +32,7 @@ Auto-fill only happens when you ask for it, never just because a page loaded.
 | `https://service.rakedigital.com` | `service.rakedigital.com` only (`www.` is ignored) |
 | `https://rakedigital.com` with **Also auto-fill on its subdomains** ticked | `rakedigital.com` and any address ending in `.rakedigital.com` |
 
-Tick **Also auto-fill on its subdomains** in the entry only when you trust every site under that name. It's off by default, so a login for one client's `x.freshservice.com` is never offered on another client's tenant.
+Tick **Also auto-fill on its subdomains** in the entry only when you trust every site under that name. It's ignored for names anyone can have a subdomain of, such as `co.uk`, `github.io`, `azurewebsites.net` or `freshservice.com`: those entries only fill their exact site. It's off by default, so a login for one client's `x.freshservice.com` is never offered on another client's tenant.
 
 **Safety checks:** it only fills `https://` pages, only when the page in the tab right now matches the entry's website (it checks again at the moment it fills, in case the page changed), and only in the page itself, not in frames inside it. The password goes from the vault straight into the page and never passes through the side panel. Once filled, the page can read what's in the box, just as it can when you type it, so only fill sites you trust.
 
@@ -61,7 +61,7 @@ In the Vault tab, behind the **⚙** button (the vault must be unlocked). They'r
 | Ask again when Windows locks or the PC sleeps | Asks again on Windows lock (`Win+L`) and sleep. | On |
 | Clear a copied password from the clipboard after | 10 seconds, 30 seconds, 1 minute, 2 minutes or never. | 30 seconds |
 | Windows Hello | Lets your face, fingerprint or PIN answer when the vault asks again. Turning it on needs the master password. Only shown on Windows PCs with Windows Hello set up. | Off |
-| Change master password | Needs the current one. Entries and Windows Hello carry on working. | – |
+| Change master password | Needs the current one. Entries stay, but the vault is encrypted again with a new key and its `.bak` copy is replaced, so the old password no longer opens it (or any later save). Windows Hello is turned off, because it held the old key: turn it on again afterwards. Encrypted copies saved earlier still open with the old password. | – |
 | Save an encrypted copy… | Saves the vault file, still encrypted, wherever you choose. It opens with the master password you had when you saved it. | – |
 | Delete the vault | Needs the master password. Removes the vault and its `.bak` copy from this PC. | – |
 

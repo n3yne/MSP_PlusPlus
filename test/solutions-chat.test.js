@@ -109,6 +109,11 @@ describe("solutions-chat for chat-website providers", () => {
 
   test("buildAnswerPrompt leaves a prompt that already fits alone", () => {
     expect(chat.buildAnswerPrompt("q?", [], "", articles, source, 60000)).toBe(chat.buildAnswerPrompt("q?", [], "", articles, source));
+    // A long ticket and history are shortened too when the articles can't go any shorter.
+    const history = [{ role: "user", text: "h".repeat(2000) }, { role: "assistant", text: "a".repeat(2000) }];
+    const squeezed = chat.buildAnswerPrompt("q?", history, "t".repeat(9000), articles, source, 6000);
+    expect(squeezed.length).toBeLessThanOrEqual(6000);
+    expect(squeezed).toContain("[ticket text shortened]");
   });
 
   test("fitArticles doesn't change the originals", () => {

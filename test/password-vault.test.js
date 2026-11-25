@@ -445,6 +445,29 @@ describe("password-vault password change and backup", () => {
     expect(s2.listEntries().map((e) => e.name)).toEqual(["Keep me"]);
   });
 
+  test("change password: new vault key, and the .bak no longer opens with the old password", async () => {
+    const s = await created();
+    await s.saveEntry({ name: "Secret" });
+    const before = fs.readFileSync(vaultFile(), "utf8"); // what someone may have copied earlier
+    await s.saveEntry({ name: "Second" }); // .bak now holds `before`'s successor, still the old password
+    const res = await s.changePassword(PW, PW2);
+    expect(res.helloTurnedOff).toBe(false);
+    // The .bak is the new file.
+    expect(fs.readFileSync(vaultFile() + ".bak", "utf8")).toBe(fs.readFileSync(vaultFile(), "utf8"));
+    // The old password + an old copy gives the old vault key, which no longer opens the new file.
+    const oldFile = C.parseFile(before);
+    const mk = await C.deriveKey(PW, oldFile.header.kdf);
+    const oldKey = C.unwrapVaultKey(mk, oldFile.keyWrap, oldFile.header);
+    const now = C.parseFile(fs.readFileSync(vaultFile(), "utf8"));
+    expect(() => C.decryptPayload(oldKey, now.data, now.header)).toThrow();
+    // Entries stay and later saves work with the new key.
+    await s.saveEntry({ name: "Third" });
+    const s2 = makeSession();
+    await s2.init();
+    await s2.unlock(PW2);
+    expect(s2.listEntries().map((e) => e.name).sort()).toEqual(["Second", "Secret", "Third"]);
+  });
+
   test("backup copy is the encrypted file and opens with the password", async () => {
     const s = await created();
     await s.saveEntry({ name: "Backed up" });
@@ -578,13 +601,16 @@ describe("password-vault Windows Hello", () => {
     expect(s.state).toBe("locked");
   });
 
-  test("changing the master password keeps Hello working", async () => {
+  test("changing the master password turns Hello off (it wrapped the old key)", async () => {
     const hello = fakeHello();
     const s = await created({ hello });
     await s.enableHello(PW);
-    await s.changePassword(PW, PW2);
+    const res = await s.changePassword(PW, PW2);
+    expect(res.helloTurnedOff).toBe(true);
+    expect(s.status().helloEnabled).toBe(false);
     s.reprompt();
-    await s.unlockWithHello();
+    expect(s.state).toBe("locked");
+    await s.unlock(PW2);
     expect(s.state).toBe("unlocked");
   });
 

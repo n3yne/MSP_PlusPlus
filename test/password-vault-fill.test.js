@@ -16,6 +16,14 @@ const PW = "correct horse battery";
 describe("password-vault auto-fill matching", () => {
   test("this site only by default: same host, www. ignored, https page only", () => {
     expect(F.siteMatches("https://service.rakedigital.com/login", "https://service.rakedigital.com/a/b?c", "host")).toBe(true);
+    // Subdomain mode never spreads across names anyone can have a subdomain of.
+    expect(F.siteMatches("co.uk", "https://evil.co.uk/", "domain")).toBe(false);
+    expect(F.siteMatches("https://github.io", "https://attacker.github.io/", "domain")).toBe(false);
+    expect(F.siteMatches("freshservice.com", "https://other-tenant.freshservice.com/", "domain")).toBe(false);
+    expect(F.siteMatches("github.io", "https://github.io/", "domain")).toBe(true);
+    expect(F.siteMatches("example.co.uk", "https://login.example.co.uk/", "domain")).toBe(true);
+    expect(F.isSharedSuffix("com.au")).toBe(true);
+    expect(F.isSharedSuffix("example.com")).toBe(false);
     expect(F.siteMatches("service.rakedigital.com", "https://service.rakedigital.com/", "host")).toBe(true);
     expect(F.siteMatches("https://www.example.com", "https://example.com/", "host")).toBe(true);
     expect(F.siteMatches("https://example.com", "https://www.example.com/", "host")).toBe(true);

@@ -27,6 +27,7 @@ If MSP++ can't find Copilot's message box (it hasn't loaded, you're signed out, 
 
 - It only works on a PC your company already manages (if Copilot signs in in Edge without asking about the device, it should work here). On any other PC Windows has no proof to give, and nothing changes.
 - The proof goes only to `login.microsoftonline.com` and `login.microsoft.com`, over https, on page loads. It's made fresh by Windows for each request and never saved or shown to plugins.
+- It's only used with the two Microsoft Copilot sites, never with **Other chat site**, so another site can't start Microsoft sign-ins that carry it.
 - The setting shows whether Windows has a proof on this PC. It only appears on Windows.
 - If you were already shown error 53000, click **Sign out**, then **Open and sign in** again.
 

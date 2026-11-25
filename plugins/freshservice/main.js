@@ -894,9 +894,14 @@ module.exports = {
     // the configured domain; see assistant-tools.js.
     api.handle("assistant-tools", async function () {
       const conn = connection();
+      // The filter tool tells the AI how to ask for "open" on this account.
+      let openQuery = "";
+      if (!conn.error) {
+        try { openQuery = slaOpenStatusQuery(await fieldLabels(conn)); } catch { /* generic wording */ }
+      }
       return {
         site: "Freshservice",
-        tools: assistantTools.TOOLS,
+        tools: assistantTools.toolsFor(openQuery),
         ready: !conn.error,
         error: conn.error || undefined,
         linkBase: conn.error ? "" : "https://" + conn.domain + "/a/tickets/",
@@ -1445,19 +1450,21 @@ function formatTicketState(t) {
 }
 
 // The ticket filter for "not resolved or closed", e.g.
-// "(status:2 OR status:3 OR status:6 OR status:>6)". Freshservice's :< and :>
+// "(status:2 OR status:3 OR status:6 OR status:>7)". Freshservice's :< and :>
 // include the number itself (status:<4 matches Resolved too), so a range
 // like (status:<4 OR status:>5) matches every ticket, closed ones included.
 // Instead each open status from the account's form is named, plus everything
-// above the highest status known, for custom statuses the form didn't list
-// (that range can't reach 4 or 5 whichever way the operator works).
+// above the highest status known, for custom statuses the form didn't list.
+// That range starts one above the highest known status: :> includes its own
+// number, so "status:>5" on an account with no custom statuses would match
+// Closed (5), and the highest custom status may itself mean Closed.
 function slaOpenStatusQuery(labels) {
   const names = (labels && labels.status) || STATUS_LABELS;
   const all = Object.keys(names).map(Number).filter((n) => Number.isInteger(n) && n > 0);
   const open = all
     .filter((n) => n !== 4 && n !== 5 && !/^(?:resolved|closed)$/i.test(String(names[n] || "")))
     .sort((a, b) => a - b);
-  const top = Math.max(5, ...all);
+  const top = Math.max(5, ...all) + 1;
   return "(" + open.map((n) => "status:" + n).concat("status:>" + top).join(" OR ") + ")";
 }
 

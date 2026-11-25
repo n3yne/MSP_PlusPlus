@@ -554,7 +554,8 @@
     const pw = h("input", { type: "password", className: "pv-input pv-mono", value: e.password, maxlength: "1000", autocomplete: "off", spellcheck: "false" });
     const url = h("input", { className: "pv-input", value: e.url, maxlength: "2048", placeholder: "https://", spellcheck: "false" });
     const sub = h("input", { type: "checkbox", checked: e.match === "domain" });
-    const subLabel = h("label", { className: "pv-check", title: "Off: only this exact site. On: also any address that ends in this site's name, e.g. eu.example.com for example.com." }, [
+    const subLabel = h("label", { className: "pv-check", title: "Off: only this exact site. On: also any address that ends in this site's name, e.g. eu.example.com for example.com. " +
+      "Ignored for names anyone can have a subdomain of, such as github.io or co.uk." }, [
       sub, " Also auto-fill on its subdomains",
     ]);
     const fold = h("input", { className: "pv-input", value: e.folder, maxlength: "100", list: "pv-folders", placeholder: "Optional" });
@@ -764,9 +765,11 @@
       onsubmit: function (ev) {
         ev.preventDefault();
         if (next.value !== next2.value) return flash("The new passwords don't match.", "error");
-        act("change-password", { current: cur.value, next: next.value }, function () {
+        act("change-password", { current: cur.value, next: next.value }, function (res) {
           cur.value = next.value = next2.value = "";
-          flash("Master password changed. Encrypted copies you made before still open with the old one.", "ok");
+          flash("Master password changed, and the vault was encrypted again with a new key, so the old password no longer opens it. " +
+            (res && res.helloTurnedOff ? "Windows Hello was turned off: turn it on again below. " : "") +
+            "Encrypted copies you saved before still open with the old password.", "ok");
         });
       },
     }, [

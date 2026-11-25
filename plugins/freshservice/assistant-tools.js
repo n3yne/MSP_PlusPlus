@@ -31,7 +31,7 @@ const EMAIL_PATTERN = /^[^\s@"'<>\\,]{1,64}@[^\s@"'<>\\,]{1,253}$/;
 
 const ID_SCHEMA = { type: "integer", minimum: 1 };
 
-const TOOLS = [
+const TOOL_LIST = [
   {
     name: "get_ticket",
     description: "Read one Freshservice ticket: subject, status, priority, requester, agent, group, dates, description and its replies and notes.",
@@ -48,8 +48,8 @@ const TOOLS = [
       "Fields: status (2 Open, 3 Pending, 4 Resolved, 5 Closed, or a custom status number), priority (1 Low, 2 Medium, 3 High, 4 Urgent), " +
       "requester_id, agent_id, group_id, department_id, type ('Incident' or 'Service Request'), tag, " +
       "created_at, updated_at, due_by (dates as 'YYYY-MM-DD' with :> or :<). " +
-      "Combine with AND / OR and parentheses. Strings and dates use single quotes. There is no NOT: " +
-      "for 'not resolved or closed' use (status:<4 OR status:>5). " +
+      "Combine with AND / OR and parentheses. Strings and dates use single quotes. :> and :< include the number itself. " +
+      "{OPEN_HINT} " +
       "Example: requester_id:123 AND created_at:>'2026-10-01'. Find ids first with find_requester, find_agent or list_groups.",
     parameters: {
       type: "object",
@@ -153,6 +153,26 @@ const TOOLS = [
   },
 ];
 
+// "{OPEN_HINT}" in a description: how to ask for "not resolved or closed".
+// There is no NOT, and a range like (status:<4 OR status:>5) matches every
+// ticket because :< and :> include the number, so the open statuses are named.
+const GENERIC_OPEN_HINT = "There is no NOT: for 'not resolved or closed' name each open status, e.g. (status:2 OR status:3), " +
+  "or use my_open_tickets for the agent's own.";
+
+function openHint(openQuery) {
+  return typeof openQuery === "string" && /^\(status:\d+(?: OR status:>?\d+)*\)$/.test(openQuery)
+    ? "There is no NOT: for 'not resolved or closed' on this account use " + openQuery + "."
+    : GENERIC_OPEN_HINT;
+}
+
+// The lookups, with the filter tool's "open" wording for this account
+// (openQuery from slaOpenStatusQuery, or "" for the generic wording).
+function toolsFor(openQuery) {
+  const hint = openHint(openQuery);
+  return TOOL_LIST.map((t) => Object.assign({}, t, { description: t.description.replace("{OPEN_HINT}", hint) }));
+}
+
+const TOOLS = toolsFor("");
 const TOOL_NAMES = new Set(TOOLS.map((t) => t.name));
 
 // ===== Argument helpers =====
@@ -340,7 +360,7 @@ function checkFilterQuery(raw) {
   if (!q) return { error: "The filter query is empty." };
   if (q.length > MAX_FILTER_QUERY_CHARS) return { error: `The filter query is longer than ${MAX_FILTER_QUERY_CHARS} characters.` };
   if (/["\\]/.test(q)) return { error: "Use single quotes in the filter query, not double quotes or backslashes." };
-  if (/\bNOT\b/i.test(q)) return { error: "Freshservice filters have no NOT. Use ranges such as (status:<4 OR status:>5)." };
+  if (/\bNOT\b/i.test(q)) return { error: "Freshservice filters have no NOT. Name the statuses you want instead, e.g. (status:2 OR status:3)." };
   if (!/^[\w\s:'<>().@+\-,/]+$/.test(q)) return { error: "The filter query has characters Freshservice filters don't use." };
   return { query: q };
 }
@@ -532,6 +552,7 @@ async function lookup(ctx, tool, args) {
 
 module.exports = {
   TOOLS,
+  toolsFor,
   lookup,
   runLookup,
   checkFilterQuery,

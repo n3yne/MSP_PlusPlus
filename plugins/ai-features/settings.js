@@ -100,7 +100,8 @@
       '    <span class="settings-toggle-label">Use Windows Device Sign-On</span>' +
       "  </label>" +
       '  <p class="settings-description">Signs in to Microsoft the way Edge does: Windows vouches that this PC is registered with ' +
-      "your organisation, so sign-in rules that require a compliant device let you in. The proof only goes to Microsoft&#39;s sign-in page.</p>" +
+      "your organisation, so sign-in rules that require a compliant device let you in. The proof only goes to Microsoft&#39;s sign-in page, " +
+      "and only with the Microsoft Copilot sites, never with Other chat site.</p>" +
       '  <p class="settings-description" id="ai-plugin-web-sso-state"></p>' +
       "</div>" +
       '<div class="settings-field settings-field-column" data-ai-providers="copilotweb">' +

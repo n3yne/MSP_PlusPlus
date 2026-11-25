@@ -470,7 +470,7 @@
     if (typeof api.commands.addProvider === "function") {
       // "Set Ticket Status: Pending" etc., from the choices already loaded.
       api.commands.addProvider({
-        id: "quick-actions.set",
+        id: "quick-actions-set",
         group: "Quick Actions",
         items: function (query) {
           // The panel's ticket may be stale (it isn't followed while hidden), so

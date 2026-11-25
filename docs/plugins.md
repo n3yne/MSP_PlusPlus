@@ -261,7 +261,7 @@ Encrypts a secret with the operating system's credential storage (Electron `safe
 
 #### `api.windowsSso`
 
-*App 0.8.6 and later, Windows only.* Windows device sign-on for Microsoft sign-in pages in one of your plugin's own `persist:` sessions, the way Edge does it. On a PC registered with Microsoft Entra ID, MSP++ asks Windows for short-lived signed proofs (`x-ms-RefreshTokenCredential`, `x-ms-DeviceCredential`) and adds them to page loads on `https://login.microsoftonline.com` and `https://login.microsoft.com` only, so Conditional Access sees a known, compliant device. Your plugin never sees the proofs. Check that `api.windowsSso` exists before using it, for older apps.
+*App 0.8.6 and later, Windows only.* Windows device sign-on for Microsoft sign-in pages in one of your plugin's own `persist:` sessions, the way Edge does it. On a PC registered with Microsoft Entra ID, MSP++ asks Windows for short-lived signed proofs (`x-ms-RefreshTokenCredential`, `x-ms-DeviceCredential`) and adds them to page loads on `https://login.microsoftonline.com` and `https://login.microsoft.com` only, so Conditional Access sees a known, compliant device. Your plugin never sees the proofs. Check that `api.windowsSso` exists before using it, for older apps. From app 0.8.10 the app's own tabs and pop-outs get the proofs too, and the user's **Use Windows Device Sign-On** switch is in General settings (`windowsDeviceSignOn` in `getSettings()`, a boolean; `undefined` on older apps): respect it when you turn this on.
 
 | Method | What it does |
 |---|---|

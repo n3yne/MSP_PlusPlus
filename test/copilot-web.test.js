@@ -642,6 +642,14 @@ describe("copilot-web Windows device sign-on", () => {
     await expect(result).rejects.toThrow(/Cancelled/);
   });
 
+  test("follows General's windowsDeviceSignOn when the app has it (0.8.10+)", () => {
+    const { client, windowsSso } = withSso(true);
+    client.applyDeviceSso({ windowsDeviceSignOn: false, aiWebDeviceSso: true });
+    expect(windowsSso.setForPartition).toHaveBeenLastCalledWith(web.PARTITION, false);
+    client.applyDeviceSso({ windowsDeviceSignOn: true, aiWebDeviceSso: false });
+    expect(windowsSso.setForPartition).toHaveBeenLastCalledWith(web.PARTITION, true);
+  });
+
   test("reports whether this MSP++ and this PC have it", async () => {
     expect(await withSso(true).client.deviceSsoStatus()).toEqual({ supported: true, available: true });
     expect(await withSso(false).client.deviceSsoStatus()).toEqual({ supported: true, available: false });

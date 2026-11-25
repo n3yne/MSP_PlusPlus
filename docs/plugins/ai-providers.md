@@ -23,7 +23,7 @@ If MSP++ can't find Copilot's message box (it hasn't loaded, you're signed out, 
 
 **Windows device sign-on**
 
-*MSP++ 0.8.6 and later, Windows.* Many companies only allow Microsoft sign-in from a managed or compliant device (Conditional Access). Edge proves the device to Microsoft automatically; plain browser windows can't, so sign-in fails with error **53000** ("Your device is required to be managed"). With **Use Windows Device Sign-On** on (the default), the Copilot window does what Edge does: on a PC registered with your company's Microsoft Entra ID, MSP++ asks Windows for a short-lived signed proof of the device and sends it to Microsoft's sign-in page.
+*MSP++ 0.8.6 and later, Windows.* Many companies only allow Microsoft sign-in from a managed or compliant device (Conditional Access). Edge proves the device to Microsoft automatically; plain browser windows can't, so sign-in fails with error **53000** ("Your device is required to be managed"). With **Use Windows Device Sign-On** on (the default; in [General settings](../settings.md#general) from MSP++ 0.8.10, where it also covers tabs and pop-out windows), the Copilot window does what Edge does: on a PC registered with your company's Microsoft Entra ID, MSP++ asks Windows for a short-lived signed proof of the device and sends it to Microsoft's sign-in page.
 
 - It only works on a PC your company already manages (if Copilot signs in in Edge without asking about the device, it should work here). On any other PC Windows has no proof to give, and nothing changes.
 - The proof goes only to `login.microsoftonline.com` and `login.microsoft.com`, over https, on page loads. It's made fresh by Windows for each request and never saved or shown to plugins.

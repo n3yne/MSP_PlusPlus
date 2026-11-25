@@ -45,6 +45,11 @@ const DEFAULT_SETTINGS = {
   linkClickBackground: false,
   // Windows opened with "Open in New Window" stay above other windows.
   popOutAlwaysOnTop: false,
+  // Windows only: on a PC registered with the organisation's Microsoft Entra ID,
+  // send Windows' device sign-on proof to Microsoft sign-in pages in tabs and
+  // pop-outs (and the Copilot window), as Edge does, so Conditional Access sees a
+  // known device. See windows-sso.js. Replaces AI Features' aiWebDeviceSso.
+  windowsDeviceSignOn: true,
 };
 
 function validateSettings(s) {
@@ -71,6 +76,7 @@ function validateSettings(s) {
   if (s.pluginAutoUpdate !== undefined && typeof s.pluginAutoUpdate !== "boolean") return false;
   if (s.linkClickBackground !== undefined && typeof s.linkClickBackground !== "boolean") return false;
   if (s.popOutAlwaysOnTop !== undefined && typeof s.popOutAlwaysOnTop !== "boolean") return false;
+  if (s.windowsDeviceSignOn !== undefined && typeof s.windowsDeviceSignOn !== "boolean") return false;
   if (!SiteColors.validOverrides(s.siteTabColorOverrides)) return false;
   if (s.dismissedReleaseVersion !== undefined && (typeof s.dismissedReleaseVersion !== "string" || s.dismissedReleaseVersion.length > 20)) return false;
   return true;
@@ -86,6 +92,12 @@ function migrateCoreSettings(raw) {
       raw.sidePanelEnabled = raw.notePanelEnabled;
     }
     delete raw.notePanelEnabled;
+  }
+  // 0.8.10: "Use Windows Device Sign-On" moved from AI Features (aiWebDeviceSso,
+  // Copilot window only) to General (windowsDeviceSignOn, the whole app). Someone
+  // who turned it off keeps it off. aiWebDeviceSso stays for older plugin versions.
+  if (typeof raw.windowsDeviceSignOn !== "boolean" && raw.aiWebDeviceSso === false) {
+    raw.windowsDeviceSignOn = false;
   }
   return raw;
 }

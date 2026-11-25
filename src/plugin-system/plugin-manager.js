@@ -13,6 +13,7 @@ const PluginCategories = require("../shared/plugin-categories");
 const safeFile = require("../main/safe-file");
 const WindowsHello = require("../main/windows-hello");
 const WindowsSso = require("../main/windows-sso");
+const PrivateClipboard = require("../main/private-clipboard");
 
 const pluginBus = new EventEmitter();
 pluginBus.setMaxListeners(100);
@@ -387,6 +388,11 @@ function buildPluginApi(pluginId, ipcMain) {
     // "persist:" sessions, as Edge does, so "compliant device" Conditional Access
     // lets sign-in through. The plugin never sees the proof. See windows-sso.js.
     windowsSso: WindowsSso.getShared().forPlugin(pluginId),
+
+    // Private clipboard (app 0.8.9+): clipboard.writePrivate(text) copies text
+    // Windows keeps out of clipboard history and cloud sync (password
+    // managers do this); elsewhere it copies normally. See private-clipboard.js.
+    clipboard: PrivateClipboard.getShared(),
 
     decryptCredential(encrypted) {
       if (typeof encrypted !== "string" || !encrypted) return null;

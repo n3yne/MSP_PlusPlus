@@ -61,7 +61,16 @@ module.exports = {
       filePath: path.join(api.getDataPath(), "vault.json"),
       hello,
     });
-    const clip = createClipboardGuard(clipboard);
+    // Copies go through the app's private clipboard (app 0.8.9+), which keeps
+    // them out of Windows clipboard history (Win+V) and cloud clipboard sync.
+    // Clearing writes an empty string, which needs no privacy.
+    const clip = createClipboardGuard({
+      readText: () => clipboard.readText(),
+      writeText: (t) => {
+        if (t && api.clipboard && typeof api.clipboard.writePrivate === "function") api.clipboard.writePrivate(t);
+        else clipboard.writeText(t);
+      },
+    });
     const ready = session.init().catch((e) => api.log("Password Vault: couldn't check for a vault:", e.message));
     let helloSupported = false;
     if (hello) hello.isSupported().then((v) => { helloSupported = v; }).catch(() => {});

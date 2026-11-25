@@ -268,7 +268,13 @@ Encrypts a secret with the operating system's credential storage (Electron `safe
 | `isAvailable()` | Resolves `true` when Windows has a device sign-on proof here: the PC is registered with Entra ID and a work account is signed in to Windows. Cached for a minute. |
 | `setForPartition(partition, on)` | Turns the headers on or off for a session such as `"persist:my-plugin-web"` and returns `on`. Only `persist:` names (letters, digits, `.`, `_`, `-`). It takes over that session's `webRequest.onBeforeSendHeaders` listener, and throws if another plugin has turned it on for the same session. |
 
+Electron allows one `onBeforeSendHeaders` listener per session, so: don't add your own to a session you turn this on for (it would replace this one, or this would replace yours), and turning it off removes the session's listener entirely. Use a session of its own for the pages that need device sign-on, and only for sites you trust to start Microsoft sign-ins (Copilot turns it off for its "Other chat site").
+
 See `plugins/ai-features/copilot-web.js` for an example.
+
+#### `api.clipboard`
+
+*App 0.8.9 and later.* `writePrivate(text)` copies text that Windows keeps out of clipboard history (Win+V) and cloud clipboard sync, as password managers do, and asks clipboard monitors to ignore it. Elsewhere (not Windows, or Windows refused) it copies normally. Returns `true` when the copy was private. `isSupported()` says whether private copies work here. Use it for passwords and other secrets; clearing the clipboard afterwards is still up to you. Check that `api.clipboard` exists before using it, for older apps. Password Vault uses it.
 
 #### `api.registerSettingsTransformer(fn)`
 
@@ -731,6 +737,7 @@ api.encryptCredential(plaintext: string): string | null
 api.decryptCredential(encrypted: string): string | null
 api.windowsHello?: { isSupported(): Promise<boolean>, sign(challenge: Buffer, opts?: { create?: boolean }): Promise<Buffer>, remove(): Promise<void> }   // app 0.8.5+, Windows
 api.windowsSso?: { isAvailable(): Promise<boolean>, setForPartition(partition: string, on: boolean): boolean }   // app 0.8.6+, Windows
+api.clipboard?: { writePrivate(text: string): boolean, isSupported(): boolean }   // app 0.8.9+
 api.registerSettingsTransformer(fn: (settings: AppSettings) => AppSettings | void): void
 ```
 

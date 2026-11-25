@@ -12,7 +12,7 @@ Keep passwords in an encrypted vault on this PC, opened with a master password. 
 - **Unlock** – Type the master password. After 3 wrong tries in a row, each further try waits longer (2, 4, 8, 16, then 30 seconds).
 - **Add an entry** – **+ New**: name, username, password, website, folder and notes. The website is what auto-fill matches (see below). **Generate** makes a password: 8 to 64 characters with the character types you pick, or a passphrase of 3 to 10 words.
 - **Find one** – Type in the search box (searches name, username, website and folder), or pick a folder.
-- **Use one** – On each row, 👤 copies the username, 🔑 copies the password, and ↗ opens the website in a new tab. A copied password is cleared from the clipboard after 30 seconds, unless you've copied something else since. Click a row to edit or delete the entry.
+- **Use one** – On each row, 👤 copies the username, 🔑 copies the password, and ↗ opens the website in a new tab. A copied password is cleared from the clipboard after 30 seconds, unless you've copied something else since. On Windows with MSP++ 0.8.9 or later, copied usernames and passwords are also kept out of clipboard history (`Win+V`) and cloud clipboard sync; on older versions they show up there and stay after the clipboard is cleared. Click a row to edit or delete the entry.
 - **Fill a sign-in page** – See [Auto-fill](#auto-fill).
 - **Lock now** – The 🔒 button in the tab, or `Ctrl+Shift+L` from anywhere in MSP++. Locking also clears a copied password from the clipboard.
 

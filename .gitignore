@@ -28,3 +28,4 @@ icon-raw.png
 dist-plugins/
 native/windows-hello/build/
 native/windows-sso/build/
+native/windows-clipboard/build/

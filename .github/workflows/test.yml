@@ -52,13 +52,14 @@ jobs:
       - name: Test
         run: npm test -- --ci
 
-      # Builds the native addons (native/windows-hello, native/windows-sso) for
+      # Builds the native addons (native/windows-hello, native/windows-sso, native/windows-clipboard) for
       # Node and checks they load and Windows answers them.
       - name: Build and check the native addons
         run: |
           node scripts/build-native.js --node
           node scripts/check-windows-hello.js
           node scripts/check-windows-sso.js
+          node scripts/check-windows-clipboard.js
 
   # Packs the app into a folder (no installer) to catch a broken "build" block
   # in package.json or a missing file before a release tag finds it.
@@ -98,6 +99,7 @@ jobs:
           # The Windows Hello addon has to sit outside app.asar to load.
           test -f "dist/win-unpacked/resources/app.asar.unpacked/native/windows-hello/build/Release/windows_hello.node" || { echo "windows_hello.node is missing from app.asar.unpacked"; exit 1; }
           test -f "dist/win-unpacked/resources/app.asar.unpacked/native/windows-sso/build/Release/windows_sso.node" || { echo "windows_sso.node is missing from app.asar.unpacked"; exit 1; }
+          test -f "dist/win-unpacked/resources/app.asar.unpacked/native/windows-clipboard/build/Release/windows_clipboard.node" || { echo "windows_clipboard.node is missing from app.asar.unpacked"; exit 1; }
           npx --yes @electron/asar@3.4.1 list dist/win-unpacked/resources/app.asar > asar-files.txt
           # Every file the build block lists must end up in the package.
           node -e '

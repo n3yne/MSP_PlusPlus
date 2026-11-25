@@ -144,7 +144,13 @@ describe("copilot-web pickReply", () => {
   test("selection first, then the page, then a changed clipboard", () => {
     expect(web.pickReply({ selection: "Selected", probe, base, clipboard: "c", clipboardAtStart: "", prompt: "p" })).toBe("Selected");
     expect(web.pickReply({ selection: "", probe, base, clipboard: "c", clipboardAtStart: "", prompt: "p" })).toBe("From the page");
-    expect(web.pickReply({ selection: "", probe: base, base, clipboard: "Copied reply", clipboardAtStart: "old", prompt: "p" })).toBe("Copied reply");
+    expect(web.pickReply({ selection: "", probe: base, base, clipboard: "Copied reply from the site", clipboardAtStart: "old", prompt: "p" })).toBe("Copied reply from the site");
+  });
+
+  test("never takes a password-like clipboard (no spaces, or short) as the reply", () => {
+    expect(web.pickReply({ selection: "", probe: base, base, clipboard: "Xk7#pQ2!vLm9@wR4zT", clipboardAtStart: "", prompt: "p" })).toBe("");
+    expect(web.pickReply({ selection: "", probe: base, base, clipboard: "able-Boat-cake-dark-edge-7", clipboardAtStart: "", prompt: "p" })).toBe("");
+    expect(web.pickReply({ selection: "", probe: base, base, clipboard: "ok then", clipboardAtStart: "", prompt: "p" })).toBe("");
   });
 
   test("never hands back the prompt or an unchanged clipboard", () => {
@@ -302,9 +308,9 @@ describe("copilot-web one-click requests", () => {
     await until(() => fake.bar() && fake.bar().mode === "fallback");
     expect(fake.state.clipboard).toBe("Prompt text");
     // The user pastes, sends, and clicks Copilot's Copy button.
-    fake.state.clipboard = "Copied answer";
+    fake.state.clipboard = "Copied answer from Copilot";
     await client._onBarAction("use");
-    await expect(result).resolves.toBe("Copied answer");
+    await expect(result).resolves.toBe("Copied answer from Copilot");
   });
 
   test("Cancel rejects the request", async () => {
@@ -341,6 +347,21 @@ describe("copilot-web one-click requests", () => {
   test("a custom site needs an address", async () => {
     const { client } = setup();
     await expect(client.chat("hi", { aiWebSite: "custom" })).rejects.toThrow(/address/);
+  });
+
+  test("pop-ups get the same https-only rules, down to their own pop-ups", () => {
+    const { fake, client } = setup();
+    client.open({});
+    const view = fake.state.windows[0].child;
+    expect(view.webContents.openHandler({ url: "http://example.com/" }).action).toBe("deny");
+    expect(view.webContents.openHandler({ url: "https://login.microsoftonline.com/" }).action).toBe("allow");
+    const handlers = {};
+    const popup = { webContents: { setWindowOpenHandler(fn) { this.openHandler = fn; }, on(n, fn) { handlers[n] = fn; } } };
+    view.webContents.emit("did-create-window", popup);
+    expect(popup.webContents.openHandler({ url: "file:///C:/x" }).action).toBe("deny");
+    const ev = { prevented: false, preventDefault() { this.prevented = true; } };
+    handlers["will-navigate"](ev, "file:///C:/x");
+    expect(ev.prevented).toBe(true);
   });
 
   test("only clipboard writes are allowed for the site", () => {
@@ -603,6 +624,13 @@ describe("copilot-web Windows device sign-on", () => {
     const { client, windowsSso } = withSso(true);
     client.open({});
     expect(windowsSso.setForPartition).toHaveBeenCalledWith(web.PARTITION, true);
+  });
+
+  test("is never turned on for Other chat site", () => {
+    const { client, windowsSso } = withSso(true);
+    client.open({ aiWebSite: "custom", aiWebUrl: "https://chat.example.com/" });
+    expect(windowsSso.setForPartition).toHaveBeenCalledWith(web.PARTITION, false);
+    expect(windowsSso.setForPartition).not.toHaveBeenCalledWith(web.PARTITION, true);
   });
 
   test("the setting turns it off", async () => {

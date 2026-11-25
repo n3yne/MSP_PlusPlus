@@ -29,6 +29,27 @@ function parseSite(u) {
   return { protocol: url.protocol, host, port: url.port };
 }
 
+// Names where anyone can have a subdomain, so "this site and its subdomains"
+// would fill on other people's sites: country second levels (co.uk, com.au)
+// and shared hosting or tenant domains. Entries on these match their exact
+// host only. Not a full public suffix list; it covers the common cases.
+const SHARED_SUFFIXES = new Set([
+  "github.io", "gitlab.io", "azurewebsites.net", "azurestaticapps.net", "cloudapp.net", "cloudapp.azure.com",
+  "blob.core.windows.net", "web.core.windows.net", "cloudfront.net", "amazonaws.com", "s3.amazonaws.com",
+  "herokuapp.com", "netlify.app", "vercel.app", "pages.dev", "workers.dev", "web.app", "firebaseapp.com",
+  "appspot.com", "blogspot.com", "wordpress.com", "wixsite.com", "squarespace.com", "myshopify.com",
+  "sharepoint.com", "onmicrosoft.com", "freshservice.com", "myfreshworks.com", "freshworks.com",
+  "atlassian.net", "zendesk.com", "service-now.com", "my.salesforce.com", "force.com", "ngrok.io", "ngrok-free.app",
+]);
+
+function isSharedSuffix(host) {
+  const h = String(host || "").toLowerCase();
+  if (SHARED_SUFFIXES.has(h)) return true;
+  const labels = h.split(".");
+  // Two short labels such as co.uk, com.au, or.jp: a country's second level.
+  return labels.length === 2 && labels[0].length <= 3 && labels[1].length === 2;
+}
+
 function stripWww(host) {
   return host.startsWith("www.") ? host.slice(4) : host;
 }
@@ -45,7 +66,8 @@ function siteMatches(entryUrl, pageUrl, match) {
   const ph = stripWww(page.host);
   if (eh === ph) return true;
   // A bare word like "com" or "localhost" never matches other sites' subdomains.
-  return match === "domain" && eh.includes(".") && ph.endsWith("." + eh);
+  // Nor does a name where anyone can have a subdomain (co.uk, github.io).
+  return match === "domain" && eh.includes(".") && !isSharedSuffix(eh) && ph.endsWith("." + eh);
 }
 
 function originOf(pageUrl) {
@@ -157,6 +179,7 @@ module.exports = {
   MATCH_MODES,
   CYCLE_MS,
   parseSite,
+  isSharedSuffix,
   siteMatches,
   originOf,
   pageFill,

@@ -1,12 +1,12 @@
 {
   "id": "solutions-chat",
   "name": "Solutions Chat",
-  "version": "0.8.5",
+  "version": "0.8.8.1",
   "distribution": "directory",
   "description": "A Solutions tab in the side panel that answers questions from your Freshservice Solutions articles, using the AI provider set up in AI Features.",
   "category": "AI",
   "requires": ["ai-features", "freshservice"],
   "renderer": "renderer.js",
   "settings": "settings.js",
-  "minAppVersion": "0.5.7"
+  "minAppVersion": "0.8.7"
 }

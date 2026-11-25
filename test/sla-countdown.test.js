@@ -195,7 +195,7 @@ describe("freshservice SLA handlers", () => {
     const res = await handlers["my-sla-tickets"]({});
     expect(res.error).toBeUndefined();
     const filterUrl = global.fetch.mock.calls.map((c) => c[0]).find((u) => u.includes("/tickets/filter"));
-    expect(decodeURIComponent(filterUrl)).toContain("\"agent_id:9 AND (status:2 OR status:3 OR status:>5)\"");
+    expect(decodeURIComponent(filterUrl)).toContain("\"agent_id:9 AND (status:2 OR status:3 OR status:>6)\"");
     expect(decodeURIComponent(filterUrl)).not.toMatch(/NOT/i);
     expect(res.tickets.map((t) => [t.id, t.state, t.responded])).toEqual([[1, "running", true], [2, "paused", null], [3, "running", null]]);
     expect(res.accountHosts).toEqual(["acme.freshservice.com"]);
@@ -223,18 +223,18 @@ describe("freshservice SLA handlers", () => {
     });
     const res = await handlers["my-sla-tickets"]({});
     const urls = global.fetch.mock.calls.map((c) => decodeURIComponent(c[0])).filter((u) => u.includes("/tickets/filter"));
-    expect(urls[0]).toContain("\"agent_id:9 AND (status:2 OR status:3 OR status:6 OR status:8 OR status:>8)\"");
+    expect(urls[0]).toContain("\"agent_id:9 AND (status:2 OR status:3 OR status:6 OR status:8 OR status:>9)\"");
     expect(urls).toHaveLength(5);
     expect(res.tickets).toHaveLength(150);
     expect(res.warnings).toContain("Showing the first 150 of your 200 open tickets.");
   });
 
   test("slaOpenStatusQuery", () => {
-    expect(fsApi.slaOpenStatusQuery(fsApi.choicesToLabels({}))).toBe("(status:2 OR status:3 OR status:>5)");
+    expect(fsApi.slaOpenStatusQuery(fsApi.choicesToLabels({}))).toBe("(status:2 OR status:3 OR status:>6)");
     expect(fsApi.slaOpenStatusQuery(fsApi.choicesToLabels({ status: [
       { value: 2, label: "Open" }, { value: 9, label: "Closed" }, { value: 7, label: "On Hold" },
-    ] }))).toBe("(status:2 OR status:7 OR status:>9)");
-    expect(fsApi.slaOpenStatusQuery(null)).toBe("(status:2 OR status:3 OR status:>5)");
+    ] }))).toBe("(status:2 OR status:7 OR status:>10)");
+    expect(fsApi.slaOpenStatusQuery(null)).toBe("(status:2 OR status:3 OR status:>6)");
   });
 
   test("my-sla-tickets passes on a missing API key", async () => {

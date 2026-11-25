@@ -531,21 +531,53 @@ class VaultSession {
     });
   }
 
+  // A new salt and a new vault key: the entries are encrypted again, so the old
+  // master password (and any old copy of the file it opens) can't open the new
+  // file. Windows Hello wrapped the old key, so it is turned off; the .bak is
+  // replaced with the new file. Encrypted copies saved elsewhere keep the old
+  // password and the old entries.
   changePassword(current, next) {
     return this._serial(async () => {
       this._requireUnlocked();
       checkNewPassword(next);
       await this._verifyPassword(current);
-      // New salt; the vault key stays, so only it is re-wrapped.
       const header = C.newHeader(this.kdfOverrides);
+      const newKey = C.randomBytes(C.KEY_BYTES);
       const masterKey = await C.deriveKey(next, header.kdf);
+      let keyWrap;
       try {
-        this._file = { header, keyWrap: C.wrapVaultKey(masterKey, this._vaultKey, header), data: null };
+        keyWrap = C.wrapVaultKey(masterKey, newKey, header);
       } finally {
         masterKey.fill(0);
       }
-      await this._persist();
-      return this.status();
+      if (this.state !== "unlocked") {
+        newKey.fill(0);
+        throw new VaultError("locked");
+      }
+      const hadHello = !!this._payload.hello;
+      const payload = Object.assign({}, this._payload, { hello: null });
+      const file = { header, keyWrap, data: C.encryptPayload(newKey, payload, header) };
+      const text = C.serializeFile(file);
+      try {
+        await writeAtomic(this.filePath, text);
+      } catch (e) {
+        newKey.fill(0); // the file on disk still has the old key and password
+        throw e;
+      }
+      if (this.state !== "unlocked") {
+        // Locked while writing: the new file is in place and opens with the new password.
+        newKey.fill(0);
+        await writeAtomic(this.filePath + ".bak", text).catch(() => fsp.unlink(this.filePath + ".bak").catch(() => {}));
+        return Object.assign(this.status(), { helloTurnedOff: hadHello });
+      }
+      this._vaultKey.fill(0);
+      this._vaultKey = newKey;
+      this._file = file;
+      this._payload = payload;
+      // The .bak held the old file (old password, old key): replace it, or
+      // remove it if it can't be written.
+      await writeAtomic(this.filePath + ".bak", text).catch(() => fsp.unlink(this.filePath + ".bak").catch(() => {}));
+      return Object.assign(this.status(), { helloTurnedOff: hadHello });
     });
   }
 

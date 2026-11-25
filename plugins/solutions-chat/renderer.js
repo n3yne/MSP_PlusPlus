@@ -165,8 +165,16 @@
       const full = buildAnswerPrompt(question, history, ticketText, articles, source);
       if (full.length <= maxChars) return full;
       // Leave room for the "[article continues]" markers added to cut articles.
-      return buildAnswerPrompt(question, history, ticketText,
-        fitArticles(articles, full.length - maxChars + articles.length * 25), source);
+      const fitted = fitArticles(articles, full.length - maxChars + articles.length * 25);
+      let prompt = buildAnswerPrompt(question, history, ticketText, fitted, source);
+      if (prompt.length <= maxChars) return prompt;
+      // Still too long (articles can't go below a few hundred characters each):
+      // drop the earlier conversation, then shorten the ticket's text.
+      prompt = buildAnswerPrompt(question, [], ticketText, fitted, source);
+      if (prompt.length <= maxChars) return prompt;
+      const ticket = clip(String(ticketText || "").trim(), MAX_TICKET_CHARS);
+      const keep = Math.max(0, ticket.length - (prompt.length - maxChars) - 40);
+      return buildAnswerPrompt(question, [], keep > 200 ? ticket.substring(0, keep) + "\n[ticket text shortened]" : "", fitted, source);
     }
     const past = formatHistory(history);
     const docs = articles.map((a, i) =>

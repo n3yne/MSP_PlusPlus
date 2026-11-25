@@ -1,7 +1,7 @@
 {
   "id": "ai-assistant",
   "name": "AI Assistant",
-  "version": "0.8.8.3",
+  "version": "0.8.8.4",
   "distribution": "directory",
   "description": "An Assistant tab in the side panel: a general AI chat that reads Freshservice tickets, requesters, agents, groups, assets, problems, changes and Solutions through the API to answer your questions. Read-only. Uses the AI provider set up in AI Features.",
   "category": "AI",
@@ -9,5 +9,8 @@
   "main": "main.js",
   "renderer": "renderer.js",
   "settings": "settings.js",
-  "minAppVersion": "0.8.7"
+  "minAppVersion": "0.8.7",
+  "sensitiveSettings": {
+    "aiAssistantInstructions": "AI Assistant extra instructions (added to every prompt)"
+  }
 }

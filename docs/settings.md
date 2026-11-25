@@ -34,7 +34,7 @@ When a site asks to use the microphone, camera, location, notifications or clipb
 
 ## Plugins
 
-**Settings → Plugins** lists installed plugins by category, with a **Browse** list of plugins you can install. How to install, update, import and remove plugins is on [All plugins](plugins/README.md#installing-and-managing-plugins). **Update Plugins To** and each plugin's **Updates** choice are on [Plugin release stages](plugin-release-stages.md).
+**Settings → Plugins** lists installed plugins by category, with a **Browse** list of plugins you can install. How to install, update, import and remove plugins is on [All plugins](plugins/README.md#installing-and-managing-plugins). **Update Plugins To** (in Browse, default **Beta or better**) sets the lowest release stage that plugins update to automatically. Each directory plugin's settings tab has an **Updates** choice that overrides it for that plugin. See [Plugin release stages](plugin-release-stages.md).
 
 Every plugin has an **Enabled** switch at the top of its settings tab. Plugin changes need a restart; Settings shows **Restart Now**.
 

@@ -1,7 +1,8 @@
 {
   "id": "sla-countdown",
   "name": "SLA Countdown",
-  "version": "0.8.8.1",
+  "version": "0.8.10.1",
+  "stage": "beta",
   "distribution": "directory",
   "description": "A live countdown to each ticket's first response and resolution due times, on the ticket's tab and in an SLA tab in the side panel listing your open tickets, turning amber and then red as a deadline gets close. Reads the due times through the site's API (Freshservice).",
   "category": "Tickets",

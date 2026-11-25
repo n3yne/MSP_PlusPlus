@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Solutions Chat
 
-**Category:** AI · **Side panel tab:** 📚 Solutions · **Needs:** [AI Features](ai-features.md) and [Freshservice](freshservice.md) with [its API](freshservice.md#the-freshservice-api) (installed together)
+**Stage:** [Alpha](../plugin-release-stages.md) · **Category:** AI · **Side panel tab:** 📚 Solutions · **Needs:** [AI Features](ai-features.md) and [Freshservice](freshservice.md) with [its API](freshservice.md#the-freshservice-api) (installed together)
 
 A chat that answers questions from your Freshservice **Solutions** (knowledge base) articles, and only from them.
 

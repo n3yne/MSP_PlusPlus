@@ -528,29 +528,29 @@ describe("release stages", () => {
     }
   });
 
-  test("defaults to stable only, and asks per plugin", async () => {
+  test("defaults to beta or better, and asks per plugin", async () => {
     const asked = [];
     const { dir } = setup({
       installed,
-      entries: [entryFor(man, pkg, { stage: "rc" })],
+      entries: [entryFor(man, pkg, { stage: "alpha" })],
       packages: { "time-tracker-0.8.2.mspplugin": pkg },
     });
     expect((await dir.refresh()).updates).toEqual([]);
 
     const second = setup({
       installed,
-      entries: [entryFor(man, pkg, { stage: "rc" })],
+      entries: [entryFor(man, pkg, { stage: "alpha" })],
       packages: { "time-tracker-0.8.2.mspplugin": pkg },
-      getUpdateStage: (id) => { asked.push(id); return id === "time-tracker" ? "rc" : "stable"; },
+      getUpdateStage: (id) => { asked.push(id); return id === "time-tracker" ? "alpha" : "stable"; },
     });
     expect((await second.dir.refresh()).updates.map((u) => u.id)).toEqual(["time-tracker"]);
     expect(asked).toContain("time-tracker");
   });
 
-  test("a getUpdateStage that throws falls back to stable", async () => {
+  test("a getUpdateStage that throws falls back to the default (beta)", async () => {
     const { dir } = setup({
       installed,
-      entries: [entryFor(man, pkg, { stage: "beta" })],
+      entries: [entryFor(man, pkg, { stage: "alpha" })],
       packages: { "time-tracker-0.8.2.mspplugin": pkg },
       getUpdateStage: () => { throw new Error("boom"); },
     });

@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Bookmarks Bar
 
-**Category:** Tabs & Toolbars · **Needs:** nothing
+**Stage:** [Stable](../plugin-release-stages.md) · **Category:** Tabs & Toolbars · **Needs:** nothing
 
 A row of bookmarked sites under the address bar.
 

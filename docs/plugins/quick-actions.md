@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Quick Actions
 
-**Category:** Tickets · **Side panel tab:** ⚡ Actions · **Needs:** [the Freshservice API](freshservice.md#the-freshservice-api)
+**Stage:** [Beta](../plugin-release-stages.md) · **Category:** Tickets · **Side panel tab:** ⚡ Actions · **Needs:** [the Freshservice API](freshservice.md#the-freshservice-api)
 
 Change the open ticket's status, priority, group and agent without opening the ticket form.
 

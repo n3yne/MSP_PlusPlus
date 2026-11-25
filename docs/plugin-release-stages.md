@@ -22,9 +22,9 @@ The badge shows next to the version number in **Settings → Plugins** (Installe
 
 **Settings → Plugins → Browse → Update Plugins To** sets the lowest stage an update has to be at before MSP++ offers it:
 
-- **Stable only** (the default)
+- **Stable only**
 - **RC or better**
-- **Beta or better**
+- **Beta or better** (the default in the next app release after 0.8.10; 0.8.10 itself starts on Stable only)
 - **Alpha or better**
 - **Everything (including pre-alpha)**
 
@@ -36,11 +36,25 @@ When a new version is below your choice:
 
 ### For one plugin
 
-Each directory plugin's settings tab has an **Updates** choice under its on/off switch. Leave it on **Use default** to follow **Update Plugins To**, or pick a stage for that plugin only. For example, keep everything on **Stable only** but take **Alpha or better** for one plugin you're helping to test.
+Each directory plugin's settings tab has an **Updates** choice under its on/off switch. Leave it on **Use default** to follow **Update Plugins To**, or pick a stage for that plugin only. For example, keep everything on **Beta or better** but take **Alpha or better** for one plugin you're helping to test.
 
 ## Installing a plugin that isn't stable
 
 You can install a plugin at any stage. **Update Plugins To** only decides which updates are offered automatically. In Browse, installing or updating to a version below stable asks you to confirm first. In the first-start plugin picker, plugins below stable start unticked, even ones you used before. Tick them if you want them.
+
+## Each plugin's stage
+
+Set with plugin versions 0.8.10.1 (November 2026). These versions need MSP++ 0.8.7 or later, because they have four-part version numbers. A stage changes when a plugin is tested enough to move up.
+
+| Stage | Plugins |
+|---|---|
+| Stable | [Freshservice](plugins/freshservice.md), [Metrics Bar](plugins/metrics-bar.md), [Bookmarks Bar](plugins/bookmarks-bar.md) |
+| Beta | [ConnectWise Manage](plugins/connectwise-manage.md), [Note Backup](plugins/note-backup.md), [Recent Tickets](plugins/recent-tickets.md), [Ticket Search](plugins/ticket-search.md), [Quick Actions](plugins/quick-actions.md), [SLA Countdown](plugins/sla-countdown.md), [Ticket Notifications](plugins/ticket-notifications.md), [Canned Responses](plugins/canned-responses.md), [Time Tracker](plugins/time-tracker.md), [Follow-up Reminders](plugins/follow-ups.md), [Tree Style Tabs](plugins/tree-tabs.md) |
+| Alpha | [AI Features](plugins/ai-features.md), [AI Assistant](plugins/ai-assistant.md), [Solutions Chat](plugins/solutions-chat.md), [Password Vault](plugins/password-vault.md) |
+
+With the default **Beta or better**, the alpha plugins don't update automatically. Install their updates from Browse, or set them to **Alpha or better** in their settings tabs.
+
+**On MSP++ 0.8.10** the default is still **Stable only**, so only Freshservice, Metrics Bar and Bookmarks Bar update automatically there. To keep getting updates for the others, set **Settings → Plugins → Browse → Update Plugins To** to **Beta or better**, or to **Alpha or better** if you want the alpha plugins too. MSP++ 0.8.9 and earlier ignore stages and update everything.
 
 ## For plugin authors
 
@@ -66,7 +80,7 @@ Settings (in `settings.json`):
 
 | Key | Default | Meaning |
 |---|---|---|
-| `pluginUpdateStage` | `"stable"` | The lowest stage for updates. |
+| `pluginUpdateStage` | `"beta"` | The lowest stage for updates (`"stable"` in 0.8.10). |
 | `pluginUpdateStageOverrides` | `{}` | `{ "<plugin id>": "<stage>" }` for plugins that don't follow the default. |
 
 A settings import that would change `pluginUpdateStage` lists it in the import prompt before applying it.

@@ -237,9 +237,9 @@ describe("tabsToRestore", () => {
     expect(validateSettings(Object.assign({}, base, { windowsDeviceSignOn: "on" }))).toBe(false);
   });
 
-  test("plugin update stage defaults to stable and only takes known stages", () => {
+  test("plugin update stage defaults to beta and only takes known stages", () => {
     const base = Object.assign({}, DEFAULT_SETTINGS);
-    expect(DEFAULT_SETTINGS.pluginUpdateStage).toBe("stable");
+    expect(DEFAULT_SETTINGS.pluginUpdateStage).toBe("beta");
     expect(DEFAULT_SETTINGS.pluginUpdateStageOverrides).toEqual({});
     expect(validateSettings(Object.assign({}, base, { pluginUpdateStage: "beta" }))).toBe(true);
     expect(validateSettings(Object.assign({}, base, { pluginUpdateStage: "nightly" }))).toBe(false);

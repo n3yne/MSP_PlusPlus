@@ -511,7 +511,7 @@ async function readLimited(resp, max, tooLarge) {
 //   indexUrl      directory index (defaults to the plugin-directory release)
 //   fetchImpl     fetch-compatible function
 //   getUpdateStage (id) => lowest release stage the user takes updates of that
-//                 plugin at (plugin-stages.js updateStageFor); default "stable"
+//                 plugin at (plugin-stages.js updateStageFor); default "beta"
 function createPluginDirectory(opts) {
   const {
     userData,

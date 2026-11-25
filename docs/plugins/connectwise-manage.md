@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › ConnectWise Manage
 
-**Category:** Sites · **Needs:** nothing
+**Stage:** [Beta](../plugin-release-stages.md) · **Category:** Sites · **Needs:** nothing
 
 The ConnectWise Manage site plugin makes MSP++ understand ConnectWise Manage pages. It works alongside [Freshservice](freshservice.md): each tab uses the right site automatically.
 

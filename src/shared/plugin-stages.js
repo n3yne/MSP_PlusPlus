@@ -37,7 +37,7 @@
   ];
   const DEFAULT_STAGE = "stable";
   // Default lowest stage to update to.
-  const DEFAULT_UPDATE_STAGE = "stable";
+  const DEFAULT_UPDATE_STAGE = "beta";
   const byId = {};
   STAGES.forEach(function (s) { byId[s.id] = s; });
   // Spellings people might write in a manifest.
@@ -78,7 +78,7 @@
   }
 
   // The lowest stage to update plugin `id` to, from settings:
-  //   pluginUpdateStage           global lowest stage (default "stable")
+  //   pluginUpdateStage           global lowest stage (default "beta")
   //   pluginUpdateStageOverrides  { "<id>": "<stage>" } per plugin; missing = global
   function updateStageFor(settings, id) {
     const s = settings && typeof settings === "object" ? settings : {};

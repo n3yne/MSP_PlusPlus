@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Recent Tickets
 
-**Category:** Tickets · **Side panel tab:** 🕘 Recent · **Needs:** a [site plugin](README.md#sites)
+**Stage:** [Beta](../plugin-release-stages.md) · **Category:** Tickets · **Side panel tab:** 🕘 Recent · **Needs:** a [site plugin](README.md#sites)
 
 A list of the tickets you've viewed lately, on any site, newest first. Click one to go back to it.
 

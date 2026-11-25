@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Canned Responses
 
-**Category:** Notes & Replies · **Side panel tab:** 💬 Replies · **Needs:** a [site plugin](README.md#sites) to insert into the reply box (Copy works anywhere)
+**Stage:** [Beta](../plugin-release-stages.md) · **Category:** Notes & Replies · **Side panel tab:** 💬 Replies · **Needs:** a [site plugin](README.md#sites) to insert into the reply box (Copy works anywhere)
 
 Saved replies you can drop into a ticket in one click, with placeholders for the requester, ticket and your name.
 

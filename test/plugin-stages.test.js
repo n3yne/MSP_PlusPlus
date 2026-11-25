@@ -26,13 +26,13 @@ describe("plugin-stages", () => {
     expect(PluginStages.meetsStage("pre-alpha", "pre-alpha")).toBe(true);
   });
 
-  test("updateStageFor: per-plugin override, then global, then stable", () => {
-    expect(PluginStages.updateStageFor({}, "x")).toBe("stable");
+  test("updateStageFor: per-plugin override, then global, then beta", () => {
+    expect(PluginStages.updateStageFor({}, "x")).toBe("beta");
     expect(PluginStages.updateStageFor({ pluginUpdateStage: "beta" }, "x")).toBe("beta");
     expect(PluginStages.updateStageFor({ pluginUpdateStage: "beta", pluginUpdateStageOverrides: { x: "alpha" } }, "x")).toBe("alpha");
     expect(PluginStages.updateStageFor({ pluginUpdateStage: "beta", pluginUpdateStageOverrides: { x: "alpha" } }, "y")).toBe("beta");
-    expect(PluginStages.updateStageFor({ pluginUpdateStage: "bogus", pluginUpdateStageOverrides: { x: "bogus" } }, "x")).toBe("stable");
-    expect(PluginStages.updateStageFor(null, "x")).toBe("stable");
+    expect(PluginStages.updateStageFor({ pluginUpdateStage: "bogus", pluginUpdateStageOverrides: { x: "bogus" } }, "x")).toBe("beta");
+    expect(PluginStages.updateStageFor(null, "x")).toBe("beta");
   });
 
   test("validOverrides", () => {
@@ -52,5 +52,25 @@ describe("plugin-stages", () => {
       expect(info.description).toMatch(/:/);
       expect(info.minLabel).toBeTruthy();
     }
+  });
+});
+
+describe("plugin docs show each plugin's stage", () => {
+  const fs = require("fs");
+  const path = require("path");
+  const root = path.join(__dirname, "..");
+  const plugins = fs.readdirSync(path.join(root, "plugins"), { withFileTypes: true })
+    .filter((e) => e.isDirectory() && fs.existsSync(path.join(root, "plugins", e.name, "manifest.json")))
+    .map((e) => JSON.parse(fs.readFileSync(path.join(root, "plugins", e.name, "manifest.json"), "utf8")));
+  const readme = fs.readFileSync(path.join(root, "docs", "plugins", "README.md"), "utf8");
+  const stagesPage = fs.readFileSync(path.join(root, "docs", "plugin-release-stages.md"), "utf8");
+
+  test.each(plugins.map((m) => [m.id, m]))("%s", (id, m) => {
+    const label = PluginStages.info(m.stage).label;
+    const page = fs.readFileSync(path.join(root, "docs", "plugins", id + ".md"), "utf8");
+    expect(page).toContain("**Stage:** [" + label + "](../plugin-release-stages.md)");
+    expect(readme).toMatch(new RegExp("\\(" + id + "\\.md\\) \\| " + label + " \\|"));
+    const row = stagesPage.split("\n").find((l) => l.startsWith("| " + label + " |"));
+    expect(row).toContain("(plugins/" + id + ".md)");
   });
 });

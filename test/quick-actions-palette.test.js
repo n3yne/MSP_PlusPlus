@@ -80,7 +80,11 @@ function setup({ panelActive = false, confirm } = {}) {
       sites: { forWebview: () => site, onRegistered() {} },
       commands: {
         register: (c) => { commands[c.id] = c; },
-        addProvider: (p) => { providers.push(p); },
+        // Same id check as the core's commands.addProvider (src/windows/renderer.js).
+        addProvider: (p) => {
+          if (!/^[a-z0-9][a-z0-9_-]{0,62}$/i.test(p.id)) throw new Error("commands.addProvider: invalid id");
+          providers.push(p);
+        },
       },
     },
   };

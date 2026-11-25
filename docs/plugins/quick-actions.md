@@ -11,7 +11,7 @@ Change the open ticket's status, priority, group and agent without opening the t
 - **One click** – **👤 Assign to me**, **⏸ Pending** and **✔ Resolve** save straight away. Resolve asks first, since Freshservice may email the requester.
 - **Status, priority, group, agent** – Pick new values and press **Save changes** (or **Undo**). Custom statuses from your Freshservice form are listed. Agents and groups come from the API and are kept for 10 minutes; **↻** reloads them.
 - **The page catches up** – After a change the ticket's tab reloads so it shows the new values. If you've typed something on the page, you get a **Reload tab** button instead, so nothing is lost.
-- **Command palette** – `Ctrl+K` has **Assign Ticket to Me**, **Resolve Ticket**, and **Set Ticket Status: …** / **Set Ticket Priority: …** for the open ticket.
+- **Command palette** – `Ctrl+K` has **Assign Ticket to Me**, **Resolve Ticket**, and **Set Ticket Status: …** / **Set Ticket Priority: …** for the ticket in the active tab. Type at least three letters (for example `pend` or `set st`) to see the status and priority items; they show once the ⚡ Actions tab has loaded the ticket's choices. Before Quick Actions 0.8.10.2 these status and priority items never appeared.
 
 ## Settings
 

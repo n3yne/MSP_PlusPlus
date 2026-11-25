@@ -512,6 +512,8 @@ window.pluginAPI.ui.addToolbarButton({
 
 Adds entries to the command palette (`Ctrl+K`). The palette already lists open tabs, ticket numbers and addresses typed into it, side panel tabs, app commands and a Settings entry for every plugin; the Bookmarks Bar, Recent Tickets and Ticket Search plugins add bookmarks, recently viewed tickets and ticket search results with providers.
 
+A provider's `id` matches `/^[a-z0-9][a-z0-9_-]{0,62}$/i` (no dots or colons, unlike a command's id); `addProvider` throws on any other id.
+
 A command is `{ id, title, subtitle?, group?, keywords?, shortcut?, run, runInNewTab? }`. `id` matches `/^[a-z0-9][a-z0-9:_.-]{0,99}$/i`; `group` is the heading it lists under (default "Commands"); `keywords` are extra words it is found by; `shortcut` is text shown on the right. `run()` is called on `Enter` or a click, and `runInNewTab()`, if given, on `Ctrl+Enter` or `Ctrl`+click. The palette closes before either is called.
 
 ```js

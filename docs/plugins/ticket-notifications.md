@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Ticket Notifications
 
-**Category:** Tickets · **Needs:** the [Freshservice](freshservice.md) plugin with [its API](freshservice.md#the-freshservice-api) set up
+**Stage:** [Beta](../plugin-release-stages.md) · **Category:** Tickets · **Needs:** the [Freshservice](freshservice.md) plugin with [its API](freshservice.md#the-freshservice-api) set up
 
 A desktop notification when a Freshservice ticket assigned to you gets a new reply.
 

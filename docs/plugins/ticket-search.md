@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Ticket Search
 
-**Category:** Tickets · **Side panel tab:** 🔎 Search · **Needs:** [the Freshservice API](freshservice.md#the-freshservice-api)
+**Stage:** [Beta](../plugin-release-stages.md) · **Category:** Tickets · **Side panel tab:** 🔎 Search · **Needs:** [the Freshservice API](freshservice.md#the-freshservice-api)
 
 Find Freshservice tickets as you type, and open them in a tab.
 

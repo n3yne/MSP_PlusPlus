@@ -48,9 +48,9 @@ Set in 0.8.11. A stage changes when a plugin is tested enough to move up.
 
 | Stage | Plugins |
 |---|---|
-| Stable | Freshservice, Metrics Bar, Bookmarks Bar |
-| Beta | ConnectWise Manage, Note Backup, Recent Tickets, Ticket Search, Quick Actions, SLA Countdown, Ticket Notifications, Canned Responses, Time Tracker, Follow-up Reminders, Tree Style Tabs |
-| Alpha | AI Features, AI Assistant, Solutions Chat, Password Vault |
+| Stable | [Freshservice](plugins/freshservice.md), [Metrics Bar](plugins/metrics-bar.md), [Bookmarks Bar](plugins/bookmarks-bar.md) |
+| Beta | [ConnectWise Manage](plugins/connectwise-manage.md), [Note Backup](plugins/note-backup.md), [Recent Tickets](plugins/recent-tickets.md), [Ticket Search](plugins/ticket-search.md), [Quick Actions](plugins/quick-actions.md), [SLA Countdown](plugins/sla-countdown.md), [Ticket Notifications](plugins/ticket-notifications.md), [Canned Responses](plugins/canned-responses.md), [Time Tracker](plugins/time-tracker.md), [Follow-up Reminders](plugins/follow-ups.md), [Tree Style Tabs](plugins/tree-tabs.md) |
+| Alpha | [AI Features](plugins/ai-features.md), [AI Assistant](plugins/ai-assistant.md), [Solutions Chat](plugins/solutions-chat.md), [Password Vault](plugins/password-vault.md) |
 
 With the default **Beta or better**, the alpha plugins don't update automatically. Install their updates from Browse, or set them to **Alpha or better** in their settings tabs.
 

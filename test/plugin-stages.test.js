@@ -54,3 +54,23 @@ describe("plugin-stages", () => {
     }
   });
 });
+
+describe("plugin docs show each plugin's stage", () => {
+  const fs = require("fs");
+  const path = require("path");
+  const root = path.join(__dirname, "..");
+  const plugins = fs.readdirSync(path.join(root, "plugins"), { withFileTypes: true })
+    .filter((e) => e.isDirectory() && fs.existsSync(path.join(root, "plugins", e.name, "manifest.json")))
+    .map((e) => JSON.parse(fs.readFileSync(path.join(root, "plugins", e.name, "manifest.json"), "utf8")));
+  const readme = fs.readFileSync(path.join(root, "docs", "plugins", "README.md"), "utf8");
+  const stagesPage = fs.readFileSync(path.join(root, "docs", "plugin-release-stages.md"), "utf8");
+
+  test.each(plugins.map((m) => [m.id, m]))("%s", (id, m) => {
+    const label = PluginStages.info(m.stage).label;
+    const page = fs.readFileSync(path.join(root, "docs", "plugins", id + ".md"), "utf8");
+    expect(page).toContain("**Stage:** [" + label + "](../plugin-release-stages.md)");
+    expect(readme).toMatch(new RegExp("\\(" + id + "\\.md\\) \\| " + label + " \\|"));
+    const row = stagesPage.split("\n").find((l) => l.startsWith("| " + label + " |"));
+    expect(row).toContain("(plugins/" + id + ".md)");
+  });
+});

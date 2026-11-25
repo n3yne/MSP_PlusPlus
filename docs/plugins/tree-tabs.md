@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Tree Style Tabs
 
-**Category:** Tabs & Toolbars · **Side panel tab:** 🌲 Tree · **Needs:** nothing
+**Stage:** [Beta](../plugin-release-stages.md) · **Category:** Tabs & Toolbars · **Side panel tab:** 🌲 Tree · **Needs:** nothing
 
 Shows your open tabs as a tree in the side panel: named groups, tabs under a master tab, nested as deep as you like.
 

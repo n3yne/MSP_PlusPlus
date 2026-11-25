@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Note Backup
 
-**Category:** Notes & Replies · **Side panel tab:** 📋 Notes · **Needs:** a [site plugin](README.md#sites) for ticket detection and sync
+**Stage:** [Beta](../plugin-release-stages.md) · **Category:** Notes & Replies · **Side panel tab:** 📋 Notes · **Needs:** a [site plugin](README.md#sites) for ticket detection and sync
 
 A Notes tab for drafting ticket notes, so nothing is lost if the site logs you out or a page reloads. Every note is saved to disk as you type, with snapshots you can go back to, and can sync live with the site's own note editor.
 

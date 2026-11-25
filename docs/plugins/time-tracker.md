@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Time Tracker
 
-**Category:** Time & Reminders · **Side panel tab:** ⏱ Time · **Needs:** [the Freshservice API](freshservice.md#the-freshservice-api) or [ConnectWise Manage](connectwise-manage.md) to log time (Copy works anywhere)
+**Stage:** [Beta](../plugin-release-stages.md) · **Category:** Time & Reminders · **Side panel tab:** ⏱ Time · **Needs:** [the Freshservice API](freshservice.md#the-freshservice-api) or [ConnectWise Manage](connectwise-manage.md) to log time (Copy works anywhere)
 
 A timer per ticket. When you're done, it logs the time as a time entry on the ticket, or copies it for anywhere else.
 

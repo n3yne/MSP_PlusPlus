@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Password Vault
 
-**Category:** Security · **Side panel tab:** 🔑 Vault · **Needs:** nothing
+**Stage:** [Alpha](../plugin-release-stages.md) · **Category:** Security · **Side panel tab:** 🔑 Vault · **Needs:** nothing
 
 Keep passwords in an encrypted vault on this PC, opened with a master password. You need the master password every time MSP++ starts, and again after a time you choose. Windows Hello can answer those later prompts. It can also fill in sign-in pages for you when you ask.
 

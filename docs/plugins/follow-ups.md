@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Follow-up Reminders
 
-**Category:** Time & Reminders · **Side panel tab:** ⏰ Follow-ups · **Needs:** nothing
+**Stage:** [Beta](../plugin-release-stages.md) · **Category:** Time & Reminders · **Side panel tab:** ⏰ Follow-ups · **Needs:** nothing
 
 Set a reminder on a ticket and get a desktop alert when it's time to come back to it.
 

@@ -16,7 +16,7 @@ MSP++ checks GitHub Releases when it starts and every 6 hours.
 
 Installed copies on 0.7.0 or earlier need one manual install of a newer version before automatic updates work.
 
-Plugins update separately, from the plugin directory. See [Plugin updates](plugins/README.md#updates).
+Plugins update separately, from the plugin directory. By default only updates that are **Beta or better** are offered; see [Plugin updates](plugins/README.md#updates) and [Plugin release stages](plugin-release-stages.md).
 
 ## App notifications
 

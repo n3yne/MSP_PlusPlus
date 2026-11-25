@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › SLA Countdown
 
-**Category:** Tickets · **Side panel tab:** ⏱ SLA · **Needs:** [the Freshservice API](freshservice.md#the-freshservice-api) (Freshservice plugin 0.8.5 or later)
+**Stage:** [Beta](../plugin-release-stages.md) · **Category:** Tickets · **Side panel tab:** ⏱ SLA · **Needs:** [the Freshservice API](freshservice.md#the-freshservice-api) (Freshservice plugin 0.8.5 or later)
 
 A live countdown to each ticket's **first response** and **resolution** due times, so a breach doesn't creep up while you're in another tab.
 

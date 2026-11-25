@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Metrics Bar
 
-**Category:** Tabs & Toolbars · **Needs:** a dashboard (such as BrightGauge), or [the Freshservice API](freshservice.md#the-freshservice-api) for ticket counts
+**Stage:** [Stable](../plugin-release-stages.md) · **Category:** Tabs & Toolbars · **Needs:** a dashboard (such as BrightGauge), or [the Freshservice API](freshservice.md#the-freshservice-api) for ticket counts
 
 A bar above the tab strip showing live numbers, such as tickets closed this week, read from one or more dashboards or counted through the Freshservice API.
 

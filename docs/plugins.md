@@ -891,6 +891,17 @@ A directory plugin must also be left out of the app build: add `"!plugins/<id>/*
 
 Publishing is automatic. When a change to `plugins/` reaches `main`, the **Plugin directory** workflow (`.github/workflows/plugins.yml`) runs the tests, builds every directory plugin with `node scripts/build-plugin-directory.js`, and uploads the packages and `index.json` to the `plugin-directory` release, creating it the first time. It can also be run by hand from the Actions tab. Run the script locally to see what it would publish; it writes to `dist-plugins/`.
 
+#### Release stage
+
+Every directory plugin has a release stage that tells users how finished it is. To set or change it:
+
+1. Add `"stage"` to `plugins/<id>/manifest.json`. Use `pre-alpha`, `alpha`, `beta`, `rc` or `stable`, spelled exactly like that. Leaving it out means stable.
+2. Bump the plugin's `version`. The stage belongs to a version, and a published version can't change.
+3. Update the **Stage** on the plugin's page in `docs/plugins/<id>.md`, in the table in `docs/plugins/README.md`, and in the stage list in [Plugin release stages](plugin-release-stages.md#each-plugins-stage).
+4. Merge. The Plugin directory workflow publishes the new version with its stage. The build refuses an unknown stage.
+
+Users update automatically only to versions at or above their **Update Plugins To** stage, which defaults to **Beta or better**. So an alpha version reaches only people who chose Alpha or better, for everything or for that plugin, and anyone who installs it from Browse themselves. Apps before 0.8.10 ignore the stage and offer every update. See [Plugin release stages](plugin-release-stages.md) for the details.
+
 **Versions:** a directory plugin keeps its own version. Bump it only when the plugin changes, because every new version shows up as an update for everyone who has it installed. Set `minAppVersion` when it needs something new in the app.
 
 #### Plugin version numbers

@@ -2,7 +2,7 @@
 
 [Docs home](../README.md) › [All plugins](README.md) › Freshservice
 
-**Category:** Sites · **Needs:** nothing · **Used by:** most other plugins
+**Stage:** [Stable](../plugin-release-stages.md) · **Category:** Sites · **Needs:** nothing · **Used by:** most other plugins
 
 The Freshservice site plugin is what makes MSP++ understand Freshservice pages. It finds the ticket in each tab, connects the [Notes tab](note-backup.md) to Freshservice's note editor, and provides the Freshservice API that Ticket Search, Quick Actions, SLA Countdown, Ticket Notifications, Solutions Chat, Time Tracker and the Metrics Bar use.
 

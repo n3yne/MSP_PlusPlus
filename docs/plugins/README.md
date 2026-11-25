@@ -4,62 +4,64 @@
 
 MSP++ comes with no plugins built in. Every feature below installs from the **plugin directory** under **Settings → Plugins → Browse**. Install only what you use.
 
+The **Stage** column says how finished each plugin is: **Stable** is ready for everyday use, **Beta** is finished but still being tested, and **Alpha** works but expect bugs. MSP++ updates plugins automatically only when the new version is **Beta or better** (you can change that). See [Plugin release stages](../plugin-release-stages.md).
+
 ## By category
 
 ### Sites
 
 A site plugin teaches MSP++ about a ticketing site: how to find the ticket number, where the note editor is, and how to use the site's API. Install at least one.
 
-| Plugin | What it does | Needs |
-|---|---|---|
-| [Freshservice](freshservice.md) | Ticket detection, note sync and the Freshservice API that many plugins use | – |
-| [ConnectWise Manage](connectwise-manage.md) | Ticket detection and note sync for ConnectWise Manage, including your own server | – |
+| Plugin | Stage | What it does | Needs |
+|---|---|---|---|
+| [Freshservice](freshservice.md) | Stable | Ticket detection, note sync and the Freshservice API that many plugins use | – |
+| [ConnectWise Manage](connectwise-manage.md) | Beta | Ticket detection and note sync for ConnectWise Manage, including your own server | – |
 
 ### Tickets
 
-| Plugin | What it does | Needs |
-|---|---|---|
-| [Quick Actions](quick-actions.md) | ⚡ Actions tab: change status, priority, group and agent without the ticket form | Freshservice API |
-| [Recent Tickets](recent-tickets.md) | 🕘 Recent tab: tickets you've viewed lately, on any site | – |
-| [SLA Countdown](sla-countdown.md) | Time left to first response and resolution, on tabs and in an ⏱ SLA tab | Freshservice API |
-| [Ticket Notifications](ticket-notifications.md) | Desktop alert when a ticket assigned to you gets a reply | Freshservice API |
-| [Ticket Search](ticket-search.md) | 🔎 Search tab: find tickets by number, subject or requester | Freshservice API |
+| Plugin | Stage | What it does | Needs |
+|---|---|---|---|
+| [Quick Actions](quick-actions.md) | Beta | ⚡ Actions tab: change status, priority, group and agent without the ticket form | Freshservice API |
+| [Recent Tickets](recent-tickets.md) | Beta | 🕘 Recent tab: tickets you've viewed lately, on any site | – |
+| [SLA Countdown](sla-countdown.md) | Beta | Time left to first response and resolution, on tabs and in an ⏱ SLA tab | Freshservice API |
+| [Ticket Notifications](ticket-notifications.md) | Beta | Desktop alert when a ticket assigned to you gets a reply | Freshservice API |
+| [Ticket Search](ticket-search.md) | Beta | 🔎 Search tab: find tickets by number, subject or requester | Freshservice API |
 
 ### Notes & Replies
 
-| Plugin | What it does | Needs |
-|---|---|---|
-| [Note Backup](note-backup.md) | 📋 Notes tab: draft notes with autosave, snapshots, templates and live sync | a site plugin, for sync |
-| [Canned Responses](canned-responses.md) | 💬 Replies tab: saved replies with placeholders | a site plugin for inserting |
+| Plugin | Stage | What it does | Needs |
+|---|---|---|---|
+| [Note Backup](note-backup.md) | Beta | 📋 Notes tab: draft notes with autosave, snapshots, templates and live sync | a site plugin, for sync |
+| [Canned Responses](canned-responses.md) | Beta | 💬 Replies tab: saved replies with placeholders | a site plugin for inserting |
 
 ### Time & Reminders
 
-| Plugin | What it does | Needs |
-|---|---|---|
-| [Time Tracker](time-tracker.md) | ⏱ Time tab: a timer per ticket that logs time entries | Freshservice API or ConnectWise to log |
-| [Follow-up Reminders](follow-ups.md) | ⏰ Follow-ups tab: be reminded about a ticket later | – |
+| Plugin | Stage | What it does | Needs |
+|---|---|---|---|
+| [Time Tracker](time-tracker.md) | Beta | ⏱ Time tab: a timer per ticket that logs time entries | Freshservice API or ConnectWise to log |
+| [Follow-up Reminders](follow-ups.md) | Beta | ⏰ Follow-ups tab: be reminded about a ticket later | – |
 
 ### AI
 
-| Plugin | What it does | Needs |
-|---|---|---|
-| [AI Features](ai-features.md) | ✨ Suggest and 📋 Summarize buttons in the Notes tab | an AI provider, Note Backup |
-| [AI Assistant](ai-assistant.md) | 🤖 Assistant tab: a general AI chat that looks up tickets, people and assets in Freshservice to answer questions (read-only) | AI Features, Freshservice API |
-| [Solutions Chat](solutions-chat.md) | 📚 Solutions tab: ask questions answered from your Freshservice Solutions articles | AI Features, Freshservice API |
+| Plugin | Stage | What it does | Needs |
+|---|---|---|---|
+| [AI Features](ai-features.md) | Alpha | ✨ Suggest and 📋 Summarize buttons in the Notes tab | an AI provider, Note Backup |
+| [AI Assistant](ai-assistant.md) | Alpha | 🤖 Assistant tab: a general AI chat that looks up tickets, people and assets in Freshservice to answer questions (read-only) | AI Features, Freshservice API |
+| [Solutions Chat](solutions-chat.md) | Alpha | 📚 Solutions tab: ask questions answered from your Freshservice Solutions articles | AI Features, Freshservice API |
 
 ### Tabs & Toolbars
 
-| Plugin | What it does | Needs |
-|---|---|---|
-| [Bookmarks Bar](bookmarks-bar.md) | A row of bookmarks under the address bar | – |
-| [Metrics Bar](metrics-bar.md) | Live numbers from dashboards (or Freshservice counts) above the tab bar | – |
-| [Tree Style Tabs](tree-tabs.md) | 🌲 Tree tab: your tabs as a tree with groups | – |
+| Plugin | Stage | What it does | Needs |
+|---|---|---|---|
+| [Bookmarks Bar](bookmarks-bar.md) | Stable | A row of bookmarks under the address bar | – |
+| [Metrics Bar](metrics-bar.md) | Stable | Live numbers from dashboards (or Freshservice counts) above the tab bar | – |
+| [Tree Style Tabs](tree-tabs.md) | Beta | 🌲 Tree tab: your tabs as a tree with groups | – |
 
 ### Security
 
-| Plugin | What it does | Needs |
-|---|---|---|
-| [Password Vault](password-vault.md) | 🔑 Vault tab: your passwords, encrypted with a master password, with Windows Hello and auto-fill | – |
+| Plugin | Stage | What it does | Needs |
+|---|---|---|---|
+| [Password Vault](password-vault.md) | Alpha | 🔑 Vault tab: your passwords, encrypted with a master password, with Windows Hello and auto-fill | – |
 
 ## Installing and managing plugins
 

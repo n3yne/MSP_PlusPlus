@@ -9,6 +9,8 @@ const { tabShortcutForKey } = require("../shared/tab-shortcuts");
 const pluginManager = require("../plugin-system/plugin-manager");
 const PluginDirectory = require("../plugin-system/plugin-directory");
 const { installPasskeyAccountChooser } = require("./webauthn");
+const { chromeUserAgent, userAgentHosts } = require("./user-agent");
+const WindowsSso = require("./windows-sso");
 const { createUpdater } = require("./updater");
 const { zoomActionForKey } = require("../shared/page-zoom");
 const { createPermissionPolicy, installPermissionHandlers } = require("./permissions");
@@ -642,9 +644,14 @@ function openInMainTab(url, openerId, background) {
 // createChildBrowserWindow is synchronous; applyCoreWindowSettings updates it.
 let popOutAlwaysOnTop = false;
 
+// Settings > General > "Use Windows Device Sign-On" (on by default). Read for
+// every Microsoft sign-in page load in tabs and pop-outs; see installSiteUserAgent.
+let deviceSignOnEnabled = true;
+
 // Called whenever the settings change (and at startup) to apply core settings
 // that main.js acts on itself.
 function applyCoreWindowSettings(settings) {
+  deviceSignOnEnabled = !settings || settings.windowsDeviceSignOn !== false;
   const onTop = Boolean(settings && settings.popOutAlwaysOnTop === true);
   if (onTop === popOutAlwaysOnTop) return;
   popOutAlwaysOnTop = onTop;
@@ -1619,6 +1626,17 @@ function registerIpcHandlers() {
     if (permissionPolicy) permissionPolicy.clear();
     return { answers: 0, sites: 0 };
   });
+  // Settings > General: whether device sign-on works in this build (Windows, addon
+  // loaded) and whether this PC has a proof to send.
+  electron.ipcMain.handle("windows-sso-status", async () => {
+    const sso = WindowsSso.getShared();
+    if (!sso.isSupported()) return { supported: false, available: false };
+    try {
+      return { supported: true, available: await sso.isAvailable() };
+    } catch {
+      return { supported: true, available: false };
+    }
+  });
   electron.ipcMain.handle("get-update-status", () => (updater ? updater.getStatus() : null));
   electron.ipcMain.handle("download-app-update", () => (updater ? updater.download() : null));
   electron.ipcMain.handle("install-app-update", () => (updater ? updater.install() : null));
@@ -1640,31 +1658,32 @@ function siteUrlFilter(hosts, exactHosts) {
 // Presents a plain Chrome user agent (no "Electron/…" token) to the hosts of site
 // plugins that ask for it ("site.chromeUserAgent": true), so those sites don't treat
 // the app as an unsupported browser. Covers the manifest hosts and the hosts a
-// plugin added with api.setSiteHosts. Scoped to those hosts so other services see
-// the real user agent. The Chrome version tracks the bundled Chromium so it never
-// looks outdated. Re-installed whenever a plugin changes its extra hosts; with
-// no hosts, the listener is removed.
+// plugin added with api.setSiteHosts, and always Microsoft's sign-in pages, which
+// otherwise refuse passkey sign-in (see user-agent.js). Other services see the
+// real user agent. Re-installed whenever a plugin changes its extra hosts.
+//
+// The same listener adds Windows device sign-on to Microsoft sign-in page loads
+// when "Use Windows Device Sign-On" is on (Electron allows one onBeforeSendHeaders
+// listener per session). On a PC registered with Entra ID that is Windows' proof
+// of the device and the signed-in work account, as Edge sends; Conditional Access
+// policies (compliant device, passkey or phishing-resistant MFA) then accept the
+// Windows sign-in instead of asking for something the page can't do.
 function installSiteUserAgent() {
   const webRequest = electron.session.defaultSession.webRequest;
-  const hosts = [];
-  const exactHosts = [];
-  for (const site of pluginManager.getSites()) {
-    if (!site.chromeUserAgent) continue;
-    for (const h of site.hosts) if (!hosts.includes(h)) hosts.push(h);
-    for (const h of site.extraHosts) if (!exactHosts.includes(h)) exactHosts.push(h);
-  }
-  if (!hosts.length && !exactHosts.length) {
-    webRequest.onBeforeSendHeaders(null);
-    return;
-  }
-  const chromeUserAgent =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/" +
-    process.versions.chrome + " Safari/537.36";
+  const { hosts, exactHosts } = userAgentHosts(pluginManager.getSites());
+  const ua = chromeUserAgent(process.versions.chrome, process.platform);
+  const sso = WindowsSso.getShared();
   webRequest.onBeforeSendHeaders(
     siteUrlFilter(hosts, exactHosts),
     (details, callback) => {
-      details.requestHeaders["User-Agent"] = chromeUserAgent;
-      callback({ requestHeaders: details.requestHeaders });
+      details.requestHeaders["User-Agent"] = ua;
+      if (!deviceSignOnEnabled || !WindowsSso.isLoginUrl(details.url)) {
+        callback({ requestHeaders: details.requestHeaders });
+        return;
+      }
+      sso.requestHeadersFor(details).then((withProof) => {
+        callback({ requestHeaders: withProof || details.requestHeaders });
+      });
     },
   );
 }

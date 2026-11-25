@@ -60,7 +60,7 @@ To keep these windows in front of everything else (handy for a ticket you're cop
 
 ## Sign-ins, passkeys and permissions
 
-- **Passkeys** – Sites that offer "sign in with a passkey" (Microsoft sign-in, for example) work in tabs. On Windows, the Windows Hello prompt handles this PC's passkeys, security keys and phones (scan the QR code). When a security key holds several accounts for a site, the app asks which one to use.
+- **Passkeys** – Sites that offer "sign in with a passkey" (Microsoft sign-in, for example) work in tabs. On Windows, the Windows Hello prompt handles this PC's passkeys, security keys and phones (scan the QR code). When a security key holds several accounts for a site, the app asks which one to use. Microsoft's sign-in pages are always sent a plain Chrome user agent (app 0.8.10 and later), because Microsoft hides the passkey option from browsers it doesn't recognise. On a company Windows PC, [Use Windows Device Sign-On](settings.md#general) (on by default) also lets Microsoft accept your Windows sign-in, as Edge does, when your organisation requires a passkey or a company device.
 - **Permission prompts** – A site has to ask before it uses the microphone, camera, location, notifications or clipboard, or opens a link in another program. Harmless permissions (such as copying to the clipboard) are allowed without asking. Your **Allow** or **Block** answer is saved per site; see [Settings → Site permissions](settings.md#site-permissions) to reset them.
 - **Password managers** – Browser password manager extensions aren't supported. Use your desktop password manager's auto-type instead.
 

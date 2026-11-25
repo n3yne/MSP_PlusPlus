@@ -125,6 +125,23 @@
 
           </div>
 
+          <!-- Shown only where device sign-on works (Windows, addon built) -->
+          <div class="settings-section" id="windows-sso-section" hidden>
+            <h3 class="settings-section-title">Microsoft Sign-In</h3>
+
+            <label class="settings-toggle">
+              <input type="checkbox" id="setting-windows-sso" />
+              <span class="settings-toggle-slider"></span>
+              <span class="settings-toggle-label">Use Windows Device Sign-On</span>
+            </label>
+            <p class="settings-description">
+              Sign in to Microsoft the way Edge does: Windows vouches for this PC and your work account, so
+              sign-in rules that need a company device, a passkey or Windows Hello let you in. Applies to tabs,
+              pop-out windows and the Copilot window. The proof only goes to Microsoft&#39;s sign-in page.
+            </p>
+            <p class="settings-description" id="windows-sso-state"></p>
+          </div>
+
           <div class="settings-section">
             <h3 class="settings-section-title">Updates</h3>
 

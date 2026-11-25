@@ -167,3 +167,31 @@ describe("windows-sso sessions", () => {
     expect(Object.isFrozen(api)).toBe(true);
   });
 });
+
+describe("windows-sso for the app's own tabs (requestHeadersFor)", () => {
+  test("returns the headers with the proofs for a sign-in page load", async () => {
+    const { sso } = setup();
+    const out = await sso.requestHeadersFor({
+      url: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+      resourceType: "mainFrame",
+      requestHeaders: { "User-Agent": "chrome" },
+    });
+    expect(out).toEqual({ "User-Agent": "chrome", "x-ms-RefreshTokenCredential": PROOF, "x-ms-DeviceCredential": "dev.cred.sig" });
+  });
+
+  test("null for other requests, no proof, Windows refusing, or not Windows", async () => {
+    const page = { url: "https://login.microsoftonline.com/", resourceType: "mainFrame", requestHeaders: {} };
+    expect(await setup().sso.requestHeadersFor({ ...page, resourceType: "xhr" })).toBeNull();
+    expect(await setup().sso.requestHeadersFor({ ...page, url: "https://login.microsoftonline.com.evil.example/" })).toBeNull();
+    expect(await setup({ cookies: [] }).sso.requestHeadersFor(page)).toBeNull();
+    expect(await setup({ throws: true }).sso.requestHeadersFor(page)).toBeNull();
+    expect(await setup({ platform: "darwin" }).sso.requestHeadersFor(page)).toBeNull();
+    expect(await setup().sso.requestHeadersFor(null)).toBeNull();
+  });
+
+  test("isSupported says whether the addon works here", () => {
+    expect(setup().sso.isSupported()).toBe(true);
+    expect(setup({ unavailable: true }).sso.isSupported()).toBe(false);
+    expect(setup({ platform: "linux" }).sso.isSupported()).toBe(false);
+  });
+});

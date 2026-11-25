@@ -58,6 +58,14 @@ describe("validateSettings", () => {
 // ==================== migrateCoreSettings ====================
 
 describe("migrateCoreSettings", () => {
+  test("0.8.10: keeps device sign-on off for someone who turned it off in AI Features", () => {
+    expect(migrateCoreSettings({ aiWebDeviceSso: false })).toEqual({ aiWebDeviceSso: false, windowsDeviceSignOn: false });
+    expect(migrateCoreSettings({ aiWebDeviceSso: true })).toEqual({ aiWebDeviceSso: true });
+    expect(migrateCoreSettings({})).toEqual({});
+    // A choice already made in General wins.
+    expect(migrateCoreSettings({ aiWebDeviceSso: false, windowsDeviceSignOn: true })).toEqual({ aiWebDeviceSso: false, windowsDeviceSignOn: true });
+  });
+
   test("carries notePanelEnabled over to sidePanelEnabled", () => {
     expect(migrateCoreSettings({ notePanelEnabled: false })).toEqual({ sidePanelEnabled: false });
     expect(migrateCoreSettings({ notePanelEnabled: true })).toEqual({ sidePanelEnabled: true });
@@ -220,6 +228,13 @@ describe("tabsToRestore", () => {
       delete without[key];
       expect(validateSettings(without)).toBe(true);
     }
+  });
+
+  test("windowsDeviceSignOn defaults on and must be a boolean when present", () => {
+    const base = Object.assign({}, DEFAULT_SETTINGS);
+    expect(DEFAULT_SETTINGS.windowsDeviceSignOn).toBe(true);
+    expect(validateSettings(Object.assign({}, base, { windowsDeviceSignOn: false }))).toBe(true);
+    expect(validateSettings(Object.assign({}, base, { windowsDeviceSignOn: "on" }))).toBe(false);
   });
 
   test("unreadTabBadges defaults on and must be a boolean when present", () => {

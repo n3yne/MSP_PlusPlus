@@ -1,7 +1,7 @@
 {
   "id": "tree-tabs",
   "name": "Tree Style Tabs",
-  "version": "0.8.11",
+  "version": "0.8.10.1",
   "stage": "beta",
   "distribution": "directory",
   "description": "A Tree tab in the side panel that arranges open tabs as a tree: named groups, tabs under a master tab, nested as deep as you like.",
@@ -9,5 +9,5 @@
   "main": "main.js",
   "renderer": "renderer.js",
   "settings": "settings.js",
-  "minAppVersion": "0.7.4"
+  "minAppVersion": "0.8.7"
 }

@@ -198,7 +198,8 @@ describe("connectwise-manage page scripts", () => {
     expect(manifest.site.hosts).toEqual(["myconnectwise.net"]);
     // No defaultUrl: Freshservice stays the Home URL default for fresh installs.
     expect(manifest.site.defaultUrl).toBeUndefined();
-    expect(manifest.minAppVersion).toBe("0.5.7");
+    // Four-part plugin versions (0.8.10.1) need app 0.8.7+, the first that reads them.
+    expect(manifest.minAppVersion).toBe("0.8.7");
   });
 });
 

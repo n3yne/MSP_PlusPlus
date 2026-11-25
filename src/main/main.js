@@ -9,6 +9,7 @@ const { tabShortcutForKey } = require("../shared/tab-shortcuts");
 const pluginManager = require("../plugin-system/plugin-manager");
 const PluginDirectory = require("../plugin-system/plugin-directory");
 const { installPasskeyAccountChooser } = require("./webauthn");
+const { chromeUserAgent, userAgentHosts } = require("./user-agent");
 const { createUpdater } = require("./updater");
 const { zoomActionForKey } = require("../shared/page-zoom");
 const { createPermissionPolicy, installPermissionHandlers } = require("./permissions");
@@ -1640,30 +1641,17 @@ function siteUrlFilter(hosts, exactHosts) {
 // Presents a plain Chrome user agent (no "Electron/…" token) to the hosts of site
 // plugins that ask for it ("site.chromeUserAgent": true), so those sites don't treat
 // the app as an unsupported browser. Covers the manifest hosts and the hosts a
-// plugin added with api.setSiteHosts. Scoped to those hosts so other services see
-// the real user agent. The Chrome version tracks the bundled Chromium so it never
-// looks outdated. Re-installed whenever a plugin changes its extra hosts; with
-// no hosts, the listener is removed.
+// plugin added with api.setSiteHosts, and always Microsoft's sign-in pages, which
+// otherwise refuse passkey sign-in (see user-agent.js). Other services see the
+// real user agent. Re-installed whenever a plugin changes its extra hosts.
 function installSiteUserAgent() {
   const webRequest = electron.session.defaultSession.webRequest;
-  const hosts = [];
-  const exactHosts = [];
-  for (const site of pluginManager.getSites()) {
-    if (!site.chromeUserAgent) continue;
-    for (const h of site.hosts) if (!hosts.includes(h)) hosts.push(h);
-    for (const h of site.extraHosts) if (!exactHosts.includes(h)) exactHosts.push(h);
-  }
-  if (!hosts.length && !exactHosts.length) {
-    webRequest.onBeforeSendHeaders(null);
-    return;
-  }
-  const chromeUserAgent =
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/" +
-    process.versions.chrome + " Safari/537.36";
+  const { hosts, exactHosts } = userAgentHosts(pluginManager.getSites());
+  const ua = chromeUserAgent(process.versions.chrome, process.platform);
   webRequest.onBeforeSendHeaders(
     siteUrlFilter(hosts, exactHosts),
     (details, callback) => {
-      details.requestHeaders["User-Agent"] = chromeUserAgent;
+      details.requestHeaders["User-Agent"] = ua;
       callback({ requestHeaders: details.requestHeaders });
     },
   );

@@ -104,6 +104,11 @@
       "and only with the Microsoft Copilot sites, never with Other chat site.</p>" +
       '  <p class="settings-description" id="ai-plugin-web-sso-state"></p>' +
       "</div>" +
+      // MSP++ 0.8.10+: the switch is in Settings > General, for the whole app
+      '<div class="settings-field settings-field-column" data-ai-providers="copilotweb" id="ai-plugin-web-sso-moved" style="display:none">' +
+      '  <p class="settings-description">Windows device sign-on for the Copilot window is now set under ' +
+      "<strong>General &gt; Microsoft Sign-In</strong>, where it applies to the whole app.</p>" +
+      "</div>" +
       '<div class="settings-field settings-field-column" data-ai-providers="copilotweb">' +
       '  <label class="settings-toggle">' +
       '    <input type="checkbox" id="ai-plugin-web-auto" />' +
@@ -153,7 +158,10 @@
     const elWebSso     = panel.querySelector("#ai-plugin-web-sso");
     const elWebSsoRow  = panel.querySelector("#ai-plugin-web-sso-row");
     const elWebSsoState = panel.querySelector("#ai-plugin-web-sso-state");
+    const elWebSsoMoved = panel.querySelector("#ai-plugin-web-sso-moved");
     let ssoSupported = false;
+    // MSP++ 0.8.10+ has the switch in General settings (windowsDeviceSignOn).
+    let ssoInGeneral = typeof settingsAPI.getSettings().windowsDeviceSignOn === "boolean";
 
     // Shows only the fields that apply to the selected provider.
     function showProviderFields(provider) {
@@ -295,6 +303,8 @@
       elWebSite.value = s.aiWebSite || "copilot-work";
       elWebAuto.checked = s.aiWebAutoSend === true;
       elWebSso.checked = s.aiWebDeviceSso !== false;
+      ssoInGeneral = typeof s.windowsDeviceSignOn === "boolean";
+      showSsoRow();
       showWebUrlRow();
     }
 
@@ -375,7 +385,9 @@
     }
 
     function showSsoRow() {
-      elWebSsoRow.style.display = elProvider.value === "copilotweb" && ssoSupported ? "" : "none";
+      const copilot = elProvider.value === "copilotweb" && ssoSupported;
+      elWebSsoRow.style.display = copilot && !ssoInGeneral ? "" : "none";
+      elWebSsoMoved.style.display = copilot && ssoInGeneral ? "" : "none";
     }
 
     elWebSso.addEventListener("change", function () {

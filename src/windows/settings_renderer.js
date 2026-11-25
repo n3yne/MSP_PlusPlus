@@ -76,6 +76,7 @@ document.addEventListener("DOMContentLoaded", function () {
     pluginAutoUpdate: false,
     linkClickBackground: false,
     popOutAlwaysOnTop: false,
+    windowsDeviceSignOn: true,
   };
 
   // ==================== Element References ====================
@@ -87,6 +88,9 @@ document.addEventListener("DOMContentLoaded", function () {
   const settingLinkBackground = document.getElementById("setting-link-click-background");
   const settingPopOutOnTop    = document.getElementById("setting-pop-out-on-top");
   const settingSiteColors     = document.getElementById("setting-site-tab-colors");
+  const settingWindowsSso     = document.getElementById("setting-windows-sso");
+  const windowsSsoSection     = document.getElementById("windows-sso-section");
+  const windowsSsoState       = document.getElementById("windows-sso-state");
   const siteColorList         = document.getElementById("site-tab-color-list");
   const settingTheme          = document.getElementById("setting-theme");
   const settingAutoUpdate     = document.getElementById("setting-auto-update");
@@ -166,6 +170,7 @@ document.addEventListener("DOMContentLoaded", function () {
     settingUnreadBadges.checked = settings.unreadTabBadges !== false;
     settingLinkBackground.checked = settings.linkClickBackground === true;
     settingPopOutOnTop.checked = settings.popOutAlwaysOnTop === true;
+    settingWindowsSso.checked = settings.windowsDeviceSignOn !== false;
     settingSiteColors.checked = settings.siteTabColors !== false;
     renderSiteColorList();
     const collapsedKey = JSON.stringify(settings.pluginCategoriesCollapsed || null);
@@ -211,6 +216,23 @@ document.addEventListener("DOMContentLoaded", function () {
     appSettings.popOutAlwaysOnTop = settingPopOutOnTop.checked;
     saveSettings({ popOutAlwaysOnTop: appSettings.popOutAlwaysOnTop });
   });
+
+  settingWindowsSso.addEventListener("change", function () {
+    appSettings.windowsDeviceSignOn = settingWindowsSso.checked;
+    saveSettings({ windowsDeviceSignOn: appSettings.windowsDeviceSignOn });
+  });
+
+  // Shows the device sign-on section only where it works, and whether this PC
+  // has a proof to send.
+  Promise.resolve(window.backupAPI.getWindowsSsoStatus ? window.backupAPI.getWindowsSsoStatus() : null)
+    .then(function (st) {
+      if (!st || !st.supported) return;
+      windowsSsoSection.hidden = false;
+      windowsSsoState.textContent = st.available
+        ? "This PC is registered with your organisation: device sign-on is available."
+        : "No device sign-on on this PC. It needs a PC registered with your organisation (Entra ID) and Windows signed in with your work account.";
+    })
+    .catch(function () { /* leave the section hidden */ });
 
   settingSiteColors.addEventListener("change", function () {
     appSettings.siteTabColors = settingSiteColors.checked;

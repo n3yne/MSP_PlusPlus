@@ -817,13 +817,17 @@ function createCopilotWeb(api, deps) {
   // Windows device sign-on (app 0.8.6+, api.windowsSso): Windows' proof that
   // this PC is registered with the organisation goes to Microsoft's sign-in
   // page in this session, as Edge does, so a "compliant device" Conditional
-  // Access policy lets sign-in through. On by default (aiWebDeviceSso); it does
-  // nothing on a PC that isn't registered, or on older MSP++ versions.
+  // Access policy lets sign-in through. On by default; it does nothing on a PC
+  // that isn't registered, or on older MSP++ versions. From MSP++ 0.8.10 the
+  // switch is Settings > General (windowsDeviceSignOn, for the whole app);
+  // older versions use this plugin's own aiWebDeviceSso.
   // Only for the built-in Microsoft Copilot sites: an "Other chat site" page in
   // this session could otherwise start Microsoft sign-ins that carry the proof.
   function applyDeviceSso(settings) {
     if (!api.windowsSso) return false;
-    const on = (!settings || settings.aiWebDeviceSso !== false) && siteFor(settings).key !== "custom";
+    const s = settings || {};
+    const wanted = typeof s.windowsDeviceSignOn === "boolean" ? s.windowsDeviceSignOn : s.aiWebDeviceSso !== false;
+    const on = wanted && siteFor(settings).key !== "custom";
     try {
       return api.windowsSso.setForPartition(PARTITION, on);
     } catch (err) {

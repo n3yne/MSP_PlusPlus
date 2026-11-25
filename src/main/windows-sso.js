@@ -106,19 +106,31 @@ function createWindowsSso(options) {
     return available;
   }
 
+  // The request headers with the proofs added, for an onBeforeSendHeaders
+  // `details`, or null when nothing should be added (not a page load on a login
+  // URL, or no proof). Never rejects.
+  async function requestHeadersFor(details) {
+    if (!details || !PAGE_LOADS.has(details.resourceType) || !isLoginUrl(details.url)) return null;
+    let extra;
+    try { extra = await headersFor(details.url); } catch { return null; }
+    if (!Object.keys(extra).length) return null;
+    const requestHeaders = Object.assign({}, details.requestHeaders);
+    // Never let a page-supplied header of the same name through alongside ours.
+    for (const k of Object.keys(requestHeaders)) if (HEADER_NAME.test(k)) delete requestHeaders[k];
+    Object.assign(requestHeaders, extra);
+    return requestHeaders;
+  }
+
   function onBeforeSendHeaders(details, callback) {
-    if (!details || !PAGE_LOADS.has(details.resourceType) || !isLoginUrl(details.url)) {
-      callback({});
-      return;
-    }
-    headersFor(details.url).then((extra) => {
-      if (!Object.keys(extra).length) { callback({}); return; }
-      const requestHeaders = Object.assign({}, details.requestHeaders);
-      // Never let a page-supplied header of the same name through alongside ours.
-      for (const k of Object.keys(requestHeaders)) if (HEADER_NAME.test(k)) delete requestHeaders[k];
-      Object.assign(requestHeaders, extra);
-      callback({ requestHeaders });
-    }, () => callback({}));
+    requestHeadersFor(details).then((requestHeaders) => {
+      callback(requestHeaders ? { requestHeaders } : {});
+    });
+  }
+
+  // Whether this MSP++ can send proofs at all (Windows, addon loaded). Says
+  // nothing about whether this PC has one: see isAvailable.
+  function isSupported() {
+    return !!getNative();
   }
 
   // Turns the headers on or off for a "persist:" session. It takes over that
@@ -149,7 +161,7 @@ function createWindowsSso(options) {
     });
   }
 
-  return { isAvailable, headersFor, setForPartition, forPlugin, _onBeforeSendHeaders: onBeforeSendHeaders };
+  return { isAvailable, isSupported, headersFor, requestHeadersFor, setForPartition, forPlugin, _onBeforeSendHeaders: onBeforeSendHeaders };
 }
 
 let shared = null;

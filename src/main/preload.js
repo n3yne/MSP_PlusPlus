@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld("backupAPI", {
   exportSettings: () => ipcRenderer.invoke("export-settings"),
   importSettings: () => ipcRenderer.invoke("import-settings"),
   getUpdateStatus: () => ipcRenderer.invoke("get-update-status"),
+  getWindowsSsoStatus: () => ipcRenderer.invoke("windows-sso-status"),
   downloadAppUpdate: () => ipcRenderer.invoke("download-app-update"),
   installAppUpdate: () => ipcRenderer.invoke("install-app-update"),
   onAppUpdateStatus: (callback) =>

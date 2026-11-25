@@ -237,6 +237,17 @@ describe("tabsToRestore", () => {
     expect(validateSettings(Object.assign({}, base, { windowsDeviceSignOn: "on" }))).toBe(false);
   });
 
+  test("plugin update stage defaults to stable and only takes known stages", () => {
+    const base = Object.assign({}, DEFAULT_SETTINGS);
+    expect(DEFAULT_SETTINGS.pluginUpdateStage).toBe("stable");
+    expect(DEFAULT_SETTINGS.pluginUpdateStageOverrides).toEqual({});
+    expect(validateSettings(Object.assign({}, base, { pluginUpdateStage: "beta" }))).toBe(true);
+    expect(validateSettings(Object.assign({}, base, { pluginUpdateStage: "nightly" }))).toBe(false);
+    expect(validateSettings(Object.assign({}, base, { pluginUpdateStageOverrides: { "time-tracker": "alpha" } }))).toBe(true);
+    expect(validateSettings(Object.assign({}, base, { pluginUpdateStageOverrides: { "time-tracker": "x" } }))).toBe(false);
+    expect(validateSettings(Object.assign({}, base, { pluginUpdateStageOverrides: ["beta"] }))).toBe(false);
+  });
+
   test("unreadTabBadges defaults on and must be a boolean when present", () => {
     const base = Object.assign({}, DEFAULT_SETTINGS);
     expect(DEFAULT_SETTINGS.unreadTabBadges).toBe(true);

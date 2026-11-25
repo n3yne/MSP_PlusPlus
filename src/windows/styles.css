@@ -2225,6 +2225,39 @@ body[data-theme="light"] .downloads-panel {
   color: var(--text-muted);
 }
 
+/* Release stage badges (plugin-stages.js). Stable shows none. */
+.plugin-badge-stage { cursor: help; }
+.plugin-badge-stage-pre-alpha { background: rgba(231, 76, 60, 0.2);  color: #e74c3c; }
+.plugin-badge-stage-alpha     { background: rgba(230, 126, 34, 0.2); color: #e67e22; }
+.plugin-badge-stage-beta      { background: rgba(241, 196, 15, 0.2); color: #f1c40f; }
+.plugin-badge-stage-rc        { background: rgba(52, 152, 219, 0.2); color: #3498db; }
+body[data-theme="light"] .plugin-badge-stage-pre-alpha { color: #c0392b; }
+body[data-theme="light"] .plugin-badge-stage-alpha     { color: #b9560b; }
+body[data-theme="light"] .plugin-badge-stage-beta      { color: #8a6d00; }
+body[data-theme="light"] .plugin-badge-stage-rc        { color: #1f6fa8; }
+
+.plugin-update-stage-field { margin-top: 16px; }
+
+.plugin-stage-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.plugin-stage-confirm {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
 .plugin-item-desc {
   font-size: 11px;
   line-height: 1.4;

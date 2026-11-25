@@ -92,6 +92,40 @@ describe("checkManifests versions", () => {
   });
 });
 
+describe("checkManifests stage", () => {
+  const plugin = (stage) => ({
+    folder: "p",
+    manifest: { id: "p", name: "P", description: "d", category: "Tickets", distribution: "directory", version: "1.0.0", stage },
+    distribution: "directory",
+  });
+
+  test("accepts the five stages and no stage", () => {
+    for (const stage of [undefined, "pre-alpha", "alpha", "beta", "rc", "stable"]) {
+      expect(checkManifests([plugin(stage)])).toEqual([]);
+    }
+  });
+
+  test("refuses anything else, including other spellings", () => {
+    for (const stage of ["Beta", "RC", "nightly", "", 3]) {
+      expect(checkManifests([plugin(stage)]).join("\n")).toMatch(/"stage" must be one of pre-alpha, alpha, beta, rc, stable/);
+    }
+  });
+});
+
+describe("buildDirectory stage", () => {
+  const root = makeRoot([
+    ["beta-thing", { id: "beta-thing", name: "Beta", version: "1.0.0", description: "d", category: "Tickets", distribution: "directory", stage: "beta" }],
+    ["stable-thing", { id: "stable-thing", name: "Stable", version: "1.0.0", description: "d", category: "Tickets", distribution: "directory", stage: "stable" }],
+  ]);
+
+  test("writes the stage to the index only when it isn't stable", () => {
+    const index = buildDirectory({ root, outDir: path.join(root, "out") });
+    const byId = Object.fromEntries(index.plugins.map((p) => [p.id, p]));
+    expect(byId["beta-thing"].stage).toBe("beta");
+    expect("stage" in byId["stable-thing"]).toBe(false);
+  });
+});
+
 describe("buildDirectory", () => {
   const root = makeRoot([
     ["core-thing", { id: "core-thing", name: "Core", version: "1.0.0", description: "Stays bundled", category: "Tickets" }],

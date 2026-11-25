@@ -497,6 +497,13 @@ document.addEventListener("DOMContentLoaded", function () {
     openNotificationsPanel();
   }
 
+  // " (Beta)" for an update below stable, so people know what they're getting.
+  function stageSuffix(stage) {
+    const Stages = window.PluginStages;
+    if (!Stages || Stages.isStable(stage)) return "";
+    return ` (${Stages.info(stage).label})`;
+  }
+
   function showPluginDirectoryStatus(state) {
     showMovedPlugins(state);
     const updates = state && Array.isArray(state.updates) ? state.updates : [];
@@ -512,10 +519,10 @@ document.addEventListener("DOMContentLoaded", function () {
         id: notifNextId++,
         type: "plugin-updates",
         key,
-        title: updates.length === 1 ? `Plugin Update: ${names[0]} v${updates[0].version}` : `${updates.length} Plugin Updates`,
+        title: updates.length === 1 ? `Plugin Update: ${names[0]} v${updates[0].version}${stageSuffix(updates[0].stage)}` : `${updates.length} Plugin Updates`,
         desc: updates.length === 1
           ? `A newer version of ${names[0]} is in the plugin directory.`
-          : `New versions of ${names.join(", ")} are in the plugin directory.`,
+          : `New versions of ${updates.map((u) => u.name + stageSuffix(u.stage)).join(", ")} are in the plugin directory.`,
         action: {
           label: "Open Plugins",
           kind: "callback",

@@ -26,6 +26,7 @@ const fs = require("fs");
 const path = require("path");
 
 const PluginPackage = require("./plugin-package");
+const PluginStages = require("../shared/plugin-stages");
 
 const DEFAULT_INDEX_URL = "https://github.com/n3yne/MSP_PlusPlus/releases/download/plugin-directory/index.json";
 const ID_PATTERN = /^[a-z0-9][a-z0-9_-]{0,62}$/;
@@ -109,6 +110,8 @@ function parseIndex(json, indexUrl, logger = console) {
       size: e.size,
       changelog: cleanText(e.changelog, 2000),
       site: e.site === true,
+      // Release stage (plugin-stages.js); missing or unknown is stable.
+      stage: PluginStages.normalizeStage(e.stage),
     });
   }
   return { plugins };
@@ -507,6 +510,8 @@ async function readLimited(resp, max, tooLarge) {
 //   getInstalled  () => [{ id, version, source, loaded, ... }] (pluginManager.getPluginInfo)
 //   indexUrl      directory index (defaults to the plugin-directory release)
 //   fetchImpl     fetch-compatible function
+//   getUpdateStage (id) => lowest release stage the user takes updates of that
+//                 plugin at (plugin-stages.js updateStageFor); default "stable"
 function createPluginDirectory(opts) {
   const {
     userData,
@@ -516,6 +521,7 @@ function createPluginDirectory(opts) {
     fetchImpl = (...args) => fetch(...args),
     logger = console,
     indexTimeoutMs = 20000,
+    getUpdateStage = () => PluginStages.DEFAULT_UPDATE_STAGE,
   } = opts;
   const userAgent = "MSP-PP/" + appVersion;
 
@@ -590,6 +596,12 @@ function createPluginDirectory(opts) {
       let status = "available";
       if (have) status = compareVersions(e.version, have.version) > 0 ? "update" : "installed";
       if (!compatible && status !== "installed") status = "incompatible";
+      // An update below the stage the user takes updates at is still listed
+      // (and can be installed by hand from Browse), but isn't counted in
+      // `updates`, so it isn't announced or installed automatically.
+      let updateStage = PluginStages.DEFAULT_UPDATE_STAGE;
+      try { updateStage = PluginStages.normalizeStage(getUpdateStage(e.id)); } catch { /* default */ }
+      const belowUpdateStage = status === "update" && !PluginStages.meetsStage(e.stage, updateStage);
       let pendingAction = "";
       if (pending.remove[e.id]) pendingAction = "remove";
       else if (pending.install[e.id]) pendingAction = have ? "update" : "install";
@@ -598,17 +610,23 @@ function createPluginDirectory(opts) {
         compatible,
         installedVersion: have ? have.version || "" : "",
         installedSource: have ? have.source || "" : "",
+        installedStage: have ? PluginStages.normalizeStage(have.stage) : "",
+        updateStage,
+        belowUpdateStage,
         pendingAction,
         pendingVersion: pending.install[e.id] ? pending.install[e.id].version || "" : "",
       });
     });
-    const updates = plugins.filter(p => p.status === "update" && !p.pendingAction);
+    const updates = plugins.filter(p => p.status === "update" && !p.pendingAction && !p.belowUpdateStage);
     return {
       indexUrl,
       fetchedAt,
       error: lastError,
       plugins,
-      updates: updates.map(p => ({ id: p.id, name: p.name, version: p.version, installedVersion: p.installedVersion })),
+      updates: updates.map(p => ({ id: p.id, name: p.name, version: p.version, installedVersion: p.installedVersion, stage: p.stage })),
+      // Updates waiting for a version at the user's update stage.
+      heldBack: plugins.filter(p => p.belowUpdateStage && !p.pendingAction)
+        .map(p => ({ id: p.id, name: p.name, version: p.version, stage: p.stage, installedVersion: p.installedVersion, updateStage: p.updateStage })),
       pending: {
         install: Object.keys(pending.install),
         remove: Object.keys(pending.remove),

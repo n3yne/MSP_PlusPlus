@@ -74,6 +74,8 @@ document.addEventListener("DOMContentLoaded", function () {
     unreadTabBadges: true,
     siteTabColors: true,
     pluginAutoUpdate: false,
+    pluginUpdateStage: "stable",
+    pluginUpdateStageOverrides: {},
     linkClickBackground: false,
     popOutAlwaysOnTop: false,
     windowsDeviceSignOn: true,
@@ -112,6 +114,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const btnPluginUpdateAll    = document.getElementById("btn-plugin-update-all");
   const btnPluginDirCheck     = document.getElementById("btn-plugin-directory-check");
   const settingPluginAutoUpd  = document.getElementById("setting-plugin-auto-update");
+  const settingPluginStage    = document.getElementById("setting-plugin-update-stage");
   const pluginMovedBox        = document.getElementById("plugin-moved");
   const pluginUpdateCounts    = [document.getElementById("plugin-update-count"), document.getElementById("nav-plugin-update-count")];
 
@@ -166,6 +169,8 @@ document.addEventListener("DOMContentLoaded", function () {
     settingTheme.checked = theme === "light";
     settingAutoUpdate.checked = settings.autoUpdate !== false;
     if (settingPluginAutoUpd) settingPluginAutoUpd.checked = settings.pluginAutoUpdate === true;
+    if (settingPluginStage) settingPluginStage.value = window.PluginStages.updateStageFor(settings, null);
+    refreshStageOverrideSelects();
     settingRestoreTabs.checked = settings.restoreTabs !== false;
     settingUnreadBadges.checked = settings.unreadTabBadges !== false;
     settingLinkBackground.checked = settings.linkClickBackground === true;
@@ -328,6 +333,117 @@ document.addEventListener("DOMContentLoaded", function () {
       appSettings.pluginAutoUpdate = settingPluginAutoUpd.checked;
       saveSettings({ pluginAutoUpdate: appSettings.pluginAutoUpdate });
     });
+  }
+
+  // ==================== Plugin release stages ====================
+  // Stable first: the list reads from safest to least finished.
+  const STAGES_SAFEST_FIRST = window.PluginStages.STAGES.slice().reverse();
+
+  function fillStageOptions(select) {
+    STAGES_SAFEST_FIRST.forEach(function (st) {
+      const opt = document.createElement("option");
+      opt.value = st.id;
+      opt.textContent = st.minLabel;
+      select.appendChild(opt);
+    });
+  }
+
+  if (settingPluginStage) {
+    fillStageOptions(settingPluginStage);
+    settingPluginStage.value = window.PluginStages.DEFAULT_UPDATE_STAGE;
+    settingPluginStage.addEventListener("change", function () {
+      appSettings.pluginUpdateStage = settingPluginStage.value;
+      saveSettings({ pluginUpdateStage: appSettings.pluginUpdateStage });
+      refreshStageOverrideSelects();
+    });
+  }
+
+  // A coloured badge for a release stage below stable, with what it means on
+  // hover; null for stable.
+  function stageBadge(stage) {
+    const info = window.PluginStages.info(stage);
+    if (info.id === "stable") return null;
+    const badge = document.createElement("span");
+    badge.className = "plugin-badge plugin-badge-stage plugin-badge-stage-" + info.id;
+    badge.textContent = info.label;
+    badge.title = info.description;
+    return badge;
+  }
+
+  function globalStageLabel() {
+    const st = window.PluginStages.info(window.PluginStages.updateStageFor(appSettings, null));
+    return "Use default (" + st.minLabel + ")";
+  }
+
+  // Per-plugin "Updates" choice in a directory plugin's settings tab. "" means
+  // follow the global Update Plugins To setting.
+  function buildStageOverrideRow(plugin) {
+    const row = document.createElement("div");
+    row.className = "plugin-stage-row";
+    const id = "plugin-stage-override-" + plugin.id;
+    const label = document.createElement("label");
+    label.htmlFor = id;
+    label.textContent = "Updates:";
+    const select = document.createElement("select");
+    select.id = id;
+    select.className = "settings-select-input plugin-stage-override";
+    select.dataset.pluginId = plugin.id;
+    const def = document.createElement("option");
+    def.value = "";
+    def.textContent = globalStageLabel();
+    select.appendChild(def);
+    fillStageOptions(select);
+    const overrides = appSettings.pluginUpdateStageOverrides || {};
+    select.value = window.PluginStages.isStage(overrides[plugin.id]) ? overrides[plugin.id] : "";
+    select.title = "The lowest release stage " + (plugin.name || plugin.id) + " updates to";
+    select.addEventListener("change", function () {
+      const next = Object.assign({}, appSettings.pluginUpdateStageOverrides || {});
+      if (select.value) next[plugin.id] = select.value;
+      else delete next[plugin.id];
+      appSettings.pluginUpdateStageOverrides = next;
+      saveSettings({ pluginUpdateStageOverrides: next });
+    });
+    row.appendChild(label);
+    row.appendChild(select);
+    return row;
+  }
+
+  function refreshStageOverrideSelects() {
+    const overrides = appSettings.pluginUpdateStageOverrides || {};
+    document.querySelectorAll("select.plugin-stage-override").forEach(function (select) {
+      if (select.options[0]) select.options[0].textContent = globalStageLabel();
+      const v = overrides[select.dataset.pluginId];
+      select.value = window.PluginStages.isStage(v) ? v : "";
+    });
+  }
+
+  // Inline "this is an alpha, install anyway?" under a directory card, for
+  // installing or updating to a version below stable.
+  function showStageConfirm(item, entry, verb, onConfirm) {
+    if (item.querySelector(".plugin-stage-confirm")) return;
+    const info = window.PluginStages.info(entry.stage);
+    const row = document.createElement("div");
+    row.className = "plugin-stage-confirm";
+    const text = document.createElement("span");
+    const meaning = info.description.replace(/^[^:]+:\s*/, "");
+    text.textContent = entry.name + " v" + entry.version + " is marked " + info.label + ". " +
+      meaning.charAt(0).toUpperCase() + meaning.slice(1) + " " + verb + " anyway?";
+    row.appendChild(text);
+    const ok = document.createElement("button");
+    ok.type = "button";
+    ok.className = "btn btn-small btn-warning";
+    ok.textContent = verb;
+    const close = function () { row.remove(); item.classList.remove("confirming"); };
+    ok.addEventListener("click", function () { close(); onConfirm(); });
+    const cancel = document.createElement("button");
+    cancel.type = "button";
+    cancel.className = "btn btn-small btn-secondary";
+    cancel.textContent = "Cancel";
+    cancel.addEventListener("click", close);
+    row.appendChild(ok);
+    row.appendChild(cancel);
+    item.classList.add("confirming");
+    item.appendChild(row);
   }
 
   // ==================== Updates ====================
@@ -538,6 +654,8 @@ document.addEventListener("DOMContentLoaded", function () {
       ver.textContent = "v" + plugin.version;
       frag.appendChild(ver);
     }
+    const stage = stageBadge(plugin.stage);
+    if (stage) frag.appendChild(stage);
     const source = SOURCE_BADGES[plugin.source] || SOURCE_BADGES.user;
     const sourceBadge = document.createElement("span");
     sourceBadge.className = "plugin-badge " + source.className;
@@ -867,6 +985,8 @@ document.addEventListener("DOMContentLoaded", function () {
     badges.appendChild(createBadges(plugin));
     row.appendChild(badges);
     header.appendChild(row);
+    // Only plugins from the directory get updates.
+    if (plugin.source === "directory") header.appendChild(buildStageOverrideRow(plugin));
 
     const notice = document.createElement("div");
     notice.className = "plugin-restart-notice plugin-panel-restart" + (pluginRestartPending ? " visible" : "");
@@ -1168,7 +1288,7 @@ document.addEventListener("DOMContentLoaded", function () {
   }
 
   // The button (or state text) on the right of a directory card.
-  function buildBrowseAction(entry) {
+  function buildBrowseAction(entry, item) {
     const wrap = document.createElement("div");
     wrap.className = "plugin-item-actions";
     function stateText(text) {
@@ -1186,12 +1306,17 @@ document.addEventListener("DOMContentLoaded", function () {
       wrap.appendChild(btn);
       return btn;
     }
-    const install = function () {
+    const doInstall = function () {
       const needs = entry.requires.filter(function (r) { return !findPlugin(r); });
       const label = needs.length
         ? "Downloading " + entry.name + " and " + needs.map(directoryName).join(", ") + "…"
         : "Downloading " + entry.name + "…";
       reportInstall(window.backupAPI.installFromDirectory([entry.id]), label);
+    };
+    // Below stable asks first.
+    const install = function () {
+      if (window.PluginStages.isStable(entry.stage)) { doInstall(); return; }
+      showStageConfirm(item, entry, entry.status === "update" ? "Update" : "Install", doInstall);
     };
 
     if (entry.pendingAction === "remove") {
@@ -1202,6 +1327,13 @@ document.addEventListener("DOMContentLoaded", function () {
       button("Cancel", "btn-secondary", function () { cancelPluginChange(entry.id); });
     } else if (entry.status === "incompatible") {
       stateText("Needs MSP++ " + entry.minAppVersion);
+    } else if (entry.status === "update" && entry.belowUpdateStage) {
+      const st = window.PluginStages.info(entry.stage);
+      stateText("Below your update stage");
+      const btn = button("Update to " + st.label + " v" + entry.version, "btn-secondary", install);
+      btn.title = "v" + entry.version + " is " + st.label.toLowerCase() + ". Your plugins update to " +
+        window.PluginStages.info(entry.updateStage).minLabel.toLowerCase() +
+        ", so it isn't installed automatically. You can still install it yourself.";
     } else if (entry.status === "update") {
       button("Update to v" + entry.version, "btn-primary", install);
     } else if (entry.status === "installed") {
@@ -1230,6 +1362,9 @@ document.addEventListener("DOMContentLoaded", function () {
       ? "v" + entry.installedVersion + " → v" + entry.version
       : "v" + (entry.installedVersion && entry.status === "installed" ? entry.installedVersion : entry.version);
     header.appendChild(ver);
+    // The stage of the version listed (the new one, for an update).
+    const stage = stageBadge(entry.status === "installed" && entry.installedStage ? entry.installedStage : entry.stage);
+    if (stage) header.appendChild(stage);
     if (entry.installedSource === "bundled") {
       const b = document.createElement("span");
       b.className = "plugin-badge plugin-badge-bundled";
@@ -1254,7 +1389,7 @@ document.addEventListener("DOMContentLoaded", function () {
     info.appendChild(metaEl);
 
     item.appendChild(info);
-    item.appendChild(buildBrowseAction(entry));
+    item.appendChild(buildBrowseAction(entry, item));
     return item;
   }
 

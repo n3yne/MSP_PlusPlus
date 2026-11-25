@@ -28,6 +28,7 @@ const path = require("path");
 
 const PluginPackage = require("../src/plugin-system/plugin-package");
 const PluginCategories = require("../src/shared/plugin-categories");
+const PluginStages = require("../src/shared/plugin-stages");
 const { compareVersions } = require("../src/plugin-system/plugin-directory");
 
 const ROOT = path.join(__dirname, "..");
@@ -72,6 +73,9 @@ function checkManifests(plugins) {
           else if (!ids.has(r)) problems.push(`${p.folder}: requires "${r}", which isn't a plugin in this repo`);
         }
       }
+    }
+    if (m.stage !== undefined && !PluginStages.isStage(m.stage)) {
+      problems.push(`${p.folder}: "stage" must be one of ${PluginStages.STAGES.map((s) => s.id).join(", ")}`);
     }
     if (p.distribution === "directory") {
       if (m.id !== p.folder) problems.push(`${p.folder}: folder name must match the id "${m.id}" for directory plugins`);
@@ -120,6 +124,8 @@ function buildDirectory({ root = ROOT, outDir = path.join(ROOT, "dist-plugins") 
     };
     if (m.minAppVersion) entry.minAppVersion = m.minAppVersion;
     if (m.site) entry.site = true;
+    // Only written when not stable, so the index of a stable plugin is unchanged.
+    if (!PluginStages.isStable(m.stage)) entry.stage = PluginStages.normalizeStage(m.stage);
     if (typeof m.changelog === "string" && m.changelog.trim()) entry.changelog = m.changelog.trim();
     entries.push(entry);
   }

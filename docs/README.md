@@ -18,7 +18,7 @@ Start with the page that matches what you want to do.
 
 ## Plugins
 
-[**All plugins**](plugins/README.md) lists every plugin by category and explains how to install, update and remove them. Each plugin has its own page:
+[**All plugins**](plugins/README.md) lists every plugin by category and explains how to install, update and remove them. [Plugin release stages](plugin-release-stages.md) explains the pre-alpha, alpha, beta and RC badges and how to choose which updates you get. Each plugin has its own page:
 
 - **Sites:** [Freshservice](plugins/freshservice.md) · [ConnectWise Manage](plugins/connectwise-manage.md)
 - **Tickets:** [Quick Actions](plugins/quick-actions.md) · [Recent Tickets](plugins/recent-tickets.md) · [SLA Countdown](plugins/sla-countdown.md) · [Ticket Notifications](plugins/ticket-notifications.md) · [Ticket Search](plugins/ticket-search.md)

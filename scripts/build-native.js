@@ -3,6 +3,7 @@
 // Builds the native addons on Windows:
 //   native/windows-hello  Windows Hello (api.windowsHello)
 //   native/windows-sso    Windows device sign-on for Microsoft sign-in (api.windowsSso)
+//   native/windows-clipboard  private clipboard copies (api.clipboard)
 //
 //   node scripts/build-native.js           for the installed Electron (release builds)
 //   node scripts/build-native.js --node    for plain Node (the CI smoke test)
@@ -16,7 +17,7 @@
 const path = require("path");
 const { spawnSync } = require("child_process");
 
-const ADDONS = ["windows-hello", "windows-sso"];
+const ADDONS = ["windows-hello", "windows-sso", "windows-clipboard"];
 
 if (process.platform !== "win32") {
   console.log("[build-native] Not Windows: skipping the native addons.");

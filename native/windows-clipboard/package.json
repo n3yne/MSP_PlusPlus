@@ -1,0 +1,9 @@
+{
+  "name": "msp-windows-clipboard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MSP++ private clipboard: a small Node-API addon that copies text Windows keeps out of clipboard history and cloud sync",
+  "main": "index.js",
+  "gypfile": true,
+  "license": "MIT"
+}

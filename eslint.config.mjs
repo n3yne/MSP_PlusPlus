@@ -6,7 +6,7 @@ export default [
 
   // Main process + Node.js files
   {
-    files: ["src/main/**/*.js", "src/plugin-system/**/*.js", "scripts/**/*.js", "plugins/**/main.js", "plugins/ai-features/m365.js", "plugins/ai-features/copilot-web.js", "plugins/ai-features/http.js", "plugins/ai-features/tool-chat.js", "plugins/freshservice/assistant-tools.js", "plugins/note-backup/legacy-import.js", "plugins/password-vault/vault-*.js", "native/windows-hello/index.js", "native/windows-sso/index.js"],
+    files: ["src/main/**/*.js", "src/plugin-system/**/*.js", "scripts/**/*.js", "plugins/**/main.js", "plugins/ai-features/m365.js", "plugins/ai-features/copilot-web.js", "plugins/ai-features/http.js", "plugins/ai-features/tool-chat.js", "plugins/freshservice/assistant-tools.js", "plugins/note-backup/legacy-import.js", "plugins/password-vault/vault-*.js", "native/windows-hello/index.js", "native/windows-sso/index.js", "native/windows-clipboard/index.js"],
     languageOptions: {
       ecmaVersion: 2022,
       sourceType: "commonjs",

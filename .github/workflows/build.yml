@@ -47,7 +47,8 @@ jobs:
       # latest.yml and the installer's .blockmap. The installed app reads latest.yml
       # from the release to find updates, so both must be attached to the release.
       # Native addons: Windows Hello (native/windows-hello, api.windowsHello) and
-      # Windows device sign-on (native/windows-sso, api.windowsSso).
+      # Windows device sign-on (native/windows-sso, api.windowsSso), and the
+      # private clipboard (native/windows-clipboard, api.clipboard).
       - name: Build the native addons
         run: node scripts/build-native.js
 

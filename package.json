@@ -76,9 +76,9 @@
       "deleteAppDataOnUninstall": false
     },
     "appx": {
-      "identityName": "MSPPlusPlus.PLACEHOLDER",
-      "publisher": "CN=00000000-0000-0000-0000-000000000000",
-      "publisherDisplayName": "PLACEHOLDER",
+      "identityName": "Esscey.MSP",
+      "publisher": "CN=DA30FDC6-0ABB-4421-A81D-08C1378686F5",
+      "publisherDisplayName": "Esscey",
       "applicationId": "MSPPlusPlus",
       "displayName": "MSP++",
       "backgroundColor": "transparent",

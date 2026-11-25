@@ -21,7 +21,7 @@ Partner Center gives each app three values under **Product management → Produc
 | Package/Identity/Publisher (starts `CN=`) | `publisher` |
 | Package/Properties/PublisherDisplayName | `publisherDisplayName` |
 
-Until they are filled in, the fields say `PLACEHOLDER` and the workflow prints a warning. Partner Center refuses a package whose identity doesn't match.
+MSP++ is reserved in Partner Center as `Esscey.MSP` (publisher `Esscey`, Store ID 9NVJX5HK84G2, package family name `Esscey.MSP_xj933ga3cdbrj`). Partner Center refuses a package whose identity doesn't match. If the fields ever say `PLACEHOLDER`, the workflow prints a warning.
 
 ## What's different in the Store copy
 
@@ -38,7 +38,7 @@ Windows installs the package read-only under `C:\Program Files\WindowsApps\`. No
 The Store copy runs with Windows' AppData redirection (Windows 10 1903 and later):
 
 - **Files that already exist** in `%APPDATA%\MSP++\` (or the old `Freshservice++` folder) are read and changed in place. So a Store copy installed on a PC that had the installer build picks up the same settings, plugins and note backups.
-- **New files and folders** are written to a private per-app folder, `%LOCALAPPDATA%\Packages\<package family name>\LocalCache\Roaming\MSP++\`, but MSP++ still sees them at the normal path. Explorer, other programs and the installer build don't see them at `%APPDATA%\MSP++\`.
+- **New files and folders** are written to a private per-app folder, `%LOCALAPPDATA%\Packages\Esscey.MSP_xj933ga3cdbrj\LocalCache\Roaming\MSP++\`, but MSP++ still sees them at the normal path. Explorer, other programs and the installer build don't see them at `%APPDATA%\MSP++\`.
 - **Uninstalling the Store app deletes the private folder.** That includes any note backups, plugin data and settings files created by the Store copy. Before uninstalling, use **Settings → General → Export Settings**, and copy anything you need from the private folder.
 - Running the Store copy and the installer build on the same PC isn't recommended: they share the files that existed before, but each keeps its own new ones.
 
@@ -63,7 +63,7 @@ From Microsoft Store Policies 7.20 (October 2026). These shape the listing and t
 
 ## Submitting (done by hand in Partner Center)
 
-1. Fill in the identity values above, merge, and run **Build & Release** (or push a release tag).
+1. Publish a release (or run **Build & Release** by hand).
 2. Download the `windows-store` artifact and unzip it to get the `.appx`.
 3. In Partner Center, open the app → **Start your submission**. Set pricing (free), properties (category Business or Productivity), age rating, then **Packages** → upload the `.appx`.
 4. **Store listing**: description (mention plugins and the sites it works with), at least one screenshot, privacy policy URL.

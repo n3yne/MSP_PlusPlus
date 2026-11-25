@@ -1,7 +1,8 @@
 {
   "id": "ticket-search",
   "name": "Ticket Search",
-  "version": "0.7.7",
+  "version": "0.8.11",
+  "stage": "beta",
   "distribution": "directory",
   "description": "A Search tab in the side panel that finds tickets by number, subject or requester through the site's API (Freshservice), and opens them in a tab.",
   "category": "Tickets",

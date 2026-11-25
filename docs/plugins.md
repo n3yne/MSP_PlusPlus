@@ -885,7 +885,7 @@ Plugin source stays in `plugins/` in this repo, tested like every other plugin. 
 |---|---|
 | `"distribution"` | `"bundled"` (the default) ships the plugin inside the app. `"directory"` leaves it out of the app and publishes it to the directory instead. A directory plugin's folder name must match its `id`, and it needs a `version`, `name`, `description` and `category`. |
 | `"requires"` | Ids of other plugins this one needs, such as `["ai-features"]`. Installing it from the directory installs those too, and removing one of them warns about what needs it. |
-| `"stage"` | How finished this version is: `pre-alpha`, `alpha`, `beta`, `rc` or `stable` (default). Users on "Stable only" (the default) aren't offered updates below stable automatically. See [Plugin release stages](plugin-release-stages.md). |
+| `"stage"` | How finished this version is: `pre-alpha`, `alpha`, `beta`, `rc` or `stable` (default). Users aren't offered updates below their chosen stage automatically (default "Beta or better"). See [Plugin release stages](plugin-release-stages.md). |
 
 A directory plugin must also be left out of the app build: add `"!plugins/<id>/**"` to `build.files` in `package.json` (a test checks the list matches).
 

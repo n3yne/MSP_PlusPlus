@@ -1,7 +1,8 @@
 {
   "id": "ticket-notifications",
   "name": "Ticket Notifications",
-  "version": "0.7.8",
+  "version": "0.8.11",
+  "stage": "beta",
   "distribution": "directory",
   "description": "Desktop notifications when a Freshservice ticket assigned to you gets a new reply, checked through the Freshservice API.",
   "category": "Tickets",

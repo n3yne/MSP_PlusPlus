@@ -77,7 +77,7 @@ Every install, update and removal happens at the next start, because a running p
 
 MSP++ checks the directory 30 seconds after it starts, then once a day, or when you click **Check Now**. When updates are waiting you get a count on Plugins and Browse, an **Update All** button and a notification. Turn on **Install Plugin Updates Automatically** to download them without asking.
 
-Plugins can be marked **pre-alpha**, **alpha**, **beta** or **RC** when they're not finished yet, shown as a coloured badge. **Update Plugins To** (stable only by default) decides which of those updates you're offered. See [Plugin release stages](../plugin-release-stages.md).
+Plugins can be marked **pre-alpha**, **alpha**, **beta** or **RC** when they're not finished yet, shown as a coloured badge. **Update Plugins To** (beta or better by default) decides which of those updates you're offered. See [Plugin release stages](../plugin-release-stages.md).
 
 Each download is checked against the size and SHA-256 listed in the directory before it's unpacked.
 

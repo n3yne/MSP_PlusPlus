@@ -74,7 +74,7 @@ document.addEventListener("DOMContentLoaded", function () {
     unreadTabBadges: true,
     siteTabColors: true,
     pluginAutoUpdate: false,
-    pluginUpdateStage: "stable",
+    pluginUpdateStage: "beta",
     pluginUpdateStageOverrides: {},
     linkClickBackground: false,
     popOutAlwaysOnTop: false,

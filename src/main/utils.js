@@ -44,7 +44,7 @@ const DEFAULT_SETTINGS = {
   // Lowest release stage (plugin-stages.js: pre-alpha, alpha, beta, rc, stable)
   // a plugin update must be at to be announced or installed automatically.
   // pluginUpdateStageOverrides { "<id>": "<stage>" } sets it for one plugin.
-  pluginUpdateStage: "stable",
+  pluginUpdateStage: "beta",
   pluginUpdateStageOverrides: {},
   // Middle-click or Ctrl+click on a link in a page: true opens the new tab in the
   // background and stays on the current tab (like Chrome). False switches to it.

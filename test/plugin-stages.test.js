@@ -26,13 +26,13 @@ describe("plugin-stages", () => {
     expect(PluginStages.meetsStage("pre-alpha", "pre-alpha")).toBe(true);
   });
 
-  test("updateStageFor: per-plugin override, then global, then stable", () => {
-    expect(PluginStages.updateStageFor({}, "x")).toBe("stable");
+  test("updateStageFor: per-plugin override, then global, then beta", () => {
+    expect(PluginStages.updateStageFor({}, "x")).toBe("beta");
     expect(PluginStages.updateStageFor({ pluginUpdateStage: "beta" }, "x")).toBe("beta");
     expect(PluginStages.updateStageFor({ pluginUpdateStage: "beta", pluginUpdateStageOverrides: { x: "alpha" } }, "x")).toBe("alpha");
     expect(PluginStages.updateStageFor({ pluginUpdateStage: "beta", pluginUpdateStageOverrides: { x: "alpha" } }, "y")).toBe("beta");
-    expect(PluginStages.updateStageFor({ pluginUpdateStage: "bogus", pluginUpdateStageOverrides: { x: "bogus" } }, "x")).toBe("stable");
-    expect(PluginStages.updateStageFor(null, "x")).toBe("stable");
+    expect(PluginStages.updateStageFor({ pluginUpdateStage: "bogus", pluginUpdateStageOverrides: { x: "bogus" } }, "x")).toBe("beta");
+    expect(PluginStages.updateStageFor(null, "x")).toBe("beta");
   });
 
   test("validOverrides", () => {

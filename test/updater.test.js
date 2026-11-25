@@ -199,7 +199,7 @@ describe("createUpdater (Microsoft Store)", () => {
     try {
       const fetchImpl = jest.fn();
       const updater = createUpdater({
-        currentVersion: "0.8.10",
+        currentVersion: "0.8.9",
         isPackaged: true,
         platform: "win32",
         env: {},

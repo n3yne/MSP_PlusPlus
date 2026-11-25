@@ -9,7 +9,7 @@ MSP++ can be published to the Microsoft Store as an MSIX/AppX package. The Store
 - `npm run build-store` (Windows only) builds `dist/MSP-PlusPlus-Store-<version>.appx`.
 - The **Build & Release** workflow builds it on every run and uploads it as the `windows-store` artifact. It is **not** attached to the GitHub release: it's unsigned, so it can't be installed from there. Download it from the run and upload it in Partner Center.
 - Settings live in `package.json` under `build.appx`. The tile images are in `build/appx/`, made from `assets/icon.png` (transparent background, icon at about two thirds of the tile).
-- The package version is the app version with `.0` added (0.8.10 → 0.8.10.0). The Store requires the last part to be 0.
+- The package version is the app version with `.0` added (0.8.9 → 0.8.9.0). The Store requires the last part to be 0.
 
 ### Partner Center identity
 

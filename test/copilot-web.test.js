@@ -642,7 +642,7 @@ describe("copilot-web Windows device sign-on", () => {
     await expect(result).rejects.toThrow(/Cancelled/);
   });
 
-  test("follows General's windowsDeviceSignOn when the app has it (0.8.10+)", () => {
+  test("follows General's windowsDeviceSignOn when the app has it (0.8.9+)", () => {
     const { client, windowsSso } = withSso(true);
     client.applyDeviceSso({ windowsDeviceSignOn: false, aiWebDeviceSso: true });
     expect(windowsSso.setForPartition).toHaveBeenLastCalledWith(web.PARTITION, false);

@@ -58,7 +58,7 @@ describe("validateSettings", () => {
 // ==================== migrateCoreSettings ====================
 
 describe("migrateCoreSettings", () => {
-  test("0.8.10: keeps device sign-on off for someone who turned it off in AI Features", () => {
+  test("0.8.9: keeps device sign-on off for someone who turned it off in AI Features", () => {
     expect(migrateCoreSettings({ aiWebDeviceSso: false })).toEqual({ aiWebDeviceSso: false, windowsDeviceSignOn: false });
     expect(migrateCoreSettings({ aiWebDeviceSso: true })).toEqual({ aiWebDeviceSso: true });
     expect(migrateCoreSettings({})).toEqual({});

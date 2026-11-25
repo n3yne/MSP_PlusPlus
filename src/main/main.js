@@ -959,6 +959,31 @@ function settingsTarget(target) {
   return null;
 }
 
+// Settings is a single page with no back button, so nothing may ever replace it.
+// A web link clicked there (a plain click, middle-click, Ctrl+click, a
+// target="_blank" link or window.open from a plugin's settings tab) opens in a
+// pop-out window instead, like Open in New Window, and follows Keep Pop-Out
+// Windows on Top. Anything that isn't a web page is just blocked.
+// lockDownWindow has already cancelled the navigation; this runs after it.
+function installSettingsLinkHandling(win) {
+  win.webContents.on("will-navigate", (event, url) => {
+    if (isWebUrl(url)) createChildBrowserWindow(url);
+  });
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (isWebUrl(url)) createChildBrowserWindow(url);
+    return { action: "deny" };
+  });
+  // Pages shown inside Settings (the Metrics Bar dashboard picker) may move
+  // around their own site to sign in, but their new windows and popups open as
+  // pop-out windows too, never as a second copy of Settings.
+  win.webContents.on("did-attach-webview", (event, contents) => {
+    contents.setWindowOpenHandler(({ url }) => {
+      if (isWebUrl(url)) createChildBrowserWindow(url);
+      return { action: "deny" };
+    });
+  });
+}
+
 function createSettingsWindow(target) {
   const show = settingsTarget(target);
   if (settingsWindow && !settingsWindow.isDestroyed()) {
@@ -996,10 +1021,7 @@ function createSettingsWindow(target) {
     },
   });
   lockDownWindow(settingsWindow);
-  settingsWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (isWebUrl(url)) electron.shell.openExternal(url);
-    return { action: "deny" };
-  });
+  installSettingsLinkHandling(settingsWindow);
   settingsWindow.loadFile(path.join(__dirname, "..", "windows", "settings.html"), show ? { query: show } : undefined);
   settingsWindow.on("closed", () => { settingsWindow = null; });
 }

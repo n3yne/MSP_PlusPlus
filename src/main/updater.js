@@ -8,9 +8,11 @@
 // clicks "Restart to update". Builds that can't replace themselves (the portable
 // .exe, the unsigned Mac app, and running from source) fall back to the GitHub
 // releases API and only tell the user a new version is out, with a link to it.
+// The Microsoft Store build (MSIX) never checks: the Store installs its updates,
+// and Store policy doesn't allow pointing users at other downloads.
 //
 // Both modes report the same status object to the windows ("app-update-status"):
-//   { mode: "auto"|"notify", reason, state, currentVersion, version, releaseUrl,
+//   { mode: "auto"|"notify"|"store", reason, state, currentVersion, version, releaseUrl,
 //     autoDownload, percent, error }
 //   state: "idle" | "checking" | "none" | "available" | "downloading" | "downloaded" | "error"
 //   reason (notify mode only): "dev" | "portable" | "mac" | "platform" | "no-config"
@@ -43,8 +45,10 @@ function isNewerVersion(current, latest) {
 //   isPackaged     electron.app.isPackaged
 //   env            process.env (the portable launcher sets PORTABLE_EXECUTABLE_DIR)
 //   resourcesPath  process.resourcesPath (electron-builder writes app-update.yml there)
-function detectUpdateMode({ isPackaged, platform, env, resourcesPath, exists }) {
+//   windowsStore   process.windowsStore (true when running from an MSIX/AppX package)
+function detectUpdateMode({ isPackaged, platform, env, resourcesPath, exists, windowsStore }) {
   if (!isPackaged) return { mode: "notify", reason: "dev" };
+  if (windowsStore) return { mode: "store", reason: "store" };
   if (platform === "darwin") return { mode: "notify", reason: "mac" };
   if (platform !== "win32") return { mode: "notify", reason: "platform" };
   if (env && env.PORTABLE_EXECUTABLE_DIR) return { mode: "notify", reason: "portable" };
@@ -148,6 +152,7 @@ function createUpdater(opts) {
   // Runs one check. Overlapping calls share it. Once an update is downloaded
   // there is nothing more to check until the app restarts.
   function check() {
+    if (mode === "store") return Promise.resolve(getStatus());
     if (status.state === "downloaded" || status.state === "downloading") return Promise.resolve(getStatus());
     if (inFlight) return inFlight;
     inFlight = (async () => {
@@ -200,6 +205,7 @@ function createUpdater(opts) {
 
   function start() {
     stop();
+    if (mode === "store") return;
     timers.push(setTimeout(check, FIRST_CHECK_DELAY_MS));
     timers.push(setInterval(check, CHECK_INTERVAL_MS));
   }

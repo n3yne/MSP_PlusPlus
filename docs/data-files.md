@@ -103,6 +103,8 @@ Electron (Chromium) keeps the browsing data for the tabs here. This is where you
 | Uninstall entry in the registry (HKCU or HKLM) | W | Added by the installer, so the app shows in Windows Settings → Apps. |
 | `%LOCALAPPDATA%\msp-pp-updater\` | R W D | Updates downloaded by the installed app, installed from here when you quit. |
 | A temporary folder under `%TEMP%` | R W | The portable `.exe` unpacks itself here each time it starts. |
+| `C:\Program Files\WindowsApps\<package>\` | R | Microsoft Store app (read-only, managed by Windows). |
+| `%LOCALAPPDATA%\Packages\<package family name>\LocalCache\` | R W D | Microsoft Store app: new files it creates in the data folder land here and are deleted when the Store app is uninstalled. See [Microsoft Store build](microsoft-store.md#the-data-folder-appdata). |
 
 ## Files you choose
 

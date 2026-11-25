@@ -338,6 +338,7 @@ document.addEventListener("DOMContentLoaded", function () {
     dev: "Running from source: updates aren't installed, you'll only be told about new releases.",
     "no-config": "This build has no update information, so it can't update itself. You'll get a notification with a link to the new version.",
     platform: "Automatic updates aren't available on this system. You'll get a notification with a link to the new version.",
+    store: "Installed from the Microsoft Store. Windows installs MSP++ updates through the Store.",
   };
 
   function showUpdateStatus(st) {
@@ -346,6 +347,7 @@ document.addEventListener("DOMContentLoaded", function () {
     updateModeNote.textContent = note;
     updateModeNote.hidden = !note;
     settingAutoUpdate.disabled = st.mode !== "auto";
+    btnCheckUpdates.hidden = st.mode === "store";
 
     let text;
     let cls = "";

@@ -1,6 +1,6 @@
 {
   "name": "msp-pp",
-  "version": "0.8.10",
+  "version": "0.8.9",
   "description": "MSP++: a wrapper for MSP and ticketing sites with a plugin side panel and ticket note backup",
   "main": "src/main/main.js",
   "scripts": {
@@ -11,7 +11,8 @@
     "build-portable": "node scripts/build-native.js && electron-builder --win portable",
     "build-installer": "node scripts/build-native.js && electron-builder --win nsis",
     "build-mac": "electron-builder --mac",
-    "build-native": "node scripts/build-native.js"
+    "build-native": "node scripts/build-native.js",
+    "build-store": "node scripts/build-native.js && electron-builder --win appx"
   },
   "author": "",
   "license": "MIT",
@@ -73,6 +74,22 @@
       "createStartMenuShortcut": true,
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": false
+    },
+    "appx": {
+      "identityName": "Esscey.MSP",
+      "publisher": "CN=DA30FDC6-0ABB-4421-A81D-08C1378686F5",
+      "publisherDisplayName": "Esscey",
+      "applicationId": "MSPPlusPlus",
+      "displayName": "MSP++",
+      "backgroundColor": "transparent",
+      "languages": [
+        "en-US"
+      ],
+      "minVersion": "10.0.18362.0",
+      "maxVersionTested": "10.0.26100.0",
+      "addAutoLaunchExtension": false,
+      "electronUpdaterAware": false,
+      "artifactName": "MSP-PlusPlus-Store-${version}.${ext}"
     },
     "mac": {
       "target": [

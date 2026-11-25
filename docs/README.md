@@ -34,6 +34,7 @@ Start with the page that matches what you want to do.
 |---|---|
 | [Files and folders](data-files.md) | Every file MSP++ and its plugins read or write: what to back up |
 | [Building from source](building.md) | Running, testing and packaging the app; how releases are made |
+| [Microsoft Store build](microsoft-store.md) | The MSIX package, what changes in the Store copy, Store policy notes, submitting |
 | [Plugin development guide](plugins.md) | Writing your own plugin: the manifest and the full API |
 | [Site plugins](sites.md) | Adding support for another ticketing site |
 | [Example plugin](example-plugin/) | A small annotated plugin to copy |

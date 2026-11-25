@@ -11,6 +11,7 @@ MSP++ checks GitHub Releases when it starts and every 6 hours.
 - **Installed Windows app** – Downloads new versions in the background and shows **Update Ready** with a **Restart to Update** button. If you don't restart, the update installs the next time you close MSP++.
 - **Ask first** – Turn off **Settings → General → Download Updates Automatically** to be asked before anything downloads. **Check for Updates** there checks now.
 - **Portable .exe and Mac app** – Can't update themselves. They show **Update Available** with a link to the release.
+- **Microsoft Store app** – Updated by the Store. MSP++ doesn't check GitHub. See [Microsoft Store build](microsoft-store.md).
 - **Hide for now** and **Don't remind me for this version** quiet a notice.
 
 Installed copies on 0.7.0 or earlier need one manual install of a newer version before automatic updates work.

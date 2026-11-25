@@ -1868,6 +1868,7 @@ electron.app.whenReady().then(async () => {
     env: process.env,
     resourcesPath: process.resourcesPath,
     exists: fs.existsSync,
+    windowsStore: process.windowsStore === true,
     getSettings: loadSettings,
     broadcast: (status) => {
       for (const win of [mainWindow, settingsWindow]) {

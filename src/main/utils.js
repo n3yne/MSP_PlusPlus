@@ -93,7 +93,7 @@ function migrateCoreSettings(raw) {
     }
     delete raw.notePanelEnabled;
   }
-  // 0.8.10: "Use Windows Device Sign-On" moved from AI Features (aiWebDeviceSso,
+  // 0.8.9: "Use Windows Device Sign-On" moved from AI Features (aiWebDeviceSso,
   // Copilot window only) to General (windowsDeviceSignOn, the whole app). Someone
   // who turned it off keeps it off. aiWebDeviceSso stays for older plugin versions.
   if (typeof raw.windowsDeviceSignOn !== "boolean" && raw.aiWebDeviceSso === false) {

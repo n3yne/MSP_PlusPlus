@@ -99,6 +99,7 @@ To approve each Store submission by hand, add yourself as a **Required reviewer*
 
 ### When a submission fails
 
+- **"Retrieved a submission that was created in Partner Center."** The workflow can't add a package to a draft submission someone started in Partner Center, and creating a package flight there can start one. In Partner Center, open MSP++, find the draft (under **Package flights → Beta** for a beta, or the app's own pending submission for a full release), open it and choose **Delete submission**. Then open the run and choose **Re-run failed jobs**. After that, leave submissions to the workflow.
 - **A submission is still in certification.** The Store allows one at a time. Wait for it to finish, then open the run and choose **Re-run failed jobs**.
 - **Version already used.** Each Store package needs a higher version than the last. Release a new patch version.
 - **Certification fails.** Partner Center emails a report. Fix the problem and make a new release.

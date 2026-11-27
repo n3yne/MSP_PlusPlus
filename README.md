@@ -4,7 +4,7 @@
 
 A desktop browser for MSP and ticketing web apps (Freshservice and ConnectWise Manage today). It wraps the sites you already use in tabs and adds a side panel, a note editor that never loses your work, live note sync, AI help, ticket tools and quality-of-life browser features on top.
 
-**Current version:** 0.8.11
+**Current version:** 0.8.12
 
 > MSP++ was called **Freshservice++** before 0.6.0. Your settings, notes and sign-ins carry over: the app keeps using the existing Freshservice++ data folder.
 

@@ -1,0 +1,50 @@
+name: Clear Partner Center flight draft (one-off)
+
+# One-off: deletes the Beta flight's pending submission when it is an empty
+# draft created in Partner Center (no package upload URL, not yet committed),
+# which blocks msstore publish. Removed again before merge.
+
+on:
+  push:
+    paths:
+      - ".github/workflows/store-clear-draft.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  clear:
+    runs-on: ubuntu-latest
+    environment: microsoft-store
+    env:
+      APP: 9NVJX5HK84G2
+      FLIGHT: ${{ vars.STORE_BETA_FLIGHT_ID }}
+      PC_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
+      PC_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
+      PC_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+    steps:
+      - name: Delete the Partner Center draft
+        run: |
+          TOKEN=$(curl -sS -X POST "https://login.microsoftonline.com/$PC_TENANT_ID/oauth2/token" \
+            --data-urlencode grant_type=client_credentials \
+            --data-urlencode "client_id=$PC_CLIENT_ID" \
+            --data-urlencode "client_secret=$PC_CLIENT_SECRET" \
+            --data-urlencode resource=https://manage.devcenter.microsoft.com | jq -r .access_token)
+          echo "::add-mask::$TOKEN"
+          BASE="https://manage.devcenter.microsoft.com/v1.0/my/applications/$APP/flights/$FLIGHT"
+          curl -sS -H "Authorization: Bearer $TOKEN" "$BASE" > flight.json
+          jq '{friendlyName, pendingFlightSubmission, lastPublishedFlightSubmission}' flight.json
+          SUB=$(jq -r '.pendingFlightSubmission.id // empty' flight.json)
+          [ -n "$SUB" ] || { echo "No pending flight submission. Nothing to do."; exit 0; }
+          curl -sS -H "Authorization: Bearer $TOKEN" "$BASE/submissions/$SUB" > sub.json
+          jq '{id, status, statusDetails, packages: (.flightPackages | length), hasUploadUrl: ((.fileUploadUrl // "") != "")}' sub.json
+          STATUS=$(jq -r .status sub.json)
+          URL=$(jq -r '.fileUploadUrl // ""' sub.json)
+          if [ "$STATUS" != "PendingCommit" ] || [ -n "$URL" ]; then
+            echo "::error::Submission $SUB is $STATUS (upload URL present: $([ -n "$URL" ] && echo yes || echo no)). Not a Partner Center draft; leaving it."
+            exit 1
+          fi
+          CODE=$(curl -sS -o del.json -w '%{http_code}' -X DELETE -H "Authorization: Bearer $TOKEN" "$BASE/submissions/$SUB")
+          echo "DELETE returned HTTP $CODE"; cat del.json 2>/dev/null; echo
+          [ "$CODE" -lt 300 ] || exit 1
+          curl -sS -H "Authorization: Bearer $TOKEN" "$BASE" | jq '{pendingFlightSubmission}'

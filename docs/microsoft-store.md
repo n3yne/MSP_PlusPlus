@@ -91,6 +91,8 @@ Without the secrets the job does nothing and prints a notice, so releases work a
 | `PARTNER_CENTER_CLIENT_ID` | Client ID |
 | `PARTNER_CENTER_CLIENT_SECRET` | Key |
 
+To check the secrets without releasing, run **Check Store credentials** from the Actions tab. It signs in and reads the app's status, and changes nothing.
+
 To approve each Store submission by hand, add yourself as a **Required reviewer** on the `microsoft-store` environment. The job then waits for your OK on the run's page.
 
 ### When a submission fails

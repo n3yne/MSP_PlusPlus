@@ -1,0 +1,61 @@
+name: Check Store credentials
+
+# Read-only check that the Partner Center secrets are set where the
+# store-submit job (build.yml) reads them, and that they can sign in and
+# see the app. Changes nothing in the Store. Run it from the Actions tab
+# after setting or renewing the secrets.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ".github/workflows/store-check.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: windows-latest
+    environment: microsoft-store
+
+    env:
+      STORE_PRODUCT_ID: 9NVJX5HK84G2
+      PC_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
+      PC_SELLER_ID: ${{ secrets.PARTNER_CENTER_SELLER_ID }}
+      PC_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
+      PC_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+
+    steps:
+      # Prints only the names of missing secrets, never values.
+      - name: All four secrets are set
+        shell: bash
+        run: |
+          missing=""
+          [ -n "$PC_TENANT_ID" ] || missing="$missing PARTNER_CENTER_TENANT_ID"
+          [ -n "$PC_SELLER_ID" ] || missing="$missing PARTNER_CENTER_SELLER_ID"
+          [ -n "$PC_CLIENT_ID" ] || missing="$missing PARTNER_CENTER_CLIENT_ID"
+          [ -n "$PC_CLIENT_SECRET" ] || missing="$missing PARTNER_CENTER_CLIENT_SECRET"
+          if [ -n "$missing" ]; then echo "::error::Missing:$missing"; exit 1; fi
+          echo "All four secrets are set."
+
+      - name: Set up Microsoft Store CLI
+        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4
+
+      - name: Sign in to Partner Center
+        shell: pwsh
+        run: |
+          msstore reconfigure --tenantId "$env:PC_TENANT_ID" --sellerId "$env:PC_SELLER_ID" --clientId "$env:PC_CLIENT_ID" --clientSecret "$env:PC_CLIENT_SECRET"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Can see the MSP++ app
+        shell: pwsh
+        run: |
+          msstore apps get $env:STORE_PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Can read its submission status
+        shell: pwsh
+        run: |
+          msstore submission status $env:STORE_PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

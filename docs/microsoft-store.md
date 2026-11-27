@@ -61,7 +61,7 @@ From Microsoft Store Policies 7.20 (October 2026). These shape the listing and t
 - **Naming (10.1).** Say "for Freshservice and ConnectWise Manage" and don't suggest any connection with Freshworks or ConnectWise.
 - **Capabilities.** The package declares `runFullTrust`, which every Electron app needs. Partner Center asks why: "Desktop app (Electron) that needs full trust to run."
 
-## Submitting (done by hand in Partner Center)
+## First submission (done by hand in Partner Center)
 
 1. Publish a release (or run **Build & Release** by hand).
 2. Download the `windows-store` artifact and unzip it to get the `.appx`.
@@ -69,6 +69,39 @@ From Microsoft Store Policies 7.20 (October 2026). These shape the listing and t
 4. **Store listing**: description (mention plugins and the sites it works with), at least one screenshot, privacy policy URL.
 5. **Submission options → Notes for certification**: the review sign-in and a line on what to look at first.
 6. To try it before anyone else sees it, set **Visibility** to *Private audience* (or use a package flight) and install from the Store link Partner Center gives you. That copy is signed by the Store, so no certificate is needed.
+
+## Automatic Store updates
+
+Once the four Partner Center secrets below are set, every full release (a tag like `v0.8.11`, not `v0.8.11-beta.1`) is also sent to the Store. The `store-submit` job in **Build & Release** runs after the GitHub release is made. It uploads the Store package as a new submission, copying the listing, screenshots and notes from the live one, and commits it for certification. Microsoft usually certifies it in 1 to 3 days. After that, Windows updates installed copies through the Store.
+
+Without the secrets the job does nothing and prints a notice, so releases work as before.
+
+### One-time setup
+
+1. **Give Partner Center a Microsoft Entra tenant.** In [Partner Center](https://partner.microsoft.com/dashboard), open **Settings (gear) → Account settings → Organization profile → Tenants**. If nothing is listed, choose **Create** to make a free new tenant (an individual developer account usually has none). If you already have one, use **Associate** instead.
+2. **Create the Entra app for GitHub.** Go to **Account settings → User management → Microsoft Entra applications** and choose **Create Microsoft Entra application** (or **Add Microsoft Entra application** to use an existing app registration). Give it the **Manager** role.
+3. **Make a key.** Open that app in the same list and choose **Add new key**. Partner Center shows the **Tenant ID**, **Client ID** and **Key** (the secret). Copy the key now, because it isn't shown again. Keys expire (1 or 2 years). Make a new one before then and update the secret.
+4. **Find the Seller ID** under **Account settings → Legal info** (it may be labelled Seller ID or Publisher ID).
+5. **Add the secrets in GitHub.** Open the repository's **Settings → Environments → New environment**, name it `microsoft-store`, and add these environment secrets. Repository secrets (**Settings → Secrets and variables → Actions**) work too.
+
+| Secret | Value |
+|---|---|
+| `PARTNER_CENTER_TENANT_ID` | Tenant ID |
+| `PARTNER_CENTER_SELLER_ID` | Seller ID |
+| `PARTNER_CENTER_CLIENT_ID` | Client ID |
+| `PARTNER_CENTER_CLIENT_SECRET` | Key |
+
+To check the secrets without releasing, run **Check Store credentials** from the Actions tab. It signs in and reads the app's status, and changes nothing.
+
+To approve each Store submission by hand, add yourself as a **Required reviewer** on the `microsoft-store` environment. The job then waits for your OK on the run's page.
+
+### When a submission fails
+
+- **A submission is still in certification.** The Store allows one at a time. Wait for it to finish, then open the run and choose **Re-run failed jobs**.
+- **Version already used.** Each Store package needs a higher version than the last. Release a new patch version.
+- **Certification fails.** Partner Center emails a report. Fix the problem and make a new release.
+
+The Store product ID (9NVJX5HK84G2) is set in the workflow, not a secret. The job uses Microsoft's `microsoft-store-apppublisher` action and the Store CLI (`msstore publish`).
 
 ## See also
 

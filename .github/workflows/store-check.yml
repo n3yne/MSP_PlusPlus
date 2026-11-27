@@ -26,6 +26,7 @@ jobs:
       PC_SELLER_ID: ${{ secrets.PARTNER_CENTER_SELLER_ID }}
       PC_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
       PC_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+      BETA_FLIGHT_ID: ${{ vars.STORE_BETA_FLIGHT_ID }}
 
     steps:
       # Prints only the names of missing secrets, never values.
@@ -69,3 +70,18 @@ jobs:
           # The CLI exits with 1 when there are no flights yet; that's fine here.
           msstore flights list $env:STORE_PRODUCT_ID
           exit 0
+
+      # Checks the STORE_BETA_FLIGHT_ID variable names a real package flight.
+      - name: Beta flight variable matches a flight
+        shell: pwsh
+        run: |
+          if (-not $env:BETA_FLIGHT_ID) {
+            Write-Host "::warning::STORE_BETA_FLIGHT_ID isn't set, so betas won't go to the Store."
+            exit 0
+          }
+          Write-Host "STORE_BETA_FLIGHT_ID = $env:BETA_FLIGHT_ID"
+          msstore flights get $env:STORE_PRODUCT_ID $env:BETA_FLIGHT_ID
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host "::error::STORE_BETA_FLIGHT_ID doesn't match a package flight of this app."
+            exit 1
+          }

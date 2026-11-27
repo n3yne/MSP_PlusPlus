@@ -41,7 +41,7 @@ Most of the app has only been run through automated tests and the Linux dev buil
 ## Next up
 
 - [x] **Code audit of everything since 0.8.2.** Done in the 24 November audit; fixes in #93 and #94.
-- [ ] **Fix: Quick Actions "Set Ticket Status: …" palette items never appear.** The plugin registers its `Ctrl+K` provider with the id `quick-actions.set`, but the core only accepts letters, digits, `-` and `_`, so the call throws (one of the `commands.addProvider: invalid id` messages in the console at start-up). Rename the id or let the core accept dots, and find the second message.
+- [x] **Fix: Quick Actions "Set Ticket Status: …" palette items never appear.** The plugin registered its `Ctrl+K` provider with the id `quick-actions.set`, but the core only accepts letters, digits, `-` and `_` in provider ids, so the call threw. Renamed to `quick-actions-set` in Quick Actions 0.8.10.2 (no app change). No other plugin in the repo has a bad provider id (a test now checks them all), so the second console message probably came from an older installed plugin; check the console again after updating.
 - [x] **Require a reviewer on the `plugin-directory` environment.** Done: plugin publishes now wait for approval.
 
 ## Fixes and gaps

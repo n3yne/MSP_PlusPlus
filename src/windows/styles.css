@@ -2144,14 +2144,42 @@ body[data-theme="light"] .downloads-panel {
 }
 
 .settings-nav-group {
-  padding: 10px 16px 3px 26px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 16px 3px 14px;
+  background: none;
+  border: none;
+  text-align: left;
+  font-family: inherit;
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--text-muted);
   opacity: 0.8;
+  cursor: pointer;
   user-select: none;
+}
+
+.settings-nav-group:hover {
+  color: var(--text);
+  opacity: 1;
+}
+
+.settings-nav-group:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+.settings-nav-group.collapsed .plugin-category-chevron {
+  transform: rotate(-90deg);
+}
+
+/* A collapsed category hides its tabs, except the one that's open. */
+.settings-nav-subitem.nav-group-hidden:not(.active) {
+  display: none;
 }
 
 .plugin-list-empty {

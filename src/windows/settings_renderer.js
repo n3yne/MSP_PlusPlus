@@ -183,6 +183,7 @@ document.addEventListener("DOMContentLoaded", function () {
       lastCollapsedKey = collapsedKey;
       renderPluginList();
       renderBrowseList();
+      applyNavCollapsed();
     }
 
     if (document.activeElement !== settingDefaultUrl) {
@@ -838,8 +839,9 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // ---- Collapsible categories ----
   //
-  // Each category in the Installed and Browse lists can be collapsed by clicking
-  // its header. Saved as pluginCategoriesCollapsed: { installed: [names], browse: [names] }.
+  // Each category in the Installed and Browse lists, and each category heading in
+  // the nav, can be collapsed by clicking it. Saved as
+  // pluginCategoriesCollapsed: { installed: [names], browse: [names], nav: [names] }.
   const MAX_COLLAPSED = 100;
 
   function collapsedCategories(view) {
@@ -1079,15 +1081,58 @@ document.addEventListener("DOMContentLoaded", function () {
     let lastCategory = null;
     items.forEach(function (item) {
       if (item.category && item.category !== lastCategory) {
-        const heading = document.createElement("div");
-        heading.className = "settings-nav-group";
-        heading.textContent = item.category;
+        const heading = buildNavGroupHeading(item.category);
         anchor.after(heading);
         anchor = heading;
         lastCategory = item.category;
       }
+      item.btn.dataset.navGroup = item.category || "";
       anchor.after(item.btn);
       anchor = item.btn;
+    });
+    applyNavCollapsed();
+  }
+
+  // ---- Collapsible category headings in the nav ----
+  //
+  // Clicking a category heading in the left-hand list hides or shows that
+  // category's plugin tabs. Saved with the Plugins page's collapsed categories,
+  // as pluginCategoriesCollapsed.nav. The open tab stays visible even when its
+  // category is collapsed, so you can always see where you are.
+  function buildNavGroupHeading(name) {
+    const heading = document.createElement("button");
+    heading.type = "button";
+    heading.className = "settings-nav-group";
+    heading.dataset.category = name;
+    const chevron = document.createElement("span");
+    chevron.className = "plugin-category-chevron";
+    chevron.setAttribute("aria-hidden", "true");
+    heading.appendChild(chevron);
+    const label = document.createElement("span");
+    label.className = "settings-nav-group-label";
+    label.textContent = name;
+    heading.appendChild(label);
+    heading.addEventListener("click", function () {
+      const collapsed = !heading.classList.contains("collapsed");
+      setCategoryCollapsed("nav", name, collapsed);
+      applyNavCollapsed();
+    });
+    return heading;
+  }
+
+  function applyNavCollapsed() {
+    const nav = document.querySelector(".settings-nav");
+    if (!nav) return;
+    const collapsed = collapsedCategories("nav");
+    nav.querySelectorAll(".settings-nav-group").forEach(function (heading) {
+      const name = heading.dataset.category;
+      const isCollapsed = collapsed.has(name);
+      heading.classList.toggle("collapsed", isCollapsed);
+      heading.setAttribute("aria-expanded", isCollapsed ? "false" : "true");
+      heading.title = isCollapsed ? "Show " + name : "Hide " + name;
+    });
+    nav.querySelectorAll(".settings-nav-subitem").forEach(function (btn) {
+      btn.classList.toggle("nav-group-hidden", Boolean(btn.dataset.navGroup) && collapsed.has(btn.dataset.navGroup));
     });
   }
 

@@ -41,7 +41,7 @@ A ticket number (`12345`, `CW-12345`) or an address opens straight away, as in t
 
 ## Open in New Window
 
-Right-click a tab and choose **Open in New Window** for a plain browser window: back, forward, reload and an address bar, with no tabs, side panel, metrics or bookmarks. It shares your sign-ins and closes when the main window closes. Links it opens go to tabs in the main window, and the ⇱ button moves its page to a tab. Right-clicking a link in a page also offers **Open Link in New Window**.
+Right-click a tab and choose **Open in New Window** for a plain browser window: back, forward, reload and an address bar, with no tabs, side panel, metrics or bookmarks. It shares your sign-ins and closes when the main window closes. Links it opens go to tabs in the main window, and the ⇱ button moves its page to a tab. Right-clicking a link in a page also offers **Open Link in New Window**. Links clicked in the Settings window open this way too (see [Links in Settings](settings.md#links-in-settings)).
 
 To keep these windows in front of everything else (handy for a ticket you're copying from), turn on **Settings → General → Keep Pop-Out Windows on Top**. It's off by default, and changing it also applies to windows already open.
 

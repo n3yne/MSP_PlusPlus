@@ -4,7 +4,11 @@
 
 Open Settings with `Ctrl+,` or **Edit → Settings**. It opens in its own window, so the main window stays usable. Pressing the shortcut again brings the existing window forward.
 
-The left-hand list has **General** and **Plugins**, with a tab for every installed plugin under Plugins. Each plugin's own settings are described on its page (see [All plugins](plugins/README.md)). Changes are saved straight away and applied to the main window.
+The left-hand list has **General** and **Plugins**, with a tab for every installed plugin under Plugins, grouped by category. Click a category heading (such as **Tickets**) to hide or show its plugin tabs; MSP++ 0.8.11+ remembers which ones you've collapsed. The tab you're on stays visible even when its category is collapsed. Each plugin's own settings are described on its page (see [All plugins](plugins/README.md)). Changes are saved straight away and applied to the main window.
+
+### Links in Settings
+
+Settings never leaves its own page. From MSP++ 0.8.11, a web link clicked anywhere in Settings, including in a plugin's settings tab, opens in a [pop-out window](browser.md#open-in-new-window) instead, so Settings stays where it was. **Keep Pop-Out Windows on Top** applies to these windows too. Links that aren't web pages (files on this PC, for example) are blocked. Before 0.8.11, links opened in your default browser or did nothing.
 
 ## General
 
@@ -14,7 +18,7 @@ The left-hand list has **General** and **Plugins**, with a tab for every install
 | **Restore Tabs from Last Session** | Reopens the tabs you had open. Off: start on the Home URL (pinned tabs still come back). |
 | **Middle-Click Opens Links in Background** | Off (default): middle-clicking or `Ctrl`+clicking a link on a page opens a new tab and switches to it. On: the new tab opens behind the one you're on, like Chrome. Bookmarks have [their own setting](plugins/bookmarks-bar.md#settings). |
 | **Use Windows Device Sign-On** | Windows only, on by default (MSP++ 0.8.9+; shown under **Microsoft Sign-In** where it works). On a PC registered with your organisation's Microsoft Entra ID, Microsoft sign-in pages in tabs, pop-out windows and the Copilot window get Windows' proof of this PC and your work account, as Edge sends. Sign-in rules that need a company device, a passkey or Windows Hello then let you in. Before 0.8.9 this was in AI Features and only covered the Copilot window; if you'd turned it off there, it stays off. |
-| **Keep Pop-Out Windows on Top** | Off by default. On: windows from [Open in New Window](browser.md#open-in-new-window) stay in front of other windows, including the main window. Applies to windows already open too. |
+| **Keep Pop-Out Windows on Top** | Off by default. On: windows from [Open in New Window](browser.md#open-in-new-window) and [links in Settings](#links-in-settings) stay in front of other windows, including the main window. Applies to windows already open too. |
 | **Unread Badge on Tabs** | Shows a dot on a background tab whose page changed on its own. |
 | **Colour Tabs by Site** | A coloured stripe on tabs that belong to a site plugin. See [Tab colours](#tab-colours). |
 | **Light Mode** | Light theme instead of dark. |

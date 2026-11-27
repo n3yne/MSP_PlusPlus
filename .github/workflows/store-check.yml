@@ -10,6 +10,7 @@ on:
   push:
     paths:
       - ".github/workflows/store-check.yml"
+      - ".github/actions/store-submit/**"
 
 permissions:
   contents: read
@@ -58,4 +59,12 @@ jobs:
         shell: pwsh
         run: |
           msstore submission status $env:STORE_PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      # Shows the package flights and their IDs. Put the Beta flight's ID in
+      # the STORE_BETA_FLIGHT_ID repository variable (docs/microsoft-store.md).
+      - name: List package flights
+        shell: pwsh
+        run: |
+          msstore flights list $env:STORE_PRODUCT_ID
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

@@ -4,6 +4,12 @@
 
 ## Install on Windows
 
+### From the Microsoft Store
+
+Get MSP++ from its [Microsoft Store page](https://apps.microsoft.com/detail/9NVJX5HK84G2). Microsoft signs the Store copy, so Windows and Defender trust it, and the Store installs updates. Some differences, such as where new files are kept, are in [Microsoft Store build](microsoft-store.md#whats-different-in-the-store-copy). Each GitHub release links to the Store page too.
+
+### From GitHub
+
 Each release on the [Releases page](https://github.com/n3yne/MSP_PlusPlus/releases) has two Windows downloads:
 
 | Download | What it is |

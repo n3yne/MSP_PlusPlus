@@ -76,6 +76,8 @@ Once the four Partner Center secrets below are set, every full release (a tag li
 
 Without the secrets the job does nothing and prints a notice, so releases work as before.
 
+The release notes on GitHub link to the Store page, <https://apps.microsoft.com/detail/9NVJX5HK84G2>. On a beta the link says it's for flight testers only, and **Promote beta** changes it to the everyone line.
+
 ### One-time setup
 
 1. **Give Partner Center a Microsoft Entra tenant.** In [Partner Center](https://partner.microsoft.com/dashboard), open **Settings (gear) → Account settings → Organization profile → Tenants**. If nothing is listed, choose **Create** to make a free new tenant (an individual developer account usually has none). If you already have one, use **Associate** instead.

@@ -25,7 +25,7 @@ A desktop browser for MSP and ticketing web apps (Freshservice and ConnectWise M
 
 ## Get started
 
-1. Download the latest Windows installer (`MSP-PlusPlus-Setup-<version>.exe`) or portable `.exe` from [Releases](https://github.com/n3yne/MSP_PlusPlus/releases).
+1. Install MSP++ from the [Microsoft Store](https://apps.microsoft.com/detail/9NVJX5HK84G2), or download the Windows installer (`MSP-PlusPlus-Setup-<version>.exe`) or portable `.exe` from [Releases](https://github.com/n3yne/MSP_PlusPlus/releases).
 2. On first start, choose your site (Freshservice and/or ConnectWise Manage) and any plugins.
 3. Set your **Home URL** in Settings (`Ctrl+,`) and sign in.
 

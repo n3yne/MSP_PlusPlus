@@ -213,6 +213,14 @@ jobs:
             echo "## MSP++ ${CURRENT}"
             echo ""
             echo "### Downloads"
+            # The Store page always offers the newest version the Store has
+            # certified. A beta reaches only the Beta flight's testers there.
+            # promote.yml swaps the beta line for the full-release line.
+            if [ "${CURRENT#*-}" != "$CURRENT" ]; then
+              echo "- **Microsoft Store** — beta testers in the MSP++ Beta flight get this version from the [Microsoft Store](https://apps.microsoft.com/detail/9NVJX5HK84G2) once Microsoft certifies it (usually 1 to 3 days); everyone else there stays on the current release"
+            else
+              echo "- **Microsoft Store** — [install from the Microsoft Store](https://apps.microsoft.com/detail/9NVJX5HK84G2), signed by Microsoft and updated by the Store; this version arrives there once Microsoft certifies it (usually 1 to 3 days)"
+            fi
             echo "- **Windows installer** — \`MSP-PlusPlus-Setup-${VERSION}.exe\`, installs for just you (\`%LOCALAPPDATA%\\Programs\\MSP++\`, no admin) or everyone (\`C:\\Program Files\\MSP++\`); after that, MSP++ downloads and installs new versions itself"
             echo "- **Windows portable** — \`MSP++ ${VERSION}.exe\`, no installation required (tells you about new versions but can't install them)"
             echo "- **macOS** — \`.dmg\` disk image, drag to Applications to install"

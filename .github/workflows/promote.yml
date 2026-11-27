@@ -1,14 +1,17 @@
 name: Promote beta
 
-# Releases a tested beta to everyone without rebuilding it. Given v0.8.11-beta:
-#   1. makes the full GitHub release v0.8.11 (tag on the same commit) with the
-#      beta's own files, so installed copies update to the exact build the
-#      testers used (it was built as 0.8.11, see build.yml);
-#   2. sends the same Microsoft Store package to everyone (the beta went to the
-#      Beta package flight).
-# The new tag is made with this workflow's token, so it doesn't start a new
-# Build & Release run. The Store package comes from the beta's Build & Release
-# run, whose artifacts are kept for 90 days.
+# Releases a tested beta to everyone without rebuilding it. Given v0.8.11-beta,
+# it makes a DRAFT GitHub release v0.8.11 on the beta's commit, with the
+# beta's own files (it was built as 0.8.11, see build.yml) and its notes.
+# Publishing that draft (by a person, on the Releases page) creates the tag.
+# Build & Release then sees that v0.8.11 is on the same commit as a beta
+# with a successful build, skips building, and sends that beta's Store
+# package to everyone.
+#
+# Why a draft: the workflow token can't create a tag on a commit whose
+# workflow files differ from the default branch (GitHub refuses with
+# "Resource not accessible by integration"), and a beta's commit is often
+# behind main. A person publishing the draft has no such limit.
 
 on:
   workflow_dispatch:
@@ -98,66 +101,21 @@ jobs:
               | awk -v line="$STORE_LINE" 'index($0, "- **Microsoft Store**") == 1 { print line; next } { print }'
           } > release_notes.md
 
-      - name: Create the full release
+      - name: Create the draft release
         env:
           STABLE: ${{ steps.check.outputs.stable_tag }}
         run: |
           SHA=$(gh api "repos/$REPO/commits/$BETA_TAG" --jq .sha)
-          gh release create "$STABLE" assets/* \
+          URL=$(gh release create "$STABLE" assets/* \
             --repo "$REPO" \
             --target "$SHA" \
             --title "MSP++ $STABLE" \
             --notes-file release_notes.md \
-            --latest
-          echo "::notice::Released $STABLE: https://github.com/$REPO/releases/tag/$STABLE"
-
-  store-submit:
-    needs: github-release
-    runs-on: windows-latest
-    environment: microsoft-store
-
-    permissions:
-      contents: read
-      actions: read
-
-    env:
-      STORE_PRODUCT_ID: 9NVJX5HK84G2
-      PC_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
-      PC_SELLER_ID: ${{ secrets.PARTNER_CENTER_SELLER_ID }}
-      PC_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
-      PC_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
-
-    steps:
-      - name: Check Partner Center secrets
-        id: creds
-        shell: bash
-        run: |
-          if [ -n "$PC_TENANT_ID" ] && [ -n "$PC_SELLER_ID" ] && [ -n "$PC_CLIENT_ID" ] && [ -n "$PC_CLIENT_SECRET" ]; then
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Partner Center secrets aren't set, so the Store wasn't updated. See docs/microsoft-store.md."
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout repository
-        if: steps.creds.outputs.ok == 'true'
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-        with:
-          persist-credentials: false
-          sparse-checkout: .github
-
-      - name: Download the beta's Store package
-        if: steps.creds.outputs.ok == 'true'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        with:
-          name: windows-store
-          path: store/
-          run-id: ${{ needs.github-release.outputs.build_run }}
-          github-token: ${{ github.token }}
-
-      - name: Submit to the Microsoft Store (everyone)
-        if: steps.creds.outputs.ok == 'true'
-        uses: ./.github/actions/store-submit
-        with:
-          package-dir: store
-          product-id: ${{ env.STORE_PRODUCT_ID }}
+            --draft)
+          echo "::notice::Draft $STABLE is ready. Open it and choose Publish release: $URL (or the Releases page). Publishing sends the beta's Store package to everyone."
+          {
+            echo "### Draft $STABLE is ready"
+            echo ""
+            echo "Open the [Releases page](https://github.com/$REPO/releases), edit the **$STABLE** draft and choose **Publish release**."
+            echo "Build & Release then sends the beta's Store package to everyone, without rebuilding."
+          } >> "$GITHUB_STEP_SUMMARY"

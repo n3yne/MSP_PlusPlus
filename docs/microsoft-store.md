@@ -135,10 +135,17 @@ Without the variable, betas are still built and released on GitHub, but not sent
 ### Promoting a beta to everyone
 
 1. In GitHub, open **Actions → Promote beta → Run workflow** and type the beta tag (`v0.8.11-beta`).
-2. It checks that `v0.8.11` doesn't exist yet. Then it creates the full release `v0.8.11` on the beta's commit with the beta's own files (installer, portable, Mac, `latest.yml`) and the beta's notes. Installed copies then update to it.
-3. It sends the beta's Store package to everyone. People in the flight group already have this version, so nothing changes for them.
+2. It checks that `v0.8.11` doesn't exist yet. Then it makes a **draft** release `v0.8.11` on the beta's commit, with the beta's own files (installer, portable, Mac, `latest.yml`) and the beta's notes. The run's summary links to it.
+3. Open the [Releases page](https://github.com/n3yne/MSP_PlusPlus/releases), edit the `v0.8.11` draft and choose **Publish release**. Publishing creates the `v0.8.11` tag, and installed copies update to it.
+4. Publishing starts **Build & Release**. It sees that `v0.8.11` is on the same commit as a beta that built successfully, so it doesn't rebuild. It sends the beta's Store package to everyone. People in the flight group already have this version, so nothing changes for them.
 
-It doesn't rebuild anything and doesn't start a new Build & Release run. The Store package comes from the beta's Build & Release run, and GitHub keeps run files for 90 days, so promote within that time. After that, release a new version instead. If the Store step fails (for example because a submission is still in certification), re-run just that job from the run page.
+The beta's pre-release (`v0.8.11-beta`) stays as it is, next to the full release. You can delete it afterwards if you like, but keep its tag: the promotion check looks for it.
+
+Why a draft: GitHub doesn't let a workflow create a tag on a commit whose workflow files differ from the main branch's, and a beta's commit is often behind main. You publishing the draft has no such limit.
+
+The Store package comes from the beta's Build & Release run, and GitHub keeps run files for 90 days, so promote within that time. After that, release a new version instead. If the Store step fails (for example because a submission is still in certification), re-run just that job from the run page.
+
+A beta tagged before this change (v0.8.12-beta) runs the older Build & Release when its full tag is published, which rebuilds instead of reusing the beta's files.
 
 ## See also
 

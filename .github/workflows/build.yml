@@ -28,6 +28,22 @@ jobs:
         with:
           persist-credentials: false
 
+      # The tag must carry package.json's version: v0.8.11 or a beta of it,
+      # v0.8.11-beta. A beta is built as 0.8.11 so the same files can later be
+      # promoted to the full release (promote.yml). The Store only accepts
+      # whole version numbers, so each beta needs its own patch number.
+      - name: Check tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          BASE="${TAG%%-*}"
+          PKG=$(node -p "require('./package.json').version")
+          if [ "$BASE" != "$PKG" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME doesn't match package.json version $PKG. Use v$PKG or v$PKG-beta."
+            exit 1
+          fi
+
       - name: Setup Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
@@ -177,6 +193,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           PREV=$(git tag --sort=-version:refname | grep -v "^${CURRENT}$" | head -1)
+          # Files are named after package.json's version (0.8.11 for v0.8.11-beta).
+          VERSION="${CURRENT#v}"
+          VERSION="${VERSION%%-*}"
           START='<!-- msp-build-info:start -->'
           END='<!-- msp-build-info:end -->'
 
@@ -194,8 +213,8 @@ jobs:
             echo "## MSP++ ${CURRENT}"
             echo ""
             echo "### Downloads"
-            echo "- **Windows installer** — \`MSP-PlusPlus-Setup-${CURRENT#v}.exe\`, installs for just you (\`%LOCALAPPDATA%\\Programs\\MSP++\`, no admin) or everyone (\`C:\\Program Files\\MSP++\`); after that, MSP++ downloads and installs new versions itself"
-            echo "- **Windows portable** — \`MSP++ ${CURRENT#v}.exe\`, no installation required (tells you about new versions but can't install them)"
+            echo "- **Windows installer** — \`MSP-PlusPlus-Setup-${VERSION}.exe\`, installs for just you (\`%LOCALAPPDATA%\\Programs\\MSP++\`, no admin) or everyone (\`C:\\Program Files\\MSP++\`); after that, MSP++ downloads and installs new versions itself"
+            echo "- **Windows portable** — \`MSP++ ${VERSION}.exe\`, no installation required (tells you about new versions but can't install them)"
             echo "- **macOS** — \`.dmg\` disk image, drag to Applications to install"
             # Generated notes already end with a Full Changelog link.
             if [ -n "$PREV" ] && ! grep -q "Full Changelog" existing_notes.md; then
@@ -221,14 +240,16 @@ jobs:
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: artifacts/*
 
-  # Sends the Store package to Partner Center as a new submission, after the
-  # GitHub release is made. Only for full releases (a tag like v0.8.11-beta.1
-  # is skipped). Microsoft then certifies it (usually 1-3 days) and the Store
-  # updates installed copies itself. Setup and the secrets it needs are in
-  # docs/microsoft-store.md ("Automatic Store updates"). Without the secrets
-  # this job does nothing, so releases work as before.
+  # Sends the Store package to Partner Center after the GitHub release is
+  # made. A full release (v0.8.11) goes to everyone; a beta (v0.8.11-beta) goes
+  # to the Beta package flight, so only the testers in its flight group get it.
+  # A tested beta is released to everyone with the Promote beta workflow
+  # (promote.yml), which reuses this build. Microsoft certifies each submission
+  # (usually 1-3 days). Setup is in docs/microsoft-store.md. Without the
+  # secrets (or, for a beta, the STORE_BETA_FLIGHT_ID variable) this job does
+  # nothing, so releases work as before.
   store-submit:
-    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-windows, release]
     runs-on: windows-latest
 
@@ -242,22 +263,35 @@ jobs:
 
     env:
       STORE_PRODUCT_ID: 9NVJX5HK84G2
+      IS_BETA: ${{ contains(github.ref_name, '-') }}
+      BETA_FLIGHT_ID: ${{ vars.STORE_BETA_FLIGHT_ID }}
       PC_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
       PC_SELLER_ID: ${{ secrets.PARTNER_CENTER_SELLER_ID }}
       PC_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
       PC_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
 
     steps:
-      - name: Check Partner Center secrets
+      - name: Check Store settings
         id: creds
         shell: bash
         run: |
-          if [ -n "$PC_TENANT_ID" ] && [ -n "$PC_SELLER_ID" ] && [ -n "$PC_CLIENT_ID" ] && [ -n "$PC_CLIENT_SECRET" ]; then
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "::notice::Partner Center secrets aren't set, so this release wasn't sent to the Microsoft Store. Upload the windows-store artifact by hand, or see docs/microsoft-store.md to automate it."
+          if [ -z "$PC_TENANT_ID" ] || [ -z "$PC_SELLER_ID" ] || [ -z "$PC_CLIENT_ID" ] || [ -z "$PC_CLIENT_SECRET" ]; then
+            echo "::notice::Partner Center secrets aren't set, so this release wasn't sent to the Microsoft Store. See docs/microsoft-store.md."
             echo "ok=false" >> "$GITHUB_OUTPUT"
+          elif [ "$IS_BETA" = "true" ] && [ -z "$BETA_FLIGHT_ID" ]; then
+            echo "::notice::This is a beta, and the STORE_BETA_FLIGHT_ID variable isn't set, so it wasn't sent to the Store. See docs/microsoft-store.md (Betas in the Store)."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+            if [ "$IS_BETA" = "true" ]; then echo "flight=$BETA_FLIGHT_ID" >> "$GITHUB_OUTPUT"; fi
           fi
+
+      - name: Checkout repository
+        if: steps.creds.outputs.ok == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          sparse-checkout: .github
 
       - name: Download Microsoft Store artifact
         if: steps.creds.outputs.ok == 'true'
@@ -266,35 +300,10 @@ jobs:
           name: windows-store
           path: store/
 
-      # electron-builder names the package .appx; it is the same format as
-      # .msix, which is the name the Store CLI looks for.
-      - name: Prepare package
-        if: steps.creds.outputs.ok == 'true'
-        shell: bash
-        run: |
-          APPX=$(ls store/*.appx | head -1)
-          test -n "$APPX" || { echo "No .appx in the windows-store artifact"; exit 1; }
-          cp "$APPX" "store/MSP-PlusPlus-Store-${GITHUB_REF_NAME#v}.msix"
-          ls -l store/
-
-      - name: Set up Microsoft Store CLI
-        if: steps.creds.outputs.ok == 'true'
-        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4
-
-      - name: Sign in to Partner Center
-        if: steps.creds.outputs.ok == 'true'
-        shell: pwsh
-        run: msstore reconfigure --tenantId "$env:PC_TENANT_ID" --sellerId "$env:PC_SELLER_ID" --clientId "$env:PC_CLIENT_ID" --clientSecret "$env:PC_CLIENT_SECRET"
-
-      # Uploads the package to a new submission (copied from the live one, so
-      # the listing, screenshots and notes stay as they are) and commits it
-      # for certification. If a submission is still in certification, this
-      # fails: wait for it to finish, then re-run this job.
       - name: Submit to the Microsoft Store
         if: steps.creds.outputs.ok == 'true'
-        shell: pwsh
-        run: |
-          $msix = Get-ChildItem store/*.msix | Select-Object -First 1
-          msstore publish $msix.FullName -id $env:STORE_PRODUCT_ID
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          msstore submission status $env:STORE_PRODUCT_ID
+        uses: ./.github/actions/store-submit
+        with:
+          package-dir: store
+          product-id: ${{ env.STORE_PRODUCT_ID }}
+          flight-id: ${{ steps.creds.outputs.flight }}

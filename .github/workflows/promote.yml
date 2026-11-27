@@ -1,0 +1,160 @@
+name: Promote beta
+
+# Releases a tested beta to everyone without rebuilding it. Given v0.8.11-beta:
+#   1. makes the full GitHub release v0.8.11 (tag on the same commit) with the
+#      beta's own files, so installed copies update to the exact build the
+#      testers used (it was built as 0.8.11, see build.yml);
+#   2. sends the same Microsoft Store package to everyone (the beta went to the
+#      Beta package flight).
+# The new tag is made with this workflow's token, so it doesn't start a new
+# Build & Release run. The Store package comes from the beta's Build & Release
+# run, whose artifacts are kept for 90 days.
+
+on:
+  workflow_dispatch:
+    inputs:
+      beta_tag:
+        description: "Beta tag to promote, for example v0.8.11-beta"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: promote-${{ inputs.beta_tag }}
+  cancel-in-progress: false
+
+jobs:
+  github-release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      actions: read
+
+    outputs:
+      stable_tag: ${{ steps.check.outputs.stable_tag }}
+      build_run: ${{ steps.check.outputs.build_run }}
+
+    env:
+      BETA_TAG: ${{ inputs.beta_tag }}
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+
+    steps:
+      - name: Check the beta
+        id: check
+        run: |
+          if ! [[ "$BETA_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-[0-9A-Za-z.-]+$ ]]; then
+            echo "::error::'$BETA_TAG' isn't a beta tag like v0.8.11-beta."; exit 1
+          fi
+          VERSION="${BASH_REMATCH[1]}"
+          STABLE="v$VERSION"
+
+          PRE=$(gh release view "$BETA_TAG" --repo "$REPO" --json isPrerelease --jq .isPrerelease) \
+            || { echo "::error::No GitHub release for $BETA_TAG."; exit 1; }
+          [ "$PRE" = "true" ] || { echo "::error::$BETA_TAG isn't a pre-release."; exit 1; }
+
+          if gh release view "$STABLE" --repo "$REPO" >/dev/null 2>&1 \
+             || gh api "repos/$REPO/git/ref/tags/$STABLE" >/dev/null 2>&1; then
+            echo "::error::$STABLE already exists. A beta can only be promoted to a version that hasn't been released."; exit 1
+          fi
+
+          RUN=$(gh api "repos/$REPO/actions/workflows/build.yml/runs?event=push&branch=$BETA_TAG&status=success&per_page=1" \
+            --jq '.workflow_runs[0].id // empty')
+          [ -n "$RUN" ] || { echo "::error::No successful Build & Release run for $BETA_TAG."; exit 1; }
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "stable_tag=$STABLE" >> "$GITHUB_OUTPUT"
+          echo "build_run=$RUN" >> "$GITHUB_OUTPUT"
+          echo "Promoting $BETA_TAG to $STABLE (build run $RUN)"
+
+      - name: Download the beta's files
+        env:
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          mkdir assets
+          gh release download "$BETA_TAG" --repo "$REPO" --dir assets
+          ls -l assets
+          # Installed copies read latest.yml to find updates; it must describe
+          # this version, or they won't update.
+          test -f assets/latest.yml || { echo "::error::The beta release has no latest.yml."; exit 1; }
+          LATEST=$(sed -n 's/^version: //p' assets/latest.yml | tr -d "'\" \r")
+          [ "$LATEST" = "$VERSION" ] || {
+            echo "::error::The beta was built as $LATEST, not $VERSION, so it can't be promoted as $VERSION. Make a new release instead."; exit 1; }
+
+      - name: Write release notes
+        env:
+          STABLE: ${{ steps.check.outputs.stable_tag }}
+        run: |
+          gh release view "$BETA_TAG" --repo "$REPO" --json body --jq .body | tr -d '\r' > beta_body.md
+          {
+            echo "Promoted from [$BETA_TAG](https://github.com/$REPO/releases/tag/$BETA_TAG): the same build, tested as a beta."
+            echo ""
+            sed "s/## MSP++ $BETA_TAG/## MSP++ $STABLE/" beta_body.md
+          } > release_notes.md
+
+      - name: Create the full release
+        env:
+          STABLE: ${{ steps.check.outputs.stable_tag }}
+        run: |
+          SHA=$(gh api "repos/$REPO/commits/$BETA_TAG" --jq .sha)
+          gh release create "$STABLE" assets/* \
+            --repo "$REPO" \
+            --target "$SHA" \
+            --title "MSP++ $STABLE" \
+            --notes-file release_notes.md \
+            --latest
+          echo "::notice::Released $STABLE: https://github.com/$REPO/releases/tag/$STABLE"
+
+  store-submit:
+    needs: github-release
+    runs-on: windows-latest
+    environment: microsoft-store
+
+    permissions:
+      contents: read
+      actions: read
+
+    env:
+      STORE_PRODUCT_ID: 9NVJX5HK84G2
+      PC_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
+      PC_SELLER_ID: ${{ secrets.PARTNER_CENTER_SELLER_ID }}
+      PC_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
+      PC_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+
+    steps:
+      - name: Check Partner Center secrets
+        id: creds
+        shell: bash
+        run: |
+          if [ -n "$PC_TENANT_ID" ] && [ -n "$PC_SELLER_ID" ] && [ -n "$PC_CLIENT_ID" ] && [ -n "$PC_CLIENT_SECRET" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Partner Center secrets aren't set, so the Store wasn't updated. See docs/microsoft-store.md."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout repository
+        if: steps.creds.outputs.ok == 'true'
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          sparse-checkout: .github
+
+      - name: Download the beta's Store package
+        if: steps.creds.outputs.ok == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: windows-store
+          path: store/
+          run-id: ${{ needs.github-release.outputs.build_run }}
+          github-token: ${{ github.token }}
+
+      - name: Submit to the Microsoft Store (everyone)
+        if: steps.creds.outputs.ok == 'true'
+        uses: ./.github/actions/store-submit
+        with:
+          package-dir: store
+          product-id: ${{ env.STORE_PRODUCT_ID }}

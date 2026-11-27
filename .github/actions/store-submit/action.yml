@@ -1,0 +1,67 @@
+name: Submit to the Microsoft Store
+description: >
+  Uploads an MSP++ Store package to Partner Center and commits the submission
+  for certification, either to everyone (the main listing) or to a package
+  flight. Used by build.yml (store-submit) and promote.yml. Needs the four
+  Partner Center secrets in the environment as PC_TENANT_ID, PC_SELLER_ID,
+  PC_CLIENT_ID and PC_CLIENT_SECRET.
+
+inputs:
+  package-dir:
+    description: Folder holding the .appx from the windows-store artifact.
+    required: true
+  product-id:
+    description: Store product ID.
+    required: true
+  flight-id:
+    description: Package flight ID. Empty sends the package to everyone.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    # electron-builder names the package .appx; it is the same format as
+    # .msix, which is the name the Store CLI looks for.
+    - name: Prepare package
+      shell: bash
+      env:
+        PKG_DIR: ${{ inputs.package-dir }}
+      run: |
+        APPX=$(ls "$PKG_DIR"/*.appx | head -1)
+        test -n "$APPX" || { echo "No .appx in $PKG_DIR"; exit 1; }
+        cp "$APPX" "${APPX%.appx}.msix"
+        ls -l "$PKG_DIR"
+
+    - name: Set up Microsoft Store CLI
+      uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4
+
+    - name: Sign in to Partner Center
+      shell: pwsh
+      run: |
+        msstore reconfigure --tenantId "$env:PC_TENANT_ID" --sellerId "$env:PC_SELLER_ID" --clientId "$env:PC_CLIENT_ID" --clientSecret "$env:PC_CLIENT_SECRET"
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+    # A new submission is copied from the live one (listing, screenshots and
+    # notes stay as they are), the package is uploaded and the submission is
+    # committed. If a submission for the same target is still in
+    # certification, this fails: wait for it to finish, then re-run the job.
+    - name: Submit
+      shell: pwsh
+      env:
+        PKG_DIR: ${{ inputs.package-dir }}
+        PRODUCT_ID: ${{ inputs.product-id }}
+        FLIGHT_ID: ${{ inputs.flight-id }}
+      run: |
+        $msix = Get-ChildItem (Join-Path $env:PKG_DIR '*.msix') | Select-Object -First 1
+        if ($env:FLIGHT_ID) {
+          Write-Host "Submitting $($msix.Name) to package flight $env:FLIGHT_ID"
+          msstore publish $msix.FullName -id $env:PRODUCT_ID -f $env:FLIGHT_ID
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          msstore flights submission status $env:PRODUCT_ID $env:FLIGHT_ID
+        } else {
+          Write-Host "Submitting $($msix.Name) to everyone"
+          msstore publish $msix.FullName -id $env:PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          msstore submission status $env:PRODUCT_ID
+        }

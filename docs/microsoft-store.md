@@ -72,7 +72,7 @@ From Microsoft Store Policies 7.20 (October 2026). These shape the listing and t
 
 ## Automatic Store updates
 
-Once the four Partner Center secrets below are set, every full release (a tag like `v0.8.11`, not `v0.8.11-beta.1`) is also sent to the Store. The `store-submit` job in **Build & Release** runs after the GitHub release is made. It uploads the Store package as a new submission, copying the listing, screenshots and notes from the live one, and commits it for certification. Microsoft usually certifies it in 1 to 3 days. After that, Windows updates installed copies through the Store.
+Once the four Partner Center secrets below are set, every full release (a tag like `v0.8.11`) is also sent to the Store, to everyone. Betas go to testers only: see [Betas in the Store](#betas-in-the-store). The `store-submit` job in **Build & Release** runs after the GitHub release is made. It uploads the Store package as a new submission, copying the listing, screenshots and notes from the live one, and commits it for certification. Microsoft usually certifies it in 1 to 3 days. After that, Windows updates installed copies through the Store.
 
 Without the secrets the job does nothing and prints a notice, so releases work as before.
 
@@ -102,6 +102,40 @@ To approve each Store submission by hand, add yourself as a **Required reviewer*
 - **Certification fails.** Partner Center emails a report. Fix the problem and make a new release.
 
 The Store product ID (9NVJX5HK84G2) is set in the workflow, not a secret. The job uses Microsoft's `microsoft-store-apppublisher` action and the Store CLI (`msstore publish`).
+
+## Betas in the Store
+
+A beta is a GitHub pre-release tagged with the coming version plus `-beta`, such as `v0.8.11-beta`. Its Store package goes to the **Beta package flight**, so only the people in its flight group get it. Everyone else keeps the current version. When the testers are happy, **Promote beta** releases that same build to everyone.
+
+### Version numbers
+
+- The tag must match `package.json`: `v0.8.11-beta` needs version `0.8.11`. Build & Release fails if they differ.
+- A beta is built as plain 0.8.11, and it shows that version in the app. That's what lets the same files become the full release without a rebuild.
+- **One beta per patch number.** The Store only takes whole version numbers (0.8.11.0) and never accepts the same one twice, so `v0.8.11-beta.2` would be refused. If a beta needs a fix, bump to 0.8.12 and tag `v0.8.12-beta`. The skipped 0.8.11 is never released, and that's fine.
+- Installed copies from the GitHub installer only update to full releases, never to betas, as before.
+
+### One-time setup for betas
+
+1. **Create a flight group.** In Partner Center, open MSP++ → **Package flights → New package flight → Create a flight group**. Name it, for example, *MSP++ Beta testers*, and add the testers' Microsoft account email addresses. These must be the accounts they use in the Microsoft Store.
+2. **Create the package flight.** Back in **New package flight**, name it *Beta* and pick that group. Then **Create flight**. You don't need to upload anything: the next beta release does that.
+3. **Find the flight ID.** Run **Check Store credentials** from the Actions tab. Its last step lists the package flights with their IDs. You can also copy it from the flight's page address in Partner Center (the long number after `/flights/`).
+4. **Save it in GitHub** as a repository *variable*, not a secret: **Settings → Secrets and variables → Actions → Variables → New repository variable**, named `STORE_BETA_FLIGHT_ID`.
+
+Without the variable, betas are still built and released on GitHub, but not sent to the Store.
+
+### Releasing a beta
+
+1. Merge the version bump (for example to 0.8.11).
+2. Publish a GitHub release with tag `v0.8.11-beta` and tick **Set as a pre-release**.
+3. Build & Release builds it, attaches the files and sends the Store package to the Beta flight. Testers get it once Microsoft certifies it.
+
+### Promoting a beta to everyone
+
+1. In GitHub, open **Actions → Promote beta → Run workflow** and type the beta tag (`v0.8.11-beta`).
+2. It checks that `v0.8.11` doesn't exist yet. Then it creates the full release `v0.8.11` on the beta's commit with the beta's own files (installer, portable, Mac, `latest.yml`) and the beta's notes. Installed copies then update to it.
+3. It sends the beta's Store package to everyone. People in the flight group already have this version, so nothing changes for them.
+
+It doesn't rebuild anything and doesn't start a new Build & Release run. The Store package comes from the beta's Build & Release run, and GitHub keeps run files for 90 days, so promote within that time. After that, release a new version instead. If the Store step fails (for example because a submission is still in certification), re-run just that job from the run page.
 
 ## See also
 

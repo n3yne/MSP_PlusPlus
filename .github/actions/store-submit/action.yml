@@ -57,11 +57,11 @@ runs:
         if ($env:FLIGHT_ID) {
           Write-Host "Submitting $($msix.Name) to package flight $env:FLIGHT_ID"
           msstore publish $msix.FullName -id $env:PRODUCT_ID -f $env:FLIGHT_ID
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::The Store didn't take the package. If the log above says the submission was created in Partner Center, delete that draft in Partner Center and re-run the failed job (docs/microsoft-store.md, When a submission fails)."; exit $LASTEXITCODE }
           msstore flights submission status $env:PRODUCT_ID $env:FLIGHT_ID
         } else {
           Write-Host "Submitting $($msix.Name) to everyone"
           msstore publish $msix.FullName -id $env:PRODUCT_ID
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($LASTEXITCODE -ne 0) { Write-Host "::error::The Store didn't take the package. If the log above says the submission was created in Partner Center, delete that draft in Partner Center and re-run the failed job (docs/microsoft-store.md, When a submission fails)."; exit $LASTEXITCODE }
           msstore submission status $env:PRODUCT_ID
         }

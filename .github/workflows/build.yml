@@ -220,3 +220,81 @@ jobs:
           # (which only look at the latest full release) don't update to it.
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: artifacts/*
+
+  # Sends the Store package to Partner Center as a new submission, after the
+  # GitHub release is made. Only for full releases (a tag like v0.8.11-beta.1
+  # is skipped). Microsoft then certifies it (usually 1-3 days) and the Store
+  # updates installed copies itself. Setup and the secrets it needs are in
+  # docs/microsoft-store.md ("Automatic Store updates"). Without the secrets
+  # this job does nothing, so releases work as before.
+  store-submit:
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    needs: [build-windows, release]
+    runs-on: windows-latest
+
+    # The secrets can live on this environment (or as repository secrets). Add
+    # a required reviewer to it in Settings > Environments to approve each
+    # Store submission by hand.
+    environment: microsoft-store
+
+    permissions:
+      contents: read
+
+    env:
+      STORE_PRODUCT_ID: 9NVJX5HK84G2
+      PC_TENANT_ID: ${{ secrets.PARTNER_CENTER_TENANT_ID }}
+      PC_SELLER_ID: ${{ secrets.PARTNER_CENTER_SELLER_ID }}
+      PC_CLIENT_ID: ${{ secrets.PARTNER_CENTER_CLIENT_ID }}
+      PC_CLIENT_SECRET: ${{ secrets.PARTNER_CENTER_CLIENT_SECRET }}
+
+    steps:
+      - name: Check Partner Center secrets
+        id: creds
+        shell: bash
+        run: |
+          if [ -n "$PC_TENANT_ID" ] && [ -n "$PC_SELLER_ID" ] && [ -n "$PC_CLIENT_ID" ] && [ -n "$PC_CLIENT_SECRET" ]; then
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Partner Center secrets aren't set, so this release wasn't sent to the Microsoft Store. Upload the windows-store artifact by hand, or see docs/microsoft-store.md to automate it."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download Microsoft Store artifact
+        if: steps.creds.outputs.ok == 'true'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: windows-store
+          path: store/
+
+      # electron-builder names the package .appx; it is the same format as
+      # .msix, which is the name the Store CLI looks for.
+      - name: Prepare package
+        if: steps.creds.outputs.ok == 'true'
+        shell: bash
+        run: |
+          APPX=$(ls store/*.appx | head -1)
+          test -n "$APPX" || { echo "No .appx in the windows-store artifact"; exit 1; }
+          cp "$APPX" "store/MSP-PlusPlus-Store-${GITHUB_REF_NAME#v}.msix"
+          ls -l store/
+
+      - name: Set up Microsoft Store CLI
+        if: steps.creds.outputs.ok == 'true'
+        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4
+
+      - name: Sign in to Partner Center
+        if: steps.creds.outputs.ok == 'true'
+        shell: pwsh
+        run: msstore reconfigure --tenantId "$env:PC_TENANT_ID" --sellerId "$env:PC_SELLER_ID" --clientId "$env:PC_CLIENT_ID" --clientSecret "$env:PC_CLIENT_SECRET"
+
+      # Uploads the package to a new submission (copied from the live one, so
+      # the listing, screenshots and notes stay as they are) and commits it
+      # for certification. If a submission is still in certification, this
+      # fails: wait for it to finish, then re-run this job.
+      - name: Submit to the Microsoft Store
+        if: steps.creds.outputs.ok == 'true'
+        shell: pwsh
+        run: |
+          $msix = Get-ChildItem store/*.msix | Select-Object -First 1
+          msstore publish $msix.FullName -id $env:STORE_PRODUCT_ID
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          msstore submission status $env:STORE_PRODUCT_ID

@@ -92,7 +92,10 @@ jobs:
           {
             echo "Promoted from [$BETA_TAG](https://github.com/$REPO/releases/tag/$BETA_TAG): the same build, tested as a beta."
             echo ""
-            sed "s/## MSP++ $BETA_TAG/## MSP++ $STABLE/" beta_body.md
+            # The beta's Store line said it was for flight testers only.
+            STORE_LINE='- **Microsoft Store** — [install from the Microsoft Store](https://apps.microsoft.com/detail/9NVJX5HK84G2), signed by Microsoft and updated by the Store; this version arrives there for everyone once Microsoft certifies it (usually 1 to 3 days)'
+            sed "s/## MSP++ $BETA_TAG/## MSP++ $STABLE/" beta_body.md \
+              | awk -v line="$STORE_LINE" 'index($0, "- **Microsoft Store**") == 1 { print line; next } { print }'
           } > release_notes.md
 
       - name: Create the full release
